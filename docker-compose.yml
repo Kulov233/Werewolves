@@ -1,0 +1,44 @@
+name: werewolves
+networks:
+  db_network:
+    driver: bridge
+
+services:
+  mysql:
+    container_name: mysql
+    restart: always
+    image: mysql:9.1
+    volumes:
+      - /home/ubuntu/mysql:/var/lib/mysql # TODO: 更改路径
+    env_file:
+      - .env
+    command: ['mysqld', '--character-set-server=utf8mb4', '--collation-server=utf8mb4_unicode_ci']
+    expose:
+      - 3306
+    networks:
+      - db_network
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    container_name: backend
+    restart: always
+    build: .
+    # TODO: 更改命令
+    command: >
+      bash -c
+      "python manage.py makemigrations app user post --settings=app.settings_prod &&
+      python manage.py migrate --settings=app.settings_prod &&
+      python manage.py init_db --settings=app.settings_prod &&
+      DJANGO_SETTINGS_MODULE=app.settings_prod gunicorn -w4 -b 0.0.0.0:8000 --log-level=debug app.wsgi"
+    expose:
+      - 8000
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - web_network
+      - db_network
