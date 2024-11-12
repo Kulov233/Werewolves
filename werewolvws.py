@@ -1,10 +1,25 @@
 import random
-from keys import api_key_zhipuai
+from keys import ZHIPUAI_API_KEY
 from zhipuai import ZhipuAI
- 
-client = ZhipuAI(api_key=api_key_zhipuai) 
+from typing import Literal
+client = ZhipuAI(api_key=ZHIPUAI_API_KEY)
 
-def sendmessage(mes):
+
+    
+role_translations = {
+    "Werewolf": "狼人",
+    "Villager": "平民",
+    "Prophet": "预言家",
+    "Witch": "女巫"
+}
+
+class Message:
+    def __init__(self, content, message_type, recipient=None):
+        self.content = content 
+        self.message_type = message_type# 1: 发送给人类玩家, 2: 发送给AI玩家, 3: 发送给全体
+        self.recipient = recipient
+
+def send_message(mes: Message):
     # 这里假设sendmessage的实现已经完成，对于类型1和2，会有返回值
     if mes.message_type == 1:
         # 发送给人类玩家，获取输入
@@ -22,24 +37,11 @@ def sendmessage(mes):
         print(mes.content)
     else:
         pass
-    
-role_translations = {
-    "Werewolf": "狼人",
-    "Villager": "平民",
-    "Prophet": "预言家",
-    "Witch": "女巫"
-}
-
-class Message:
-    def __init__(self, content, message_type, recipient=None):
-        self.content = content 
-        self.message_type = message_type# 1: 发送给人类玩家, 2: 发送给AI玩家, 3: 发送给全体
-        self.recipient = recipient
 
 def get_input_from_player(player, prompt):
     message_type = 1 if player.is_human else 2
     mes = Message(message_type=message_type, content=prompt, recipient=player)
-    response = sendmessage(mes)
+    response = send_message(mes)
     return response
 
 # 基础玩家类
@@ -81,7 +83,7 @@ class Prophet(Player):
                 continue
             result = f"{players[check_index].name} 的身份是 {role_translations[players[check_index].__class__.__name__]}"
             mes = Message(message_type=(1 if self.is_human else 2), content=result, recipient=self)
-            sendmessage(mes)
+            send_message(mes)
             return
 
 # 女巫类
@@ -102,7 +104,7 @@ class Witch(Player):
                 if response.lower() == "yes":
                     content = f"{victim.name} 被救活"
                     mes = Message(message_type=(1 if self.is_human else 2), content=content, recipient=self)
-                    sendmessage(mes)
+                    send_message(mes)
                     self.heal_used = True
                     return True
                 elif response.lower() == "no":
@@ -112,7 +114,7 @@ class Witch(Player):
         else:
             content += "你已经使用过解药"
             mes = Message(message_type=(1 if self.is_human else 2), content=content, recipient=self)
-            sendmessage(mes)
+            send_message(mes)
         return False
 
     def poison(self, players):
@@ -135,7 +137,7 @@ class Witch(Player):
                             continue
                         content = f"{players[poison_index].name} 被毒杀"
                         mes = Message(message_type=(1 if self.is_human else 2), content=content, recipient=self)
-                        sendmessage(mes)
+                        send_message(mes)
                         self.poison_used = True
                         return players[poison_index]
                 elif response.lower() == "no":
@@ -145,7 +147,7 @@ class Witch(Player):
         else:
             content = "你已经使用过毒药"
             mes = Message(message_type=(1 if self.is_human else 2), content=content, recipient=self)
-            sendmessage(mes)
+            send_message(mes)
         return None
 
 # 狼人类
@@ -168,7 +170,7 @@ class Werewolf(Player):
                 continue
             content = f"你选择猎杀 {players[victim_index].name}"
             mes = Message(message_type=(1 if self.is_human else 2), content=content, recipient=self)
-            sendmessage(mes)
+            send_message(mes)
             return players[victim_index]
 
 # 游戏类
@@ -188,20 +190,20 @@ class WerewolfGame:
                 if i < self.human_num:
                     content = "请输入你的名字: "
                     mes = Message(message_type=1, content=content)
-                    player_name = sendmessage(mes)
+                    player_name = send_message(mes)
                 else:
                     content = "请输入AI玩家的名字: "
                     mes = Message(message_type=1, content=content)
-                    player_name = sendmessage(mes)
+                    player_name = send_message(mes)
                 if player_name in [player.name for player in self.players]:
                     content = "玩家名字重复，请重新输入"
                     mes = Message(message_type=1, content=content)
-                    sendmessage(mes)
+                    send_message(mes)
                     continue
                 if not player_name:
                     content = "玩家名字不能为空，请重新输入"
                     mes = Message(message_type=1, content=content)
-                    sendmessage(mes)
+                    send_message(mes)
                     continue
                 player = Player(player_name)
                 player.is_human = True if i < self.human_num else False
@@ -220,7 +222,7 @@ class WerewolfGame:
             message_type = 1 if player.is_human else 2
             content = f"你的角色是：{role_translations[player.__class__.__name__]}"
             mes = Message(message_type=message_type, content=content, recipient=player)
-            sendmessage(mes)
+            send_message(mes)
 
         # 显示所有玩家（调试用）
         print("\n游戏角色分配完毕：")
@@ -233,7 +235,7 @@ class WerewolfGame:
     def night_phase(self):
         content = f"\n--- 夜晚 {self.night_count} ---\n天黑请闭眼，狼人请睁眼："
         mes = Message(message_type=3, content=content)
-        sendmessage(mes)
+        send_message(mes)
         victim = None
         poisoned_victim = None
 
@@ -248,16 +250,16 @@ class WerewolfGame:
                     victim = choices.pop()
                     content = f"狼人选择猎杀 {victim.name}"
                     mes = Message(message_type=3, content=content)
-                    sendmessage(mes)
+                    send_message(mes)
                     break
                 else:
                     content = "狼人选择的目标不一致，请重新选择"
                     mes = Message(message_type=3, content=content)
-                    sendmessage(mes)
+                    send_message(mes)
 
         content = "狼人请闭眼，预言家请睁眼："
         mes = Message(message_type=3, content=content)
-        sendmessage(mes)
+        send_message(mes)
 
         ## 预言家查验身份
         #prophet = next((player for player in self.players if isinstance(player, Prophet) and player.is_alive), None)
@@ -266,7 +268,7 @@ class WerewolfGame:
 #
         ##content = "预言家请闭眼，女巫请睁眼："
         ##mes = Message(message_type=3, content=content)
-        ##sendmessage(mes)
+        ##send_message(mes)
 #
         ## 女巫技能
         #witch = next((player for player in self.players if isinstance(player, Witch) and player.is_alive), None)
@@ -280,26 +282,26 @@ class WerewolfGame:
         #    victim.is_alive = False
         #    content = f"{victim.name} 死了"
         #    mes = Message(message_type=3, content=content)
-        #    sendmessage(mes)
+        #    send_message(mes)
         #if poisoned_victim and poisoned_victim.is_alive:
         #    poisoned_victim.is_alive = False
         #    content = f"{poisoned_victim.name} 死了"
         #    mes = Message(message_type=3, content=content)
-        #    sendmessage(mes)
+        #    send_message(mes)
         #if not victim and not poisoned_victim:
         #    content = "今晚是平安夜"
         #    mes = Message(message_type=3, content=content)
-        #    sendmessage(mes)
+        #    send_message(mes)
 #
         #self.night_count += 1
 
     def day_phase(self):
         content = "\n--- 白天 ---\n天亮了"
         mes = Message(message_type=3, content=content)
-        sendmessage(mes)
+        send_message(mes)
         content = "玩家发言阶段："
         mes = Message(message_type=3, content=content)
-        sendmessage(mes)
+        send_message(mes)
         for player in self.get_alive_players():
             player.speak()
 
@@ -324,14 +326,14 @@ class WerewolfGame:
                             continue
                         content = f"{player.name} 选择放逐 {self.get_alive_players()[vote_index].name}"
                         mes = Message(message_type=(1 if player.is_human else 2), content=content, recipient=player)
-                        sendmessage(mes)
+                        send_message(mes)
                         votes[self.get_alive_players()[vote_index].name] += 1
                         break
                     break
                 elif response.lower() == "no":
                     content = f"{player.name} 选择不投票"
                     mes = Message(message_type=(1 if player.is_human else 2), content=content, recipient=player)
-                    sendmessage(mes)
+                    send_message(mes)
                     break
                 else:
                     vote_prompt = "输入无效，请输入yes或no："
@@ -344,11 +346,11 @@ class WerewolfGame:
             max_voted_player.is_alive = False
             content = f"{max_voted_player.name} 被放逐"
             mes = Message(message_type=3, content=content)
-            sendmessage(mes)
+            send_message(mes)
         else:
             content = "出现平票，无法确定放逐玩家"
             mes = Message(message_type=3, content=content)
-            sendmessage(mes)
+            send_message(mes)
 
     def check_victory(self):
         alive_good = [player for player in self.get_alive_players() if not isinstance(player, Werewolf)]
@@ -356,12 +358,12 @@ class WerewolfGame:
         if len(alive_wolves) == 0:
             content = "好人阵营获胜！"
             mes = Message(message_type=3, content=content)
-            sendmessage(mes)
+            send_message(mes)
             return True
         if len(alive_good) <= len(alive_wolves):
             content = "狼人阵营获胜！"
             mes = Message(message_type=3, content=content)
-            sendmessage(mes)
+            send_message(mes)
             return True
         return False
 

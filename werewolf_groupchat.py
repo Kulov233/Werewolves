@@ -1,7 +1,9 @@
-from autogen import ConversableAgent, GroupChat, GroupChatManager
+from zhipuai import ZhipuAI
+import time
 from keys import ZHIPUAI_API_KEY
-from typing import Literal
-from prompts import Prompts
+from typing import Literal, List, Dict
+from prompts import PromptGenerator
+
 
 config_list = [
     {
@@ -26,19 +28,27 @@ class Player:
         self.character = character
 
 class AIPlayer(Player):
-    def __init__(self, index:int, name: str,
-                 personality: str = "你是一名狼人杀玩家。"):
+    def __init__(self, index: int, name: str,
+                 output_limit: int = 100,
+                 identity: Literal["狼人", "平民", "预言家"] = "平民",
+                 game_specified_prompt = "本局游戏中有四个玩家，其中有两个狼人、四个平民。",):
         """
-        :param name: 角色名称
-        :param personality: 性格prompt
+
+        :param index: 序号
+        :param name: 名字
+        :param output_limit: 输出字数限制
+        :param identity: 身份(Literal["狼人", "平民", "预言家"])
         """
         super().__init__(index)
-        self.personality = personality
         self.type = 'AI'
-        self.prompt_generator = Prompts()
+        self.prompt_generator = PromptGenerator(game_specified_prompt=game_specified_prompt,
+                                                output_limit=output_limit, identity=identity)
+        self.client = ZhipuAI(api_key=ZHIPUAI_API_KEY)
+        self.session_id = time.time_ns()
 
-    def get_prompt(self):
-        self.prompt_generator.generate_system_prompt()
+    def create(self, new_messages: List[Dict[str, str]]):
+        self.client.chat.completions.create(new_messages)
+
     def talk(self):
         pass
 
