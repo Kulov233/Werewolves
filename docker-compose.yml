@@ -11,7 +11,7 @@ services:
     volumes:
       - /home/ubuntu/mysql:/var/lib/mysql # TODO: 更改路径
     env_file:
-      - .env
+      - .env # TODO: 修改env文件
     command: ['mysqld', '--character-set-server=utf8mb4', '--collation-server=utf8mb4_unicode_ci']
     expose:
       - 3306
