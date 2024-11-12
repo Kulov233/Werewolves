@@ -3,8 +3,8 @@ import time
 from keys import ZHIPUAI_API_KEY
 from typing import Literal, List, Dict
 from prompts import PromptGenerator
-
-
+from zhipuai.types.chat.chat_completion import Completion
+from utils import Message
 config_list = [
     {
         'model': 'glm-4-plus',
@@ -19,7 +19,9 @@ llm_config={
 }
 
 
-class Player:
+
+
+class PlayerZ:
     def __init__(self, index: int):
         self.index = index
         self.character = None
@@ -27,8 +29,8 @@ class Player:
     def set_character(self, character: Literal["平民","狼人","预言家"]):
         self.character = character
 
-class AIPlayer(Player):
-    def __init__(self, index: int, name: str,
+class AIPlayer(PlayerZ):
+    def __init__(self, index: int = 0, name: str = "",
                  output_limit: int = 100,
                  identity: Literal["狼人", "平民", "预言家"] = "平民",
                  game_specified_prompt = "本局游戏中有四个玩家，其中有两个狼人、四个平民。",):
@@ -45,14 +47,27 @@ class AIPlayer(Player):
                                                 output_limit=output_limit, identity=identity)
         self.client = ZhipuAI(api_key=ZHIPUAI_API_KEY)
         self.session_id = time.time_ns()
+        self.messages: List[Message|Completion] = []
 
-    def create(self, new_messages: List[Dict[str, str]]):
-        self.client.chat.completions.create(new_messages)
+    def create(self) -> str:
+        messages_to_send = self.prompt_generator.full_prompt(self.messages)
+        response = self.client.chat.completions.create(
+            model="glm-4-plus",
+            messages=messages_to_send,
+            stream=False,)
+        self.messages.append(response)
+        return response.choices[0].message.content
 
-    def talk(self):
-        pass
+    def recv(self, message: Message):
+        # TODO 对局框架要彻底修改。这里要改的好看点。
+        content = message.content
+        self.messages.append(message)
+        if content.startswith("请你发言"):
+            return self.create()
+        return ""
 
-class HumanPlayer(Player):
+
+class HumanPlayer(PlayerZ):
     def __init__(self, index:int, name: str):
         super().__init__(index)
         self.type = 'HUMAN'

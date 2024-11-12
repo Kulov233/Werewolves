@@ -1,7 +1,11 @@
 import random
+from math import gamma
+
 from keys import ZHIPUAI_API_KEY
 from zhipuai import ZhipuAI
 from typing import Literal
+from werewolf_groupchat import AIPlayer
+from utils import Message
 client = ZhipuAI(api_key=ZHIPUAI_API_KEY)
 
 
@@ -13,11 +17,8 @@ role_translations = {
     "Witch": "女巫"
 }
 
-class Message:
-    def __init__(self, content, message_type, recipient=None):
-        self.content = content 
-        self.message_type = message_type# 1: 发送给人类玩家, 2: 发送给AI玩家, 3: 发送给全体
-        self.recipient = recipient
+PLAYER_LIST = []
+# TODO: 这是个全局变量，这非常不好。必须要修改。但现在没有合适方案。设计的太乱了。
 
 def send_message(mes: Message):
     # 这里假设sendmessage的实现已经完成，对于类型1和2，会有返回值
@@ -25,16 +26,18 @@ def send_message(mes: Message):
         # 发送给人类玩家，获取输入
         print(mes.content)
         response = input()
+
         return response
     elif mes.message_type == 2:
-        # 发送给AI玩家，模拟AI行为
-        print(f"(AI {mes.recipient.name} 接收到消息)")
-        # 简单模拟AI的响应，可以根据需求修改
-        response = "2"
-        return response
+        if mes.recipient is None:
+            raise ValueError("You must specify a recipient")
+        else:
+            print(mes.recipient.ai.recv(mes))
     elif mes.message_type == 3:
         # 发送给全体玩家，无需返回值
         print(mes.content)
+        for player in PLAYER_LIST:
+            player.recv(mes)
     else:
         pass
 
@@ -50,16 +53,20 @@ class Player:
         self.name = name
         self.is_alive = True
         self.is_human = False  # 默认为AI玩家
+        self.ai = None
 
     def __str__(self):
         return f"{self.name} ({role_translations[self.__class__.__name__]})"
 
     def speak(self):
-        
-        prompt = f"{self.name} 发言："
+
+        prompt = f"请你发言："
         response = get_input_from_player(self, prompt)
         # 可以根据需要处理玩家的发言内容
-        print(f"{self.name} 说: {response}")
+        print(f"{self.name}说: {response}")
+
+    def set_ai(self, ai: AIPlayer):
+        self.ai = ai
 
 # 村民类
 class Villager(Player):
@@ -175,12 +182,12 @@ class Werewolf(Player):
 
 # 游戏类
 class WerewolfGame:
-    def __init__(self, human_num=1, AI_num=5):
+    def __init__(self, human_num=1, AI_num=3):
         self.human_num = human_num
         self.AI_num = AI_num
         self.players = []
         self.night_count = 1
-        self.role_classes = [Villager, Villager, Villager, Villager, Werewolf, Werewolf]
+        self.role_classes = [Werewolf, Villager, Villager, Villager]
 
     def assign_roles(self):
         total_players = self.human_num + self.AI_num
@@ -210,7 +217,7 @@ class WerewolfGame:
                 self.players.append(player)
                 break
          # 分配角色
-        random.shuffle(self.role_classes)
+        # random.shuffle(self.role_classes)
         for i, player in enumerate(self.players):
             role_class = self.role_classes[i]
             new_player = role_class(player.name)
@@ -219,6 +226,12 @@ class WerewolfGame:
 
         # 通知玩家他们的角色
         for player in self.players:
+            if not player.is_human:
+                created_ai = AIPlayer(name=player.name , identity=role_translations[player.__class__.__name__])
+                PLAYER_LIST.append(created_ai)
+                player.set_ai(
+                    created_ai
+                )
             message_type = 1 if player.is_human else 2
             content = f"你的角色是：{role_translations[player.__class__.__name__]}"
             mes = Message(message_type=message_type, content=content, recipient=player)
@@ -376,10 +389,12 @@ class WerewolfGame:
             self.day_phase()
             if self.check_victory():
                 break
+if __name__ == '__main__':
 
-# 运行游戏
-human_num = int(input("请输入真人玩家人数："))
-AI_num = int(input("请输入AI玩家人数："))
-
-game = WerewolfGame(human_num=human_num, AI_num=AI_num)
-game.play()
+    # 运行游戏
+    # human_num = int(input("请输入真人玩家人数："))
+    # AI_num = int(input("请输入AI玩家人数："))
+    #
+    # game = WerewolfGame(human_num=human_num, AI_num=AI_num)
+    game = WerewolfGame()
+    game.play()

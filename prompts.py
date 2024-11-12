@@ -1,4 +1,5 @@
 from typing import List, Literal, Dict
+from utils import Message
 
 character_prompts = {
             "狼人":  "你的角色是狼人，属于狼人阵营。你的特殊能力是每晚可以和其他狼人一起杀死一位其他玩家。"
@@ -46,7 +47,7 @@ class PromptGenerator:
         ]
         return system_prompt
 
-    def past_messages(self, previous_messages: List[Dict[str, str]] = None):
+    def past_messages(self, previous_messages: List[Message] = None):
         """
 
         :param previous_messages: List[Dict[str, str]], 格式为{"speaker": "", "content", ""}
@@ -54,19 +55,14 @@ class PromptGenerator:
         """
 
         past_prompt = "以下是之前玩家发言的内容。"
-        processed_messages = []
-        for message in previous_messages:
-            speaker = message["speaker"]
-            if speaker.isnumeric():
-                speaker += '号'
-            processed_messages += [f"{speaker}：{message["content"]}"]
+        processed_messages = '\n'.join([message.content for message in previous_messages])
         result = [
             {"role": "system", "content": past_prompt},
-            {"role": "system", "content": '\n'.join(processed_messages)}
+            {"role": "system", "content": processed_messages}
         ]
         return result
 
-    def full_prompt(self,previous_messages: List[Dict[str, str]] = None):
+    def full_prompt(self, previous_messages: List[Message] = None):
         system_messages = self.system_prompt()
         past_messages = self.past_messages(previous_messages)
         user_messages = [
