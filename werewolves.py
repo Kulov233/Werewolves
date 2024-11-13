@@ -1,14 +1,51 @@
 import random
 from math import gamma
-
+from typing import Annotated, Optional, Literal, List
 from keys import ZHIPUAI_API_KEY
 from zhipuai import ZhipuAI
 from typing import Literal
 from werewolf_groupchat import AIPlayer
 from utils import Message
+import json
 client = ZhipuAI(api_key=ZHIPUAI_API_KEY)
 
+# 杀人工具
+from tools_register import register_tool, dispatch_tool
 
+
+@register_tool
+def wolf_kill(
+    wolf_names: Annotated[List[str], "狼人名字列表", True],
+    alive_player_names: Annotated[List[str], "存活玩家名字列表", True]
+) -> str:
+    """
+    狼人选择猎杀目标的工具
+    :param wolf_names: 狼人名字列表
+    :param alive_player_names: 存活玩家名字列表
+    :return: 被猎杀的玩家名字
+    """
+    potential_targets = [name for name in alive_player_names if name not in wolf_names]
+    victim_name = random.choice(potential_targets)
+    return victim_name
+
+# 投票放逐工具
+@register_tool
+def vote_exile(
+    player_name: Annotated[str, "投票玩家的名字", True],
+    alive_player_names: Annotated[list[str], "存活玩家名字列表", True]
+) -> Optional[str]:
+    """
+    玩家进行投票放逐的工具
+    :param player_name: 投票玩家的名字
+    :param alive_player_names: 存活玩家名字列表
+    :return: 被投票的玩家名字，若不投票则返回 None
+    """
+    if random.choice([True, False]):
+        vote_targets = [name for name in alive_player_names if name != player_name]
+        voted_name = random.choice(vote_targets)
+        return voted_name
+    else:
+        return None
     
 role_translations = {
     "Werewolf": "狼人",
@@ -219,7 +256,7 @@ class WerewolfGame:
                 self.players.append(player)
                 break
          # 分配角色
-        # random.shuffle(self.role_classes)
+        random.shuffle(self.role_classes)
         for i, player in enumerate(self.players):
             role_class = self.role_classes[i]
             new_player = role_class(player.name)
@@ -257,20 +294,34 @@ class WerewolfGame:
         # 狼人选择猎杀目标
         wolves = [player for player in self.players if isinstance(player, Werewolf) and player.is_alive]
         if wolves:
-            while True:
-                choices = set()
+            wolf_names = [wolf.name for wolf in wolves]
+            alive_player_names = [player.name for player in self.get_alive_players()]
+            if any(wolf.is_human for wolf in wolves):
+                # 如果有真人狼人，需要真人选择
                 for wolf in wolves:
-                    choices.add(wolf.kill(self.get_alive_players()))
-                if len(choices) == 1:
-                    victim = choices.pop()
-                    content = f"狼人选择猎杀 {victim.name}"
-                    mes = Message(message_type=3, content=content)
-                    send_message(mes)
-                    break
-                else:
-                    content = "狼人选择的目标不一致，请重新选择"
-                    mes = Message(message_type=3, content=content)
-                    send_message(mes)
+                    if wolf.is_human:
+                        prompt = f"{wolf.name}，请选择今晚要猎杀的目标：\n"
+                        for index, player in enumerate(self.get_alive_players()):
+                            prompt += f"{index + 1}. {player.name}\n"
+                        while True:
+                            response = get_input_from_player(wolf, prompt)
+                            if not response.isdigit():
+                                prompt = "输入序号无效，请重新输入\n"
+                                continue
+                            victim_index = int(response) - 1
+                            if victim_index < 0 or victim_index >= len(self.get_alive_players()):
+                                prompt = "输入序号超出范围，请重新输入\n"
+                                continue
+                            victim = self.get_alive_players()[victim_index]
+                            break
+            else:
+                # 所有狼人都是AI，调用工具
+                tool_params = json.dumps({
+                    "wolf_names": wolf_names,
+                    "alive_player_names": alive_player_names
+                })
+                victim_name = dispatch_tool("wolf_kill", tool_params, session_id="wolf_group")
+                victim = next(player for player in self.get_alive_players() if player.name == victim_name)
 
         content = "狼人请闭眼，预言家请睁眼："
         mes = Message(message_type=3, content=content)
@@ -292,23 +343,23 @@ class WerewolfGame:
         #        victim = None  # 解药生效，取消猎杀
         #    poisoned_victim = witch.poison(self.get_alive_players())
 #
-        ## 猎杀结果
-        #if victim and victim.is_alive:
-        #    victim.is_alive = False
-        #    content = f"{victim.name} 死了"
-        #    mes = Message(message_type=3, content=content)
-        #    send_message(mes)
-        #if poisoned_victim and poisoned_victim.is_alive:
-        #    poisoned_victim.is_alive = False
-        #    content = f"{poisoned_victim.name} 死了"
-        #    mes = Message(message_type=3, content=content)
-        #    send_message(mes)
-        #if not victim and not poisoned_victim:
-        #    content = "今晚是平安夜"
-        #    mes = Message(message_type=3, content=content)
-        #    send_message(mes)
-#
-        #self.night_count += 1
+        # 猎杀结果
+        if victim and victim.is_alive:
+            victim.is_alive = False
+            content = f"{victim.name} 死了"
+            mes = Message(message_type=3, content=content)
+            send_message(mes)
+        if poisoned_victim and poisoned_victim.is_alive:
+            poisoned_victim.is_alive = False
+            content = f"{poisoned_victim.name} 死了"
+            mes = Message(message_type=3, content=content)
+            send_message(mes)
+        if not victim and not poisoned_victim:
+            content = "今晚是平安夜"
+            mes = Message(message_type=3, content=content)
+            send_message(mes)
+
+        self.night_count += 1
 
     def day_phase(self):
         content = "\n--- 白天 ---\n天亮了"
@@ -319,42 +370,60 @@ class WerewolfGame:
         send_message(mes)
         for player in self.get_alive_players():
             response = player.speak()
-            for player in self.get_alive_players():
-                if not player.is_human:
-                    send_message(Message(message_type=2, content=response, recipient=player))
+            for player_send in self.get_alive_players():
+                if not player_send.is_human:
+                    send_message(Message(message_type=2, content=response, recipient=player_send))
 
         # 投票放逐
         votes = {player.name: 0 for player in self.get_alive_players()}
         for player in self.get_alive_players():
-            vote_prompt = f"{player.name} 是否投票放逐一位玩家 (yes/no)："
-            while True:
-                response = get_input_from_player(player, vote_prompt)
-                if response.lower() == "yes":
-                    prompt = "请投票放逐一位玩家：\n"
-                    for index, _player in enumerate(self.get_alive_players()):
-                        prompt += f"{index + 1}. {_player.name}\n"
-                    while True:
-                        vote_response = get_input_from_player(player, prompt)
-                        if not vote_response.isdigit():
-                            prompt = "输入序号无效，请重新输入\n"
-                            continue
-                        vote_index = int(vote_response) - 1
-                        if vote_index < 0 or vote_index >= len(self.get_alive_players()):
-                            prompt = "输入序号超出范围，请重新输入\n"
-                            continue
-                        content = f"{player.name} 选择放逐 {self.get_alive_players()[vote_index].name}"
+            if player.is_human:
+                vote_prompt = f"{player.name} 是否投票放逐一位玩家 (yes/no)："
+                while True:
+                    response = get_input_from_player(player, vote_prompt)
+                    if response.lower() == "yes":
+                        prompt = "请投票放逐一位玩家：\n"
+                        for index, _player in enumerate(self.get_alive_players()):
+                            prompt += f"{index + 1}. {_player.name}\n"
+                        while True:
+                            vote_response = get_input_from_player(player, prompt)
+                            if not vote_response.isdigit():
+                                prompt = "输入序号无效，请重新输入\n"
+                                continue
+                            vote_index = int(vote_response) - 1
+                            if vote_index < 0 or vote_index >= len(self.get_alive_players()):
+                                prompt = "输入序号超出范围，请重新输入\n"
+                                continue
+                            content = f"{player.name} 选择放逐 {self.get_alive_players()[vote_index].name}"
+                            mes = Message(message_type=(1 if player.is_human else 2), content=content, recipient=player)
+                            send_message(mes)
+                            votes[self.get_alive_players()[vote_index].name] += 1
+                            break
+                        break
+                    elif response.lower() == "no":
+                        content = f"{player.name} 选择不投票"
                         mes = Message(message_type=(1 if player.is_human else 2), content=content, recipient=player)
                         send_message(mes)
-                        votes[self.get_alive_players()[vote_index].name] += 1
                         break
-                    break
-                elif response.lower() == "no":
-                    content = f"{player.name} 选择不投票"
-                    mes = Message(message_type=(1 if player.is_human else 2), content=content, recipient=player)
+                    else:
+                        vote_prompt = "输入无效，请输入yes或no："
+            else:
+                # AI玩家调用投票工具
+                alive_player_names = [p.name for p in self.get_alive_players()]
+                tool_params = json.dumps({
+                    "player_name": player.name,
+                    "alive_player_names": alive_player_names
+                })
+                voted_name = dispatch_tool("vote_exile", tool_params, session_id=player.name)
+                if voted_name:
+                    content = f"{player.name} 选择放逐 {voted_name}"
+                    mes = Message(message_type=3, content=content)
                     send_message(mes)
-                    break
+                    votes[voted_name] += 1
                 else:
-                    vote_prompt = "输入无效，请输入yes或no："
+                    content = f"{player.name} 选择不投票"
+                    mes = Message(message_type=3, content=content)
+                    send_message(mes)
 
         # 统计投票结果
         max_votes = max(votes.values())
