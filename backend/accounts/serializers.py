@@ -4,6 +4,9 @@ from rest_framework import serializers
 from django.contrib.auth import authenticate
 
 # 注册序列化器
+from django.contrib.auth.models import User
+from rest_framework import serializers
+
 class RegisterSerializer(serializers.ModelSerializer):
     username = serializers.CharField(
         max_length=150,
@@ -32,13 +35,27 @@ class RegisterSerializer(serializers.ModelSerializer):
         model = User
         fields = ['username', 'email', 'password']
 
+    def validate_username(self, value):
+        # 检查用户名是否已存在
+        if User.objects.filter(username=value).exists():
+            raise serializers.ValidationError("该用户名已存在。")
+        return value
+
+    def validate_email(self, value):
+        # 检查邮箱是否已存在
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("该邮箱已被注册。")
+        return value
+
     def create(self, validated_data):
+        # 创建新用户
         user = User.objects.create_user(
             username=validated_data['username'],
             password=validated_data['password'],
             email=validated_data.get('email')
         )
         return user
+
 
 class LoginError(Exception):
     def __init__(self, param, message):
