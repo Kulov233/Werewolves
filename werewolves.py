@@ -58,12 +58,14 @@ class Player:
     def __str__(self):
         return f"{self.name} ({role_translations[self.__class__.__name__]})"
 
-    def speak(self):
+    def speak(self) -> str:
 
         prompt = f"请你发言："
         response = get_input_from_player(self, prompt)
         # 可以根据需要处理玩家的发言内容
-        print(f"{self.name}说: {response}")
+        response = f"{self.name}说: {response}"
+        return response
+
 
     def set_ai(self, ai: AIPlayer):
         self.ai = ai
@@ -316,7 +318,10 @@ class WerewolfGame:
         mes = Message(message_type=3, content=content)
         send_message(mes)
         for player in self.get_alive_players():
-            player.speak()
+            response = player.speak()
+            for player in self.get_alive_players():
+                if not player.is_human:
+                    send_message(Message(message_type=2, content=response, recipient=player))
 
         # 投票放逐
         votes = {player.name: 0 for player in self.get_alive_players()}
