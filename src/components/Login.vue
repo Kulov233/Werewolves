@@ -1,5 +1,5 @@
 <template>
-  <a-row justify="center" align="middle" style="height: 100vh">
+  <a-row justify="center" style="height: 100vh">
     <a-col :span="8">
       <a-card title="登录" bordered>
         <a-form :model="formState" @finish="onFinish" @finishFailed="onFinishFailed" layout="vertical" ref="login_form">
@@ -8,7 +8,6 @@
             name="username_or_email"
             :validateStatus="formStatus.username_or_email"
             :help="formErrors.username_or_email"
-            :rules="[{ required: true, message: '请输入用户名！' }]"
           >
             <a-input
               v-model:value="formState.username_or_email"
@@ -21,7 +20,6 @@
             name="password"
             :validateStatus="formStatus.password"
             :help="formErrors.password"
-            :rules="[{ required: true, message: '请输入密码！' }]"
           >
             <a-input
               type="password"
@@ -70,7 +68,7 @@ const resetPasswordState = () => {
 };
 
 const disabled = computed(() => {
-  return !formState.username_or_email || !formState.password;
+  return !(formState.username_or_email && formState.password);
 });
 
 const onFinish = async (values) => {

@@ -1,5 +1,5 @@
 <template>
-  <a-row justify="center" align="middle" style="height: 100vh">
+  <a-row justify="center" style="height: 100vh">
     <a-col :span="8">
       <a-card title="注册" bordered>
         <a-form :model="formState" @finish="onFinish" @finishFailed="onFinishFailed" layout="vertical" ref="register_form">
@@ -9,7 +9,6 @@
             name="username"
             :validateStatus="formStatus.username"
             :help="formErrors.username"
-            :rules="[{ required: true, message: '请输入用户名！' }]"
           >
             <a-input
               v-model:value="formState.username"
@@ -24,7 +23,6 @@
             name="email"
             :validateStatus="formStatus.email"
             :help="formErrors.email"
-            :rules="[{ required: true, message: '请输入电子邮箱！' }]"
           >
             <a-input
               v-model:value="formState.email"
@@ -38,7 +36,6 @@
             name="password"
             :validateStatus="formStatus.password"
             :help="formErrors.password"
-            :rules="[{ required: true, message: '请输入密码！' }]"
           >
             <a-input-password
               v-model:value="formState.password"
@@ -52,7 +49,6 @@
             name="confirmPassword"
             :validateStatus="formStatus.confirmPassword"
             :help="formErrors.confirmPassword"
-            :rules="[{ required: true, message: '请确认密码！' }]"
           >
             <a-input-password
               type="password"
