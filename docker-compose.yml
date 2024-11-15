@@ -30,8 +30,8 @@ services:
     # TODO: 更改命令
     command: >
       bash -c
-      "python manage.py makemigrations app user post --settings=app.settings_prod &&
-      python manage.py migrate --settings=app.settings_prod &&
+      "python manage.py makemigrations accounts &&
+      python manage.py migrate &&
       python manage.py init_db --settings=app.settings_prod &&
       DJANGO_SETTINGS_MODULE=app.settings_prod gunicorn -w4 -b 0.0.0.0:8000 --log-level=debug app.wsgi"
     expose:

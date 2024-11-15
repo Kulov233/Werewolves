@@ -1,12 +1,12 @@
 # accounts/serializers.py
+import os
+
 from django.contrib.auth.models import User
 from rest_framework import serializers
 from django.contrib.auth import authenticate
+from .models import UserProfile
 
 # 注册序列化器
-from django.contrib.auth.models import User
-from rest_framework import serializers
-
 class RegisterSerializer(serializers.ModelSerializer):
     username = serializers.CharField(
         max_length=150,
@@ -35,13 +35,15 @@ class RegisterSerializer(serializers.ModelSerializer):
         model = User
         fields = ['username', 'email', 'password']
 
-    def validate_username(self, value):
+    @staticmethod
+    def validate_username(value):
         # 检查用户名是否已存在
         if User.objects.filter(username=value).exists():
-            raise serializers.ValidationError("该用户名已存在。")
+            raise serializers.ValidationError("该用户名已被注册。")
         return value
 
-    def validate_email(self, value):
+    @staticmethod
+    def validate_email(value):
         # 检查邮箱是否已存在
         if User.objects.filter(email=value).exists():
             raise serializers.ValidationError("该邮箱已被注册。")
@@ -93,3 +95,49 @@ class UsernameEmailLoginSerializer(serializers.Serializer):
 
         data["user"] = user
         return data
+
+# 用户资料序列化器
+class UserProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserProfile
+        fields = ['bio', 'avatar']
+
+class UserSerializer(serializers.ModelSerializer):
+    profile = UserProfileSerializer(source='userprofile', read_only=True)
+
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'profile']
+
+# 上传头像序列化器
+class AvatarUploadSerializer(serializers.ModelSerializer):
+    avatar = serializers.ImageField(
+        error_messages={
+            'invalid_image': '请上传有效的图片文件。您上传的文件不是图片或是损坏的图片文件。',
+            'empty': '请上传有效的图片文件。您上传的文件为空。',
+            'invalid_extension': '请上传 JPEG、PNG 或 GIF 格式的图片文件。'
+        }
+    )
+
+    class Meta:
+        model = UserProfile
+        fields = ['avatar']  # 只包含头像字段
+
+    @staticmethod
+    def validate_avatar(value):
+        # 限制文件大小为5MB
+        limit_kb = 5 * 1024
+        if value.size > limit_kb * 1024:
+            raise serializers.ValidationError(f"头像不能超过 {limit_kb / 1024} MB。")
+
+        # 检查文件格式
+        valid_mime_types = ['image/jpeg', 'image/png', 'image/gif']
+        if value.content_type not in valid_mime_types:
+            raise serializers.ValidationError("仅支持 JPEG、PNG 和 GIF 格式的头像。")
+
+        return value
+
+    def update(self, instance, validated_data):
+        instance.avatar = validated_data.get('avatar', instance.avatar)
+        instance.save()
+        return instance

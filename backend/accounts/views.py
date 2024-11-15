@@ -1,13 +1,21 @@
 # accounts/views.py
-from .serializers import RegisterSerializer
+from .serializers import RegisterSerializer, AvatarUploadSerializer, UserSerializer
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from .serializers import UsernameEmailLoginSerializer, LoginError
+from rest_framework.permissions import IsAuthenticated, AllowAny
+
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from .models import UserProfile
+from .serializers import UsernameEmailLoginSerializer, LoginError
+
+
+# 注册
 class RegisterView(APIView):
+    permission_classes = [AllowAny]  # 允许所有用户访问（包括未认证用户）
+
     @staticmethod
     def post(request, *args, **kwargs):
         serializer = RegisterSerializer(data=request.data)
@@ -16,8 +24,10 @@ class RegisterView(APIView):
             return Response({"message": "注册成功。"}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
+# 登录
 class LoginView(APIView):
+    permission_classes = [AllowAny]  # 允许所有用户访问（包括未认证用户）
+
     @staticmethod
     def post(request, *args, **kwargs):
         serializer = UsernameEmailLoginSerializer(data=request.data)
@@ -36,3 +46,23 @@ class LoginView(APIView):
             }, status=status.HTTP_200_OK)
         except LoginError as e:
             return Response({e.param: e.message}, status=status.HTTP_401_UNAUTHORIZED)
+
+# 获取用户信息
+class UserInfoView(APIView):
+    def get(self, request):
+        user = request.user
+        serializer = UserSerializer(user)
+        return Response(serializer.data)
+
+# 上传头像
+class AvatarUploadView(APIView):
+    def post(self, request, *args, **kwargs):
+        user_profile, created = UserProfile.objects.get_or_create(user=request.user)
+        serializer = AvatarUploadSerializer(user_profile, data=request.data, partial=True)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {"message": "头像上传成功。", "avatar_url": request.build_absolute_uri(user_profile.avatar.url)},
+                status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
