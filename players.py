@@ -19,17 +19,30 @@ llm_config={
 }
 
 
+def make_game_prompt(game_info: dict) -> str:
+    """
 
+    :param game_info: 游戏信息
+    :return: 一个特定的游戏prompt，包含关键信息
+    """
+    # TODO: hts 准备prompt
 
-class PlayerZ:
+    return ""
+
+class Player:
     def __init__(self, index: int):
         self.index = index
         self.character = None
 
     def set_character(self, character: Literal["平民","狼人","预言家"]):
+        """
+
+        :param character: 定义角色
+        :return:
+        """
         self.character = character
 
-class AIPlayer(PlayerZ):
+class AIPlayer(Player):
     def __init__(self, index: int = 0, name: str = "",
                  output_limit: int = 100,
                  identity: Literal["狼人", "平民", "预言家"] = "平民",
@@ -59,7 +72,7 @@ class AIPlayer(PlayerZ):
         return response.choices[0].message.content
 
     def recv(self, message: Message):
-        # TODO 对局框架要彻底修改。这里要改的好看点。
+        # TODO 对局框架要彻底修改。这里要改的好看点。Message格式可以保留，但要有固定参数。
         content = message.content
         self.messages.append(message)
         if content.startswith("请你发言"):
@@ -67,7 +80,7 @@ class AIPlayer(PlayerZ):
         return ""
 
 
-class HumanPlayer(PlayerZ):
+class HumanPlayer(Player):
     def __init__(self, index:int, name: str):
         super().__init__(index)
         self.type = 'HUMAN'
