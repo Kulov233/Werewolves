@@ -41,6 +41,10 @@
 import axios from "axios";
 import {computed, reactive} from "vue";
 
+import { useRouter } from "vue-router"; // 引入 Vue Router
+
+const router = useRouter(); // 获取 router 实例
+
 const formState = reactive({
   username_or_email: "",
   password: "",
@@ -89,6 +93,7 @@ const onFinish = async (values) => {
     // 成功登录后重定向或执行其他逻辑
     alert("登录成功！");
     // 例如：this.$router.push("/dashboard");
+	router.push("/Home");
   } catch (error) {
     if (error.response && error.response.status === 401) {
       // 登录失败时处理错误响应

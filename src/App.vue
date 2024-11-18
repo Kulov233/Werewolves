@@ -1,13 +1,15 @@
 <template>
     <div id="app">
-		<router-view />
+        <!--<router-view />-->
       <!-- 使用 GameInterface 组件 -->
-      <GameInterface />
+      <!--<GameInterface />-->
       <nav>
       
       <router-link to="/profile">UserProfile</router-link>
       <router-link to="/login">Login</router-link>
       <router-link to="/register">Register</router-link>
+      <router-link to="/Home">主页</router-link>
+      <router-link to="/RoomCard">房间卡片组件</router-link>
     </nav>
     <!-- 显示当前路由对应的页面内容 -->
     <router-view></router-view>
@@ -16,12 +18,12 @@
   
   <script>
   // 引入 GameInterface 组件
-  import GameInterface from "./components/GameInterface.vue";
+  //import GameInterface from "./components/GameInterface.vue";
   
   export default {
     name: "App",
     components: {
-      GameInterface // 注册 GameInterface 组件
+      //GameInterface // 注册 GameInterface 组件
     }
   };
   </script>

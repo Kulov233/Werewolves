@@ -69,6 +69,8 @@
 <script setup>
 import axios from "axios";
 import {computed, reactive} from "vue";
+import { useRouter } from 'vue-router';
+const router = useRouter();
 
 const formState = reactive({
   username: "",
@@ -141,6 +143,10 @@ const onFinish = async (values) => {
     Object.keys(formState).forEach(key => formState[key] = "");
     Object.keys(formStatus).forEach(key => formStatus[key] = "");
     Object.keys(formErrors).forEach(key => formErrors[key] = "");
+
+	// 跳转到另一个页面（例如：登录页面）
+    //this.$router.push("/login");
+	router.push("/Home");
 
   } catch (error) {
     // 注册失败的响应处理
