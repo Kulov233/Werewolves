@@ -1,15 +1,14 @@
 # accounts/views.py
-from .serializers import RegisterSerializer, AvatarUploadSerializer, UserSerializer
+from .serializers import RegisterSerializer, AvatarUploadSerializer, UserSerializer, BioUpdateSerializer
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import AllowAny
 
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import UserProfile
-from .serializers import UsernameEmailLoginSerializer, LoginError
+from .serializers import *
 
 
 # 注册
@@ -49,14 +48,16 @@ class LoginView(APIView):
 
 # 获取用户信息
 class UserInfoView(APIView):
-    def get(self, request):
+    @staticmethod
+    def get(request):
         user = request.user
         serializer = UserSerializer(user)
         return Response(serializer.data)
 
 # 上传头像
 class AvatarUploadView(APIView):
-    def post(self, request, *args, **kwargs):
+    @staticmethod
+    def post(request, *args, **kwargs):
         user_profile, created = UserProfile.objects.get_or_create(user=request.user)
         serializer = AvatarUploadSerializer(user_profile, data=request.data, partial=True)
 
@@ -65,4 +66,16 @@ class AvatarUploadView(APIView):
             return Response(
                 {"message": "头像上传成功。", "avatar_url": request.build_absolute_uri(user_profile.avatar.url)},
                 status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# 修改自我介绍
+class BioUpdateView(APIView):
+    @staticmethod
+    def put(request):
+        user_profile, created = UserProfile.objects.get_or_create(user=request.user)
+        serializer = BioUpdateSerializer(user_profile, data=request.data, partial=True)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"message": "自我介绍修改成功。"}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

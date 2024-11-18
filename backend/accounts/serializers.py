@@ -141,3 +141,22 @@ class AvatarUploadSerializer(serializers.ModelSerializer):
         instance.avatar = validated_data.get('avatar', instance.avatar)
         instance.save()
         return instance
+
+# 修改自我介绍序列化器
+class BioUpdateSerializer(serializers.ModelSerializer):
+    bio = serializers.CharField(
+        max_length=100,
+        allow_blank=True,
+        error_messages={
+            'max_length': '自我介绍不能超过100个字符。'
+        }
+    )
+
+    class Meta:
+        model = UserProfile
+        fields = ['bio']
+
+    def update(self, instance, validated_data):
+        instance.bio = validated_data.get('bio', instance.bio)
+        instance.save()
+        return instance
