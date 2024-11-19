@@ -9,7 +9,7 @@ import uuid
 class LobbyConsumer(AsyncWebsocketConsumer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.lobby_cache = caches["lobby"]
+        self.lobby_cache = caches["lobby_cache"]
 
     # 连接时触发
     async def connect(self):
@@ -29,6 +29,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
 
     async def disconnect(self, close_code):
         # 从 "lobby" 组移除用户
+        # TODO: 检查用户是否在房间中，如果在房间中则移除用户
         await self.channel_layer.group_discard("lobby", self.channel_name)
 
     async def receive(self, text_data=None, bytes_data=None):
@@ -42,7 +43,18 @@ class LobbyConsumer(AsyncWebsocketConsumer):
         # 处理客户端发送的消息
         # 下面是客户端可以进行的操作
 
+        # 创建房间
         if action == "create_room":
+            # TODO: 检验是否已存在房间
+            rooms = await self.get_room_list()
+            for room in rooms:
+                if room["owner"] == self.scope["user"].id:
+                    await self.send(text_data=json.dumps({
+                        "type": "error",
+                        "message": "您已经创建了一个房间。"
+                    }))
+                    return
+
             room_id = str(uuid.uuid4())
             room_data = {
                 # TODO: 确定房间数据的格式
@@ -50,12 +62,31 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                 "title": data.get("title", "未命名的房间"),
                 "description": data.get("description", "房主没有填写简介~"),
                 "owner": self.scope["user"].id,
-                "players": [],
+                "players": [self.scope["user"].id],
                 "game_mode": data.get("game_mode", "default")
             }
             await self.create_room(room_id, room_data)
             await self.add_room_id(room_id)  # 添加房间 ID 到列表
             await self.broadcast_room_update("room_created", room_data)
+
+        # 移除房间
+        elif action == "remove_room":
+            # 验证房主身份
+            room_id = data.get("room_id")
+            room_data = self.lobby_cache.get(f"room:{room_id}")
+            if room_data and room_data["owner"] == self.scope["user"].id:
+                # 移除房间内的所有玩家
+                for player_id in room_data["players"]:
+                    # TODO: 在前端处理玩家离开房间的情况
+                    await self.channel_layer.group_discard(f"room_{room_id}", f"player_{player_id}")
+                await self.lobby_cache.delete(f"room:{room_id}")
+                await self.remove_room_id(room_id)
+                await self.broadcast_room_update("room_removed", {"id": room_id})
+            else:
+                await self.send(text_data=json.dumps({
+                    "type": "error",
+                    "message": "您不是房主，无法删除房间。"
+                }))
 
     async def broadcast_room_update(self, event_type, room_data):
         # 将房间更新广播给 "lobby" 组的所有连接

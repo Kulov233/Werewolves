@@ -7,3 +7,5 @@ PyJWT==2.9.0
 django-cors-headers==4.6.0
 pillow==11.0.0
 django-redis==5.4.0
+channels-redis==4.2.1
+uvicorn[standard]==0.32.0

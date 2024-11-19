@@ -9,7 +9,7 @@ services:
     restart: always
     image: mysql:9.1
     volumes:
-      - /home/ubuntu/mysql:/var/lib/mysql # TODO: 更改路径
+      - ./mysql:/var/lib/mysql # TODO: 更改路径
     env_file:
       - .env # TODO: 修改env文件
     command: ['mysqld', '--character-set-server=utf8mb4', '--collation-server=utf8mb4_unicode_ci']
@@ -23,6 +23,20 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7.4.1
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - db_network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
   app:
     container_name: backend
     restart: always
@@ -30,14 +44,15 @@ services:
     # TODO: 更改命令
     command: >
       bash -c
-      "python manage.py makemigrations accounts &&
+      "python manage.py makemigrations accounts lobby &&
       python manage.py migrate &&
-      python manage.py init_db --settings=app.settings_prod &&
-      DJANGO_SETTINGS_MODULE=app.settings_prod gunicorn -w4 -b 0.0.0.0:8000 --log-level=debug app.wsgi"
+      DJANGO_SETTINGS_MODULE=app.settings app.asgi:application --host 0.0.0.0 --port 8000 --reload"
     expose:
       - 8000
     depends_on:
       mysql:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - web_network

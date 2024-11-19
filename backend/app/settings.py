@@ -38,6 +38,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework', # REST 框架
+    'channels', # Channels
+    'channels_redis', # Channels Redis
     'corsheaders', # 跨域请求
     'accounts',  # 用户
     'lobby' # 游戏大厅
@@ -154,17 +156,32 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # 媒体文件
 
 import os
-
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-
 MEDIA_URL = '/media/'
 
+# ASGI
+
+ASGI_APPLICATION = 'app.asgi.application'
+
+# Channels
+
+import channels_redis
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("127.0.0.1", 63790)],
+        },
+    },
+}
+
 # Redis 缓存
-# settings.py
+
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": "redis://127.0.0.1:6379/0",  # 主 Redis 数据库
+        "LOCATION": "redis://127.0.0.1:63790/0",  # 主 Redis 数据库
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         },
@@ -172,7 +189,7 @@ CACHES = {
     # 大厅缓存
     "lobby_cache": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": "redis://127.0.0.1:6379/1",
+        "LOCATION": "redis://127.0.0.1:63790/1",
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         },
@@ -181,7 +198,7 @@ CACHES = {
     # 房间缓存
     "room_cache": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": "redis://127.0.0.1:6379/1",
+        "LOCATION": "redis://127.0.0.1:63790/1",
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         },
