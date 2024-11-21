@@ -13,6 +13,8 @@ urlpatterns = [
     path('info/', UserInfoView.as_view(), name='info'),
     # 刷新视图，使用 refresh token 获取新的 access token
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    # 获取头像视图，获取ID为所给ID的用户的头像
+    path('avatar/<int:user_id>/', UserAvatarView.as_view(), name='get_avatar'),
     # 上传头像视图，仅能为JPG、PNG和GIF，最大 5 MB
     path('avatar/upload/', AvatarUploadView.as_view(), name='upload_avatar'),
     # 更新用户简介视图，最大 100 字符

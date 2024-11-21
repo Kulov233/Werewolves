@@ -1,5 +1,6 @@
 # accounts/views.py
-from .serializers import RegisterSerializer, AvatarUploadSerializer, UserSerializer, BioUpdateSerializer
+from django.http import Http404
+from django.shortcuts import get_object_or_404, redirect
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -79,3 +80,25 @@ class BioUpdateView(APIView):
             serializer.save()
             return Response({"message": "自我介绍修改成功。"}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# 获取某个ID的用户头像
+class UserAvatarView(APIView):
+    @staticmethod
+    def get(request, user_id):
+        # 获取用户头像
+        try:
+            user_profile = get_object_or_404(UserProfile, user__id=user_id)
+        except Http404:
+            return Response(
+                {"message": "用户不存在。"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if user_profile.avatar:
+            # 重定向到头像 URL
+            return redirect(user_profile.avatar.url)
+        else:
+            # 用户没有头像，返回 404 错误
+            return Response(
+                {"message": "该用户没有设置头像。"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
