@@ -1,0 +1,38 @@
+{
+    "4": {
+      "roles": ["Werewolf", "Villager", "Villager", "Villager"],
+      "victory_conditions": {
+        "good_win": "wolf_num == 0",
+        "wolf_win": "wolf_num >= good_num"
+      }
+    },
+    "6": {
+      "roles": ["Werewolf", "Werewolf", "Prophet", "Witch", "Villager", "Villager"],
+      "victory_conditions": {
+        "good_win": "wolf_num == 0",
+        "wolf_win": "wolf_num >= good_num"
+      }
+    },
+    "8": {
+      "roles": ["Werewolf", "Werewolf", "Prophet", "Witch", "Villager", "Villager", "Villager", "Villager"],
+      "victory_conditions": {
+        "good_win": "wolf_num == 0",
+        "wolf_win": "wolf_num >= good_num"
+      }
+    },
+    "12": {
+      "roles": ["Werewolf", "Werewolf", "Werewolf", "Prophet", "Witch", "Villager", "Villager", "Villager", "Villager", "Villager", "Villager", "Villager"],
+      "victory_conditions": {
+        "good_win": "wolf_num == 0",
+        "wolf_win": "wolf_num >= good_num or not gods_alive or not villagers_alive"
+      }
+    },
+    "16": {
+    "roles": ["Werewolf", "Werewolf", "Werewolf", "Werewolf", "Prophet", "Witch", "Villager", "Villager", "Villager", "Villager", "Villager", "Villager", "Villager", "Villager", "Villager", "Villager"],
+    "victory_conditions": {
+      "good_win": "wolf_num == 0",
+      "wolf_win": "wolf_num >= good_num or not gods_alive or not villagers_alive"
+      }
+    }
+}
+  
