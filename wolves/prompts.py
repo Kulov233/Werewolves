@@ -35,19 +35,22 @@ class PromptGenerator:
         self.output_limits = output_limit
         self.style_prompt = style_prompt
         self.identity = identity
+        self.index = None
 
+    def set_index(self, index: int):
+        self.index = index
 
-    def system_prompt(self):
+    def system_prompt(self) -> list[dict[str, str]]:
 
         system_prompt = [
-            {"role": "system", "content": f"介绍：{self.intro}\n"},
-            {"role": "system", "content": f"{self.game_specified_prompt}\n"},
-            {"role": "system", "content": f"你的身份是：{self.identity}。"},
+            {"role": "system", "content": f"介绍：{self.intro}"},
+            {"role": "system", "content": f"{self.game_specified_prompt}"},
+            {"role": "system", "content": f"你的序号是：{self.index}你的身份是：{self.identity}。"},
             {"role": "system", "content": f"角色策略：{self.character_prompt}"}
         ]
         return system_prompt
 
-    def past_messages(self, previous_messages: List[Message] = None):
+    def past_messages(self, previous_messages: List[Message] = None) -> list[dict[str, str]]:
         """
 
         :param previous_messages: List[Dict[str, str]], 格式为{"speaker": "", "content", ""}
@@ -62,7 +65,7 @@ class PromptGenerator:
         ]
         return result
 
-    def full_prompt(self, previous_messages: List[Message] = None):
+    def speak_prompt(self, previous_messages: List[Message]=None) -> list[dict[str, str]]:
         system_messages = self.system_prompt()
         past_messages = self.past_messages(previous_messages)
         user_messages = [
@@ -76,9 +79,51 @@ class PromptGenerator:
         messages = system_messages + past_messages + user_messages
         return messages
 
+    def vote_prompt(self, previous_messages: List[Message]=None, second_vote=False) -> list[dict[str, str]]:
+        system_messages = self.system_prompt()
+        past_messages = self.past_messages(previous_messages)
+        user_messages = [
+            {"role": "user", "content": self.style_prompt},
+            {
+                "role": "user", "content": "接下来，请你按照以上信息，投票放逐一位玩家。"
+                                           "请调用函数vote，输入你投票放逐的玩家序号。"
+                                           # f"注意，你自己的序号是{self.index}"
+            }
+        ]
+        messages = system_messages + past_messages + user_messages
+        return messages
 
+    def kill_prompt(self, previous_messages: List[Message]=None, second_kill=False) -> list[dict[str, str]]:
+        system_messages = self.system_prompt()
+        past_messages = self.past_messages(previous_messages)
+        user_messages = [
+            {"role": "user", "content": self.style_prompt},
+            {
+                "role": "user", "content": "接下来，请你按照以上信息，选择要杀死的玩家。"
+                                           "请调用函数kill，输入你想要杀死的玩家序号。"
+                                           # f"注意，你自己的序号是{self.index}"
+            }
+        ]
+        messages = system_messages + past_messages + user_messages
+        return messages
 
+    def check_prompt(self, previous_messages: List[Message]=None) -> list[dict[str, str]]:
+        system_messages = self.system_prompt()
+        past_messages = self.past_messages(previous_messages)
+        user_messages = [
+            {"role": "user", "content": self.style_prompt},
+            {
+                "role": "user", "content": "接下来，请你按照以上信息，选择要杀死的玩家。"
+                                           "请调用函数check，输入你想要查验身份的玩家序号。"
+                                           # f"注意，你自己的序号是{self.index}"
+            }
+        ]
+        messages = system_messages + past_messages + user_messages
+        return messages
 
+    def witch_prompt(self, previous_messages: List[Message]=None) -> list[dict[str, str]]:
+        # TODO: witch prompt
+        pass
 
 A_prompt = "A(狼人): 昨晚是个平安夜。我们应该仔细观察今天的发言，看看有没有不一致的地方。"
 

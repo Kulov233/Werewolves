@@ -1,4 +1,6 @@
-from typing import List, Optional, Union, TYPE_CHECKING
+from typing import List, Optional, Union, Literal, TYPE_CHECKING
+
+
 if TYPE_CHECKING:
     from player import Player
 
@@ -6,31 +8,34 @@ class Message:
     def __init__(
         self,
         content: str,
-        message_type: str,
+        type: Literal["info", "reply", "speak", "vote", "kill", "check_identity", "witch", "guard"],
         recipients: Union['Player', List['Player'], str],
         expect_reply: bool = False,
         tools_functions: Optional[List[str]] = None
     ):
         """
         :param content: 消息内容。
-        :param message_type: 消息类型，如 'info' 或 'action_request'。
+        :param type: 消息类型，如 'info' 或 'action_request'。
         :param recipients: 消息接收者，可以是 Player 对象、Player 对象列表或 'all'。
         :param expect_reply: 是否需要回复。
         :param tools_functions: 需要发送给AI的工具函数名称列表。
         """
         self.content = content
-        self.message_type = message_type
+        self.type = type
         self.recipients = recipients
         self.expect_reply = expect_reply
         self.tools_functions = tools_functions or []
 
-def send_message(mes: Message, all_players: List['Player']) -> Optional[dict]:
+def send_message(mes: Message, all_players: List['Player'],
+                 alive_players: List['Player']=None) -> Optional[dict]:
     """
     发送消息给指定的接收者。
+    :param alive_players: 目前还活着的玩家序号名单，vote/kill/witch等行动需要用
     :param mes: Message 对象。
     :param all_players: 所有玩家的列表。
     :return: 如果需要回复，返回 {player_name: reply} 的字典。
     """
+
     from player import Player
     replies = {}
     recipients = mes.recipients
@@ -42,21 +47,14 @@ def send_message(mes: Message, all_players: List['Player']) -> Optional[dict]:
     for recipient in recipients:
         if recipient.is_human:
             # 对于人类玩家
-            print(f"消息给 {recipient.name}: {mes.content}")
+            print(f"消息给 {recipient.index}号玩家: {mes.content}")
             if mes.expect_reply:
-                reply = input(f"{recipient.name}, 请输入你的回应: ")
-                replies[recipient.name] = reply
+                reply = input(f"{recipient.index}号玩家, 请输入你的回应: ")
+                replies[recipient.index] = reply
         else:
             # 对于AI玩家
-            reply = recipient.receive(mes)
+            reply = recipient.receive(mes, alive_players)
             if mes.expect_reply:
-                replies[recipient.name] = reply
+                replies[recipient.index] = reply
     if mes.expect_reply:
         return replies
-
-
-def get_input_from_player(player, prompt):
-    message_type = 1 if player.is_human else 2
-    mes = Message(content=prompt, message_type=message_type, recipient=player)
-    response = send_message(mes)
-    return response

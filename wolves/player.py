@@ -1,6 +1,4 @@
-from message import Message, send_message, get_input_from_player
-from tools import dispatch_tool
-
+from message import Message, send_message
 
 # 角色翻译
 role_translations = {
@@ -22,13 +20,17 @@ class Player:
         return f"{self.name} ({role_translations[self.__class__.__name__]})"
 
 
-    def receive(self, message: Message):
+    def receive(self, message: Message, alive_players):
         # AI玩家处理接收到的消息
         if not self.is_human and self.ai:
-            self.ai.recv(message)
+            return self.ai.recv(message, alive_players)
+        else:
+            # 暂时默认一下只有ai玩家用这个，之后可能要改
+            raise ValueError("人类玩家收到原本应发给ai的消息")
 
     def set_ai(self, ai):
         self.ai = ai
+        self.ai.set_index(self.index)
 
 class Villager(Player):
     def __init__(self, name, index):
