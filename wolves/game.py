@@ -76,6 +76,7 @@ class WerewolfGame:
         随机分配角色，优先分配限定角色给真人玩家，限定角色分配完后再分配剩余角色
         :return:
         """
+        roles_assigned_to_humans = []
         remaining_roles = self.role_classes.copy()
         if self.roles_for_humans_first:
             # 1. 定义优先分配给真人玩家的角色
@@ -236,6 +237,7 @@ class WerewolfGame:
                     # 检查真人玩家的决策是否一致
                     if len(set(human_decisions)) > 1:
                         prompt = "狼人之间的选择不一致，请重新选择"
+                        # TODO:这里给人类玩家发一条信息
                         continue
 
                     # 一致的决定

@@ -271,7 +271,7 @@ class AIPlayer():
                 stream=False,
                 temperature=0,
             )
-            pass
+
 
 
 

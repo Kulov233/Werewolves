@@ -87,7 +87,7 @@ class PromptGenerator:
             {
                 "role": "user", "content": "接下来，请你按照以上信息，投票放逐一位玩家。"
                                            "请调用函数vote，输入你投票放逐的玩家序号。"
-                                           # f"注意，你自己的序号是{self.index}"
+                                           f"注意，你自己的序号是{self.index}"
             }
         ]
         messages = system_messages + past_messages + user_messages
@@ -101,7 +101,7 @@ class PromptGenerator:
             {
                 "role": "user", "content": "接下来，请你按照以上信息，选择要杀死的玩家。"
                                            "请调用函数kill，输入你想要杀死的玩家序号。"
-                                           # f"注意，你自己的序号是{self.index}"
+                                           f"注意，你自己的序号是{self.index}"
             }
         ]
         messages = system_messages + past_messages + user_messages
@@ -115,7 +115,7 @@ class PromptGenerator:
             {
                 "role": "user", "content": "接下来，请你按照以上信息，选择要杀死的玩家。"
                                            "请调用函数check，输入你想要查验身份的玩家序号。"
-                                           # f"注意，你自己的序号是{self.index}"
+                                           f"注意，你自己的序号是{self.index}"
             }
         ]
         messages = system_messages + past_messages + user_messages
