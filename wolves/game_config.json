@@ -11,7 +11,7 @@
         }
     },
     "6": {
-      "roles": ["Werewolf", "Werewolf", "Prophet", "Villager", "Villager", "Villager"],
+      "roles": ["Werewolf", "Werewolf", "Prophet", "Witch", "Villager", "Villager"],
       "victory_conditions": {
         "good_win": "wolf_num == 0",
         "wolf_win": "wolf_num >= good_num"
@@ -19,18 +19,21 @@
       "witch_items": {
         "cure_count": 1,
         "poison_count": 1
-        }
+        },
+      "roles_for_humans_first": ["Witch", "Prophet"]
     },
     "8": {
-      "roles": ["Werewolf", "Werewolf", "Prophet", "Witch", "Villager", "Villager", "Villager", "Villager"],
+      "roles": ["Werewolf", "Werewolf", "Prophet", "Witch", "Idiot", "Villager", "Villager", "Villager"],
       "victory_conditions": {
         "good_win": "wolf_num == 0",
-        "wolf_win": "wolf_num >= good_num"
+        "wolf_win": "wolf_num >= good_num",
+        "idiot_win": "voted_out == True"
       },
       "witch_items": {
         "cure_count": 1,
         "poison_count": 1
-        }
+        },
+      "roles_for_humans_first": ["Witch", "Idiot"]
     },
     "12": {
       "roles": ["Werewolf", "Werewolf", "Werewolf", "Prophet", "Witch", "Villager", "Villager", "Villager", "Villager", "Villager", "Villager", "Villager"],

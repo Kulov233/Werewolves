@@ -5,7 +5,8 @@ role_translations = {
     "Werewolf": "狼人",
     "Villager": "平民",
     "Prophet": "预言家",
-    "Witch": "女巫"
+    "Witch": "女巫",
+    "Idiot": "白痴"
 }
 
 class Player:
@@ -37,6 +38,10 @@ class Villager(Player):
         super().__init__(name, index)
 
 class Prophet(Player):
+    def __init__(self, name, index):
+        super().__init__(name, index)
+
+class Idiot(Player):
     def __init__(self, name, index):
         super().__init__(name, index)
 

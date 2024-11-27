@@ -1,5 +1,5 @@
 import random
-from player import Player, Werewolf, Villager, Prophet, Witch, role_translations
+from player import Player, Werewolf, Villager, Prophet, Witch, Idiot, role_translations
 from message import Message, send_message
 from ai import AIPlayer
 from tools import dispatch_tool
@@ -32,6 +32,10 @@ class WerewolfGame:
         self.victory_conditions = game_config['victory_conditions']
         # 获取女巫的解药和毒药数量
         self.witch_config = game_config.get('witch_items', {'cure_count': 1, 'poison_count': 1})
+        try:
+            self.roles_for_humans_first = self.assign_roles_from_config(game_config["roles_for_humans_first"])  # 优先真人玩家分配的角色
+        except:
+            self.roles_for_humans_first = None
 
         self.ai_players = []
 
@@ -41,7 +45,8 @@ class WerewolfGame:
             "Villager": Villager,
             "Werewolf": Werewolf,
             "Prophet": Prophet,
-            "Witch": Witch
+            "Witch": Witch,
+            "Idiot": Idiot
         }
 
         return [role_map[role] for role in roles]
@@ -68,12 +73,62 @@ class WerewolfGame:
     #随机分配角色
     def assign_roles_to_players(self) -> None:
         """
-        建立玩家并分配角色
+        随机分配角色，优先分配限定角色给真人玩家，限定角色分配完后再分配剩余角色
         :return:
         """
-        random.shuffle(self.role_classes)
-        for i, player in enumerate(self.players):
-            role_class = self.role_classes[i]
+        remaining_roles = self.role_classes.copy()
+        if self.roles_for_humans_first:
+            # 1. 定义优先分配给真人玩家的角色
+            roles_for_humans_first = self.roles_for_humans_first.copy()
+
+            # 2. 获取真人玩家和 AI 玩家
+            human_players = [player for player in self.players if player.is_human]
+            ai_players = [player for player in self.players if not player.is_human]
+
+            # 3. 打乱所有角色列表，准备后续分配
+            random.shuffle(roles_for_humans_first) 
+
+            # 4. 分配限定角色给真人玩家
+            roles_assigned_to_humans = []
+
+            # 给真人玩家优先分配限定角色
+            for role_class in roles_for_humans_first:
+                if human_players:
+                    player = human_players.pop(0)  # 从真人玩家中选一个
+                    if role_class == Witch:
+                        # 对于女巫角色，设置解药和毒药数量
+                        cure_count = self.witch_config['cure_count']
+                        poison_count = self.witch_config['poison_count']
+                        new_player = role_class(player.name, player.index, cure_count, poison_count)
+                    else:
+                        new_player = role_class(player.name, player.index)
+                    new_player.is_human = player.is_human
+                    roles_assigned_to_humans.append(new_player)
+                    remaining_roles.remove(role_class)  # 从剩余角色中移除该角色
+                else:
+                    # 如果没有足够的真人玩家，剩余的限定角色分配给 AI 玩家
+                    if ai_players:
+                        player = ai_players.pop(0)  # 从 AI 玩家中选一个
+                        if role_class == Witch:
+                            # 对于女巫角色，设置解药和毒药数量
+                            cure_count = self.witch_config['cure_count']
+                            poison_count = self.witch_config['poison_count']
+                            new_player = role_class(player.name, player.index, cure_count, poison_count)
+                        else:
+                            new_player = role_class(player.name, player.index)
+                        new_player.is_human = player.is_human
+                        roles_assigned_to_humans.append(new_player)
+                        remaining_roles.remove(role_class)  # 从剩余角色中移除该角色
+
+        
+        print("剩余角色：", remaining_roles)# 调试用
+        random.shuffle(remaining_roles)  # 随机打乱剩余角色
+
+        # 剩余的玩家，包括没有获得限定角色的真人玩家和所有 AI 玩家
+        remaining_players = human_players + ai_players
+
+        # 给剩余的玩家分配剩余的角色
+        for role_class, player in zip(remaining_roles, remaining_players):
             if role_class == Witch:
                 # 对于女巫角色，设置解药和毒药数量
                 cure_count = self.witch_config['cure_count']
@@ -82,7 +137,10 @@ class WerewolfGame:
             else:
                 new_player = role_class(player.name, player.index)
             new_player.is_human = player.is_human
-            self.players[i] = new_player
+            roles_assigned_to_humans.append(new_player)
+
+        # 5. 更新玩家列表
+        self.players = roles_assigned_to_humans
 
     #告诉玩家角色
     def notify_players_of_roles(self) -> None:
@@ -633,17 +691,34 @@ class WerewolfGame:
             self.voted_victims_info.append(death_info)
 
     def check_victory(self) -> bool:
+        voted_out = False  # 假设投票被放逐为False
         good_num = sum(1 for p in self.get_alive_players() if not isinstance(p, Werewolf))
         wolf_num = sum(1 for p in self.get_alive_players() if isinstance(p, Werewolf))
 
         gods_alive = any(isinstance(p, (Prophet, Witch)) for p in self.get_alive_players() if p.is_alive)
         villagers_alive = any(isinstance(p, Villager) for p in self.get_alive_players() if p.is_alive)
-
+        for death_info in self.voted_victims_info:
+            voted_player = death_info['voted_victim']
+            
+            # 检查是否是白痴角色
+            if isinstance(voted_player, Idiot):  # 假设Idiot是白痴角色类
+                voted_out = True  # 如果白痴被投票出去，则设置为True
+                break  # 如果已经找到了白痴，停止循环
+            
+        if eval(self.victory_conditions['idiot_win'], {"voted_out": voted_out}):
+            content = "游戏结束，白痴获胜！"
+            mes = Message(content=content, type='info', recipients='all')
+            send_message(mes, self.players)
+            return True
         if eval(self.victory_conditions['good_win'], {"wolf_num": wolf_num, "good_num": good_num}):
-            print("好人阵营获胜")
+            content = "游戏结束，好人阵营获胜！"
+            mes = Message(content=content, type='info', recipients='all')
+            send_message(mes, self.players)
             return True
         if eval(self.victory_conditions['wolf_win'], {"wolf_num": wolf_num, "good_num": good_num, "gods_alive": gods_alive, "villagers_alive": villagers_alive}):
-            print("狼人阵营获胜")
+            content = "游戏结束，狼人阵营获胜！"
+            mes = Message(content=content, type='info', recipients='all')
+            send_message(mes, self.players)
             return True
         return False
 
@@ -657,3 +732,8 @@ class WerewolfGame:
             self.day_phase()
             if self.check_victory():
                 break
+
+        # 显示所有玩家（调试用）
+        print("\n游戏角色分配完毕：")
+        for player in self.players:
+            print(f"{player.index}. {player}")
