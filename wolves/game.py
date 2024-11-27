@@ -76,7 +76,7 @@ class WerewolfGame:
         随机分配角色，优先分配限定角色给真人玩家，限定角色分配完后再分配剩余角色
         :return:
         """
-        roles_assigned_to_humans = []
+        roles_assigned = []
         remaining_roles = self.role_classes.copy()
         if self.roles_for_humans_first:
             # 1. 定义优先分配给真人玩家的角色
@@ -90,7 +90,6 @@ class WerewolfGame:
             random.shuffle(roles_for_humans_first) 
 
             # 4. 分配限定角色给真人玩家
-            roles_assigned_to_humans = []
 
             # 给真人玩家优先分配限定角色
             for role_class in roles_for_humans_first:
@@ -104,7 +103,7 @@ class WerewolfGame:
                     else:
                         new_player = role_class(player.name, player.index)
                     new_player.is_human = player.is_human
-                    roles_assigned_to_humans.append(new_player)
+                    roles_assigned.append(new_player)
                     remaining_roles.remove(role_class)  # 从剩余角色中移除该角色
                 else:
                     # 如果没有足够的真人玩家，剩余的限定角色分配给 AI 玩家
@@ -118,7 +117,7 @@ class WerewolfGame:
                         else:
                             new_player = role_class(player.name, player.index)
                         new_player.is_human = player.is_human
-                        roles_assigned_to_humans.append(new_player)
+                        roles_assigned.append(new_player)
                         remaining_roles.remove(role_class)  # 从剩余角色中移除该角色
 
         
@@ -138,13 +137,16 @@ class WerewolfGame:
             else:
                 new_player = role_class(player.name, player.index)
             new_player.is_human = player.is_human
-            roles_assigned_to_humans.append(new_player)
+            roles_assigned.append(new_player)
 
         # 5. 更新玩家列表
-        self.players = roles_assigned_to_humans
+        self.players = roles_assigned
 
     #告诉玩家角色
     def notify_players_of_roles(self) -> None:
+        # 储存狼人队友
+        werewolves = []
+
         for player in self.players:
             if not player.is_human:
                 ai_player = AIPlayer(name=player.name, identity=role_translations[player.__class__.__name__])
@@ -161,6 +163,19 @@ class WerewolfGame:
             # 发送消息
             send_message(mes, self.players)
 
+            #处理狼人角色的特殊通知
+            if isinstance(player, Werewolf):
+                werewolves.append(player)  # 将狼人加入狼人队列
+            
+        for werewolf in werewolves:
+            # 获取该狼人队友的信息
+            werewolf_team_members = [p for p in werewolves if p != werewolf]  # 排除自己
+            werewolf_team_indices = [p.index for p in werewolf_team_members]  # 获取队友的索引
+            werewolf_content = f"你的狼人队友是：{', '.join(str(i) for i in werewolf_team_indices)}"
+            mes = Message(content=werewolf_content, type="info_team", recipients=werewolf)
+            send_message(mes, self.players)
+
+        
     def setup_players(self) -> None:
         self.get_player_names()
         self.assign_roles_to_players()

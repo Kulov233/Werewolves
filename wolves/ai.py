@@ -62,6 +62,8 @@ class AIPlayer():
 
     def set_faction_indices(self, faction_indices: List[int]):
         self.faction_indices = faction_indices
+        
+        print(f"狼人队友的索引: {self.faction_indices}")  # 调试输出
 
     def create(self, messages_to_send) -> str:
         response = self.client.chat.completions.create(
@@ -87,6 +89,10 @@ class AIPlayer():
             return self.check(message, alive_players)
         elif message.type == "witch":
             return self.witch(message, alive_players, message.special_info)
+        elif message.type == "info_team":
+            # 处理狼人队友的消息，获取队友的索引
+            team_indices = list(map(int, message.content.split('：')[1].split(',')))  # 解析队友序号
+            self.set_faction_indices(team_indices)  # 设置队友序号
         else:
             raise ValueError(f"unknown message type: {message.type}")
 
