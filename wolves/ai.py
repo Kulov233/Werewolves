@@ -50,6 +50,7 @@ class AIPlayer():
         
         self.tools_functions = {}  # 存储需要的工具函数
         self.character = character
+        self.faction_indices: List[int] = []
         self.index = -1  # 未定义
 
     def set_character(self, character: Literal["平民","狼人","预言家"]):
@@ -58,6 +59,9 @@ class AIPlayer():
     def set_index(self, index: int):
         self.index = index
         self.prompt_generator.set_index(index)
+
+    def set_faction_indices(self, faction_indices: List[int]):
+        self.faction_indices = faction_indices
 
     def create(self, messages_to_send) -> str:
         response = self.client.chat.completions.create(
