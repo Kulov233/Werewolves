@@ -8,11 +8,13 @@ from channels.exceptions import DenyConnection
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.core.cache import caches
 
+from datetime import datetime
 
 class LobbyConsumer(AsyncWebsocketConsumer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.lobby_cache = caches["lobby_cache"]
+        self.room_cache = caches["room_cache"]
 
     # 连接时触发
     # noinspection PyUnresolvedReferences
@@ -23,6 +25,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                 await self.close()
             else:
                 # TODO: 需要检查用户是否已连接吗？
+                # TODO: 需要检查用户是否在房间中吗？
                 # 检查用户是否已有连接
                 # user_id = self.scope["user"].id
                 # if await self.has_active_connection(user_id):
@@ -86,6 +89,14 @@ class LobbyConsumer(AsyncWebsocketConsumer):
             # 离开房间
             elif action == "leave_room":
                 await self.handle_leave_room(data)
+            elif action == "start_game":
+                await self.handle_start_game(data)
+            else:
+                await self.send(text_data=json.dumps({
+                    "type": "error",
+                    "message": "未知操作。"
+                }))
+
         except Exception as e:
             await self.send(text_data=json.dumps({
                 "type": "error",
@@ -122,9 +133,11 @@ class LobbyConsumer(AsyncWebsocketConsumer):
             "title": data.get("title", "未命名的房间"),
             "description": data.get("description", "房主没有填写简介~"),
             "owner": self.scope["user"].id,
-            "players": [self.scope["user"].id],
+            "players": [],
             "max_players": data.get("max_players", 6), # TODO: 限制最大玩家数量
-            "game_mode": data.get("game_mode", "default")
+            "game_mode": data.get("game_mode", "default"),
+            "status": "waiting", # in-game
+            "created_at": datetime.now().isoformat()
         }
 
         # TODO: 校验房间数据
@@ -135,9 +148,12 @@ class LobbyConsumer(AsyncWebsocketConsumer):
 
         await self.update_room_in_cache(room_id, room_data)
         await self.add_room_id_to_cache(room_id)  # 添加房间 ID 到列表
-        await self.set_user_room_in_cache(self.scope["user"].id, room_id)
+
+        await self.add_player_to_room(room_id, self.scope["user"].id)
+
         await self.broadcast_room_update("room_created", room_data)
 
+    # noinspection PyUnresolvedReferences
     async def remove_room(self, room_id):
         await self.remove_room_from_cache(room_id)
         await self.remove_room_id_from_cache(room_id)
@@ -165,6 +181,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                 "message": "无法删除房间。房间可能不存在，或者您不是房主。"
             }))
 
+    # noinspection PyUnresolvedReferences
     async def handle_join_room(self, data):
         """
         加入房间
@@ -204,6 +221,52 @@ class LobbyConsumer(AsyncWebsocketConsumer):
         room_id = await self.get_user_room_from_cache(self.scope["user"].id)
         if room_id:
             await self.remove_player_from_room(room_id, self.scope["user"].id)
+        else:
+            await self.send(text_data=json.dumps({
+                "type": "error",
+                "message": "您不在任何房间中。"
+            }))
+
+    # noinspection PyUnresolvedReferences
+    async def handle_start_game(self, data):
+        room_id = await self.get_user_room_from_cache(self.scope["user"].id)
+        room_data = await self.get_room_data_from_cache(room_id)
+        if room_data:
+            if room_data["owner"] == self.scope["user"].id:
+                if len(room_data["players"]) < room_data["max_players"]:
+                    await self.send(text_data=json.dumps({
+                        "type": "error",
+                        "message": "房间人数不足。"
+                    }))
+                    return
+                else:
+                    # TODO: 开始游戏，前端应该在收到消息时，检查是否在房间中，如果在房间中则跳转到游戏页面，并连接到游戏的 WebSocket
+                    await self.broadcast_room_update("game_started", room_data)
+                    # 将房间信息写入房间缓存
+                    # TODO: 设计游戏房间数据结构
+                    room_data_in_game = {
+                        "id": room_data["id"],
+                        "title": room_data["title"],
+                        "description": room_data["description"],
+                        "max_players": room_data["max_players"],
+                        "status": "waiting", # waiting, in-game, finished
+                        "players": [
+                            {
+                                player: {
+                                'alive': True,
+                                'online': False,
+                                'role': None,
+                            }
+                        } for player in room_data["players"]],
+                        # ...
+                    }
+                    pass
+
+            else:
+                await self.send(text_data=json.dumps({
+                    "type": "error",
+                    "message": "只有房主可以开始游戏。"
+                }))
         else:
             await self.send(text_data=json.dumps({
                 "type": "error",
@@ -264,20 +327,20 @@ class LobbyConsumer(AsyncWebsocketConsumer):
             }
         )
 
-    @database_sync_to_async
-    def has_active_connection(self, user_id):
-        # 使用 Django 缓存检查用户是否已有连接
-        return self.lobby_cache.get(f"user:{user_id}:connected", False)
-
-    @database_sync_to_async
-    def add_connection(self, user_id):
-        # 将用户连接标记为 True，表示该用户已经连接
-        self.lobby_cache.set(f"user:{user_id}:connected", True, timeout=None)
-
-    @database_sync_to_async
-    def remove_connection(self, user_id):
-        # 用户断开连接时，从缓存中删除连接标记
-        self.lobby_cache.delete(f"user:{user_id}:connected")
+    # @database_sync_to_async
+    # def has_active_connection(self, user_id):
+    #     # 使用 Django 缓存检查用户是否已有连接
+    #     return self.lobby_cache.get(f"user:{user_id}:connected", False)
+    #
+    # @database_sync_to_async
+    # def add_connection(self, user_id):
+    #     # 将用户连接标记为 True，表示该用户已经连接
+    #     self.lobby_cache.set(f"user:{user_id}:connected", True, timeout=None)
+    #
+    # @database_sync_to_async
+    # def remove_connection(self, user_id):
+    #     # 用户断开连接时，从缓存中删除连接标记
+    #     self.lobby_cache.delete(f"user:{user_id}:connected")
 
     # 添加房间 ID 列表到缓存中
     @database_sync_to_async
@@ -333,3 +396,8 @@ class LobbyConsumer(AsyncWebsocketConsumer):
         # 删除用户的房间绑定记录
         self.lobby_cache.delete(f"user_room:{user_id}")
 
+    # 将房间信息写入房间缓存
+    @database_sync_to_async
+    def set_room_data_in_game_cache(self, room_id, room_data):
+        pass
+        # self.room_cache.set(f"game_room:{room_id}", room_data, timeout=None)

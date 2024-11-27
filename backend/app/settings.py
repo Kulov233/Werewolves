@@ -42,7 +42,8 @@ INSTALLED_APPS = [
     'channels_redis', # Channels Redis
     'corsheaders', # 跨域请求
     'accounts',  # 用户
-    'lobby' # 游戏大厅
+    'lobby',
+    'game' # 游戏大厅
 ]
 
 MIDDLEWARE = [
