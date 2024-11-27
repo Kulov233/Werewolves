@@ -17,36 +17,43 @@ class LobbyConsumer(AsyncWebsocketConsumer):
     # 连接时触发
     # noinspection PyUnresolvedReferences
     async def connect(self):
-        if self.scope["user"].is_anonymous:
-            # 如果用户未认证，拒绝连接
-            await self.close()
-        else:
-            # TODO: 检查用户是否已连接
-            # 检查用户是否已有连接
-            user_id = self.scope["user"].id
-            if await self.has_active_connection(user_id):
-                # 如果有现有连接，拒绝连接
-                raise DenyConnection("您已经有一个活跃连接。")
+        try:
+            if self.scope["user"].is_anonymous:
+                # 如果用户未认证，拒绝连接
+                await self.close()
+            else:
+                # TODO: 需要检查用户是否已连接吗？
+                # 检查用户是否已有连接
+                # user_id = self.scope["user"].id
+                # if await self.has_active_connection(user_id):
+                #     # 如果有现有连接，拒绝连接
+                #     raise DenyConnection("您已经有一个活跃连接。")
 
-            # 接受连接并将用户加入组
-            await self.channel_layer.group_add("lobby", self.channel_name)
-            await self.accept()
+                # 接受连接并将用户加入组
+                await self.channel_layer.group_add("lobby", self.channel_name)
+                await self.accept()
 
-            # 将用户的连接信息添加到 channel_layer 中
-            await self.add_connection(user_id)
+                # 将用户的连接信息添加到 channel_layer 中
+                # await self.add_connection(user_id)
 
-            # 发送房间列表
-            rooms = await self.get_room_list_from_cache()
+                # 发送房间列表
+                rooms = await self.get_room_list_from_cache()
+                await self.send(text_data=json.dumps({
+                    "type": "room_list",
+                    "rooms": rooms
+                }))
+        except DenyConnection as e:
             await self.send(text_data=json.dumps({
-                "type": "room_list",
-                "rooms": rooms
+                "type": "error",
+                "message": str(e)
             }))
+            await self.close()
 
     # noinspection PyUnresolvedReferences
     async def disconnect(self, close_code):
         # 从 "lobby" 组移除用户
-        user_id = self.scope["user"].id
-        await self.remove_connection(user_id)
+        # user_id = self.scope["user"].id
+        # await self.remove_connection(user_id)
 
         # TODO: 检查用户是否在房间中，如果在房间中则移除用户
         await self.channel_layer.group_discard("lobby", self.channel_name)
@@ -56,35 +63,42 @@ class LobbyConsumer(AsyncWebsocketConsumer):
             await self.clear_user_room_in_cache(self.scope["user"].id)
 
     async def receive(self, text_data=None, bytes_data=None):
-        # 仅允许认证用户发送消息
-        # if not self.scope["user"].is_authenticated:
-        #     raise DenyConnection("没有权限。")
+        try:
+            # 仅允许认证用户发送消息
+            # if not self.scope["user"].is_authenticated:
+            #     raise DenyConnection("没有权限。")
 
-        data = json.loads(text_data)
-        action = data.get("action")
+            data = json.loads(text_data)
+            action = data.get("action")
 
-        # 处理客户端发送的消息
-        # 下面是客户端可以进行的操作
+            # 处理客户端发送的消息
+            # 下面是客户端可以进行的操作
 
-        # 创建房间
-        if action == "create_room":
-            await self.create_room(data)
-        # 移除房间
-        elif action == "remove_room":
-            await self.remove_room(data)
-        # 加入房间
-        elif action == "join_room":
-            await self.join_room(data)
-        # 离开房间
-        elif action == "leave_room":
-            await self.leave_room(data)
+            # 创建房间
+            if action == "create_room":
+                await self.handle_create_room(data)
+            # 移除房间
+            elif action == "remove_room":
+                await self.handle_remove_room(data)
+            # 加入房间
+            elif action == "join_room":
+                await self.handle_join_room(data)
+            # 离开房间
+            elif action == "leave_room":
+                await self.handle_leave_room(data)
+        except Exception as e:
+            await self.send(text_data=json.dumps({
+                "type": "error",
+                "message": str(e)
+            }))
+            # await self.close()
 
     """
     下面是自定义的房间相关方法，考虑将它们模块化？
     """
 
     # noinspection PyUnresolvedReferences
-    async def create_room(self, data):
+    async def handle_create_room(self, data):
         """
         创建房间
         :param data: 客户端发送的text_data
@@ -124,8 +138,13 @@ class LobbyConsumer(AsyncWebsocketConsumer):
         await self.set_user_room_in_cache(self.scope["user"].id, room_id)
         await self.broadcast_room_update("room_created", room_data)
 
+    async def remove_room(self, room_id):
+        await self.remove_room_from_cache(room_id)
+        await self.remove_room_id_from_cache(room_id)
+        await self.broadcast_room_update("room_removed", {"id": room_id})
+
     # noinspection PyUnresolvedReferences
-    async def remove_room(self, data):
+    async def handle_remove_room(self, data):
         """
         删除房间
         :param data: 客户端发送的text_data，里面应该有且仅有room_id
@@ -135,10 +154,8 @@ class LobbyConsumer(AsyncWebsocketConsumer):
         room_id = data.get("room_id")
         room_data = await self.get_room_data_from_cache(room_id)
         if room_data and room_data["owner"] == self.scope["user"].id:
-            await self.remove_room_from_cache(room_id)
-            await self.remove_room_id_from_cache(room_id)
+            await self.remove_room(room_id)
             # TODO: 前端在收到 "room_removed" 事件后，如果用户在房间中，应该自动退出房间
-            await self.broadcast_room_update("room_removed", {"id": room_id})
 
             for player in room_data["players"]:
                 await self.clear_user_room_in_cache(player)
@@ -148,13 +165,13 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                 "message": "无法删除房间。房间可能不存在，或者您不是房主。"
             }))
 
-    async def join_room(self, data):
+    async def handle_join_room(self, data):
         """
         加入房间
         :param data: 客户端发送的text_data，里面应该有且仅有room_id
         :return: 不会返回值，但是会向客户端发送消息，遇到错误时只会向当前客户端发送消息
         """
-        if self.get_user_room_from_cache(self.scope["user"].id):
+        if await self.get_user_room_from_cache(self.scope["user"].id):
             await self.send(text_data=json.dumps({
                 "type": "error",
                 "message": "您已经在一个房间中。"
@@ -178,7 +195,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
             }))
 
     # noinspection PyUnresolvedReferences
-    async def leave_room(self, data):
+    async def handle_leave_room(self, data):
         """
         离开房间
         :param data: 客户端发送的text_data，里面应该什么都没有（使用get_user_room_from_cache）
@@ -195,7 +212,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
 
     # noinspection PyUnresolvedReferences
     async def add_player_to_room(self, room_id, user_id):
-        if self.get_user_room_from_cache(user_id):
+        if await self.get_user_room_from_cache(user_id):
             return
         room_data = await self.get_room_data_from_cache(room_id)
         if room_data:
@@ -212,9 +229,8 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                 # 检查是否是房主，和退出之后房间是否为空
                 if len(room_data["players"]) == 1:
                     # 如果房间只剩一个玩家，删除房间
-                    await self.remove_room(room_data)
+                    await self.remove_room_from_cache(room_id)
                     await self.clear_user_room_in_cache(user_id)
-                    await self.broadcast_room_update("room_removed", {"id": room_id})
                     return
                 else:
                     if room_data["owner"] == user_id:
@@ -250,20 +266,18 @@ class LobbyConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def has_active_connection(self, user_id):
-        # 查询当前 channel_layer 是否有该用户的连接
-        active_connections = self.channel_layer.get(f"user:{user_id}:connections", [])
-        return len(active_connections) > 0
+        # 使用 Django 缓存检查用户是否已有连接
+        return self.lobby_cache.get(f"user:{user_id}:connected", False)
 
     @database_sync_to_async
     def add_connection(self, user_id):
-        # 将用户的连接信息添加到 channel_layer 中
-        # 使用 `channel_name` 或其他标识符来跟踪连接
-        self.channel_layer.set(f"user:{user_id}:connections", [self.channel_name])
+        # 将用户连接标记为 True，表示该用户已经连接
+        self.lobby_cache.set(f"user:{user_id}:connected", True, timeout=None)
 
     @database_sync_to_async
     def remove_connection(self, user_id):
-        # 删除用户的连接信息
-        self.channel_layer.delete(f"user:{user_id}:connections")
+        # 用户断开连接时，从缓存中删除连接标记
+        self.lobby_cache.delete(f"user:{user_id}:connected")
 
     # 添加房间 ID 列表到缓存中
     @database_sync_to_async
