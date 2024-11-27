@@ -3,7 +3,8 @@
       "roles": ["Werewolf", "Villager", "Villager", "Villager"],
       "victory_conditions": {
         "good_win": "wolf_num == 0",
-        "wolf_win": "wolf_num >= good_num"
+        "wolf_win": "wolf_num >= good_num",
+        "idiot_win": ""
       },
       "witch_items": {
         "cure_count": 1,
@@ -14,7 +15,8 @@
       "roles": ["Werewolf", "Werewolf", "Prophet", "Witch", "Villager", "Villager"],
       "victory_conditions": {
         "good_win": "wolf_num == 0",
-        "wolf_win": "wolf_num >= good_num"
+        "wolf_win": "wolf_num >= good_num",
+        "idiot_win": ""
       },
       "witch_items": {
         "cure_count": 1,

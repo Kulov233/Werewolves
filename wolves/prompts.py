@@ -1,3 +1,4 @@
+from socket import socket
 from typing import List, Literal, Dict
 from message import Message
 
@@ -7,9 +8,17 @@ character_prompts = {
             "平民":   "你的角色是平民，属于好人阵营。没有特殊能力。你的任务是想办法从对话中找出狼人，并尽可能发动大家向他投票。此外，可以想办法保护好人阵营的特殊角色。",
             "预言家": "你的角色是预言家，属于好人阵营。你的特殊能力是每晚可以查验一位玩家的身份。"
                      "你的任务是指导好人阵营进行投票，找出真正的狼人。你可以隐藏身份来避免太早被狼人杀死，"
-                      "但如果你发现有狼人冒充预言家，一定要站出来用真实信息反驳他。"
-
+                      "但如果你发现有狼人冒充预言家，一定要站出来用真实信息反驳他。",
+            "女巫": "你的角色是女巫，属于好人阵营。你拥有一瓶解药和一瓶毒药，各使用一次。每晚你可以选择使用或不使用它们。"
+                    "解药可以救活当晚被狼人杀害的玩家，毒药可以毒死任意一位玩家。"
+                    "你的任务是利用你的药品保护好人阵营，也要谨慎狼人自刀，如果能够充分确认某人的狼人身份则使用毒药毒死他，同时尽量隐藏自己的身份。",
+            "白痴": "你的角色是白痴，属于好人阵营。你没有特殊能力，但如果你在白天被投票出局，你可以展示你的身份牌，从而不会被出局。"
+                    "你的任务是尽可能通过发言和推理引导其他玩家找出狼人，必要时可以引诱狼人在白天发言中归票自己，来帮助其他好人确定狼人身份。",
         }
+
+basic_logis_prompts = """
+    如果昨晚是平安夜，那么证明是女巫用解药救了被杀的人（如果本局中有女巫），或者守卫保护了今晚被杀的人（如果本局中有女巫）。
+"""
 
 class PromptGenerator:
     def __init__(self,
@@ -18,8 +27,9 @@ class PromptGenerator:
                                      "请你假设其他玩家会忽略不包含有效信息的内容，尽量多做针对具体的玩家的分析"
                                      "（无论分析是真是假）而不是使用情感打动其他玩家，少说空话和废话。",
                  output_limit: int = 100,
-                 identity: Literal["狼人", "平民", "预言家"] = "平民",
+                 identity: Literal["狼人", "平民", "预言家", "女巫", "白痴"] = "平民",
                  ):
+        self.faction_indices: List[int] = []
         self.intro = """
                 你正在参与一款名为狼人杀的桌游。游戏中有多个角色，每个角色都有其特殊能力和胜利目标。
                 游戏分为夜晚和白天两个阶段，会循环执行
@@ -40,6 +50,11 @@ class PromptGenerator:
     def set_index(self, index: int):
         self.index = index
 
+    def set_faction_indices(self, faction_indices: List[int]):
+        self.faction_indices = faction_indices
+
+        print(f"狼人队友的索引: {self.faction_indices}")  # 调试输出
+
     def system_prompt(self) -> list[dict[str, str]]:
 
         system_prompt = [
@@ -48,9 +63,13 @@ class PromptGenerator:
             {"role": "system", "content": f"你的序号是：{self.index}你的身份是：{self.identity}。"},
             {"role": "system", "content": f"角色策略：{self.character_prompt}"}
         ]
+        if self.faction_indices:
+            system_prompt += [{"role": "system", "content":
+                f"注意，{self.faction_indices}这几号玩家与你在同一阵营。你应当尽量暗中支持他们，"
+                f"但在他们的发言过于激进或者已经暴露时也可以考虑放弃他们换取他人信任。"}]
         return system_prompt
 
-    def past_messages(self, previous_messages: List[Message] = None) -> list[dict[str, str]]:
+    def past_messages(self, previous_messages: List[Message]) -> list[dict[str, str]]:
         """
 
         :param previous_messages: List[Dict[str, str]], 格式为{"speaker": "", "content", ""}
@@ -65,7 +84,7 @@ class PromptGenerator:
         ]
         return result
 
-    def speak_prompt(self, previous_messages: List[Message]=None) -> list[dict[str, str]]:
+    def speak_prompt(self, previous_messages: List[Message]) -> list[dict[str, str]]:
         system_messages = self.system_prompt()
         past_messages = self.past_messages(previous_messages)
         user_messages = [
@@ -79,7 +98,7 @@ class PromptGenerator:
         messages = system_messages + past_messages + user_messages
         return messages
 
-    def vote_prompt(self, previous_messages: List[Message]=None, second_vote=False) -> list[dict[str, str]]:
+    def vote_prompt(self, previous_messages: List[Message], second_vote=False) -> list[dict[str, str]]:
         system_messages = self.system_prompt()
         past_messages = self.past_messages(previous_messages)
         user_messages = [
@@ -87,43 +106,58 @@ class PromptGenerator:
             {
                 "role": "user", "content": "接下来，请你按照以上信息，投票放逐一位玩家。"
                                            "请调用函数vote，输入你投票放逐的玩家序号。"
-                                           f"注意，你自己的序号是{self.index}"
+                                           f"注意，你自己的序号是{self.index}。"
             }
         ]
         messages = system_messages + past_messages + user_messages
         return messages
 
-    def kill_prompt(self, previous_messages: List[Message]=None, second_kill=False) -> list[dict[str, str]]:
+    def kill_prompt(self, previous_messages: List[Message], second_kill=False) -> list[dict[str, str]]:
+        # TODO: 增加初次杀人的随机性
         system_messages = self.system_prompt()
         past_messages = self.past_messages(previous_messages)
         user_messages = [
             {"role": "user", "content": self.style_prompt},
             {
                 "role": "user", "content": "接下来，请你按照以上信息，选择要杀死的玩家。"
-                                           "请调用函数kill，输入你想要杀死的玩家序号。"
+                                           "请调用函数kill，输入你想要杀死的玩家序号。如果信息不足，可以随机杀一个非狼人阵营的人，但最好不要选1号。"
                                            f"注意，你自己的序号是{self.index}"
             }
         ]
         messages = system_messages + past_messages + user_messages
         return messages
 
-    def check_prompt(self, previous_messages: List[Message]=None) -> list[dict[str, str]]:
+    def check_prompt(self, previous_messages: List[Message]) -> list[dict[str, str]]:
+        # TODO:添加已经查过的人的信息，提醒一下。
         system_messages = self.system_prompt()
         past_messages = self.past_messages(previous_messages)
         user_messages = [
             {"role": "user", "content": self.style_prompt},
             {
-                "role": "user", "content": "接下来，请你按照以上信息，选择要杀死的玩家。"
-                                           "请调用函数check，输入你想要查验身份的玩家序号。"
+                "role": "user", "content": "接下来，请你按照以上信息，选择要查验的玩家。"
+                                           "请调用函数check，输入你想要查验身份的玩家序号。如果这是第一晚，可以随机查验一个人。"
                                            f"注意，你自己的序号是{self.index}"
             }
         ]
         messages = system_messages + past_messages + user_messages
         return messages
 
-    def witch_prompt(self, previous_messages: List[Message]=None) -> list[dict[str, str]]:
-        # TODO: witch prompt
-        pass
+    def witch_prompt(self, previous_messages: List[Message], special_info:dict, tool_prompt: str) -> list[dict[str, str]]:
+        system_messages = self.system_prompt()
+        past_messages = self.past_messages(previous_messages)
+
+        user_messages = [
+            {"role": "user", "content": self.style_prompt},
+            {
+                "role": "user", "content": "接下来，请你按照以上信息，调用函数进行女巫操作。"
+                                           f"{tool_prompt}"
+                                           f"一切回复均需要使用tool_call调用，如果不进行相应的操作则输入-1。"
+                                           f"注意，你自己的序号是{self.index}。如果自己今晚被杀，那么无论如何要救活自己！"
+                                           f"同时，如果狼人已经到了获胜的临界点，那么最好要救援晚上被杀的人。"
+            }
+        ]
+        messages = system_messages + past_messages + user_messages
+        return messages
 
 A_prompt = "A(狼人): 昨晚是个平安夜。我们应该仔细观察今天的发言，看看有没有不一致的地方。"
 

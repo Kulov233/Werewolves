@@ -1,4 +1,7 @@
 import random
+
+from numpy.ma.core import count
+
 from player import Player, Werewolf, Villager, Prophet, Witch, Idiot, role_translations
 from message import Message, send_message
 from ai import AIPlayer
@@ -19,7 +22,21 @@ class WerewolfGame:
         self.human_num = human_num
         self.ai_num = ai_num
         self.players: List[Player] = []
-        self.game_specified_prompt = ""
+
+        # 找出当前游戏设定角色数量
+        self.game_specified_prompt = "当前游戏中有"
+        last_role = ""
+        role_cnt = 0
+        role_cnt_dict = {}
+        for role in game_config["roles"]:
+            if role == last_role:
+                role_cnt += 1
+            else:
+                if role_cnt > 0:
+                    self.game_specified_prompt += f"{role_cnt}个{last_role}，"
+                role_cnt = 1
+                last_role = role
+        self.game_specified_prompt += f"{role_cnt}个{last_role}。"
 
         self.night_count: int = 1
 
@@ -149,7 +166,8 @@ class WerewolfGame:
 
         for player in self.players:
             if not player.is_human:
-                ai_player = AIPlayer(name=player.name, identity=role_translations[player.__class__.__name__])
+                ai_player = AIPlayer(name=player.name, identity=role_translations[player.__class__.__name__],
+                                     output_limit=100, game_specified_prompt=self.game_specified_prompt)
                 self.ai_players.append(ai_player)
                 player.set_ai(ai_player)
             # 组装消息，通知玩家他们的角色
@@ -301,6 +319,8 @@ class WerewolfGame:
                             victim_index = int(response[wolf.index])
                             if victim_index in alive_player_indices:
                                 wolf_decisions.append(victim_index)
+                            else:
+                                raise ValueError(f"狼人投了一个不不合法目标：{victim_index}")
 
                         # 第二次不一致，则按多数票决定
                         if len(set(wolf_decisions)) > 1:
@@ -361,7 +381,7 @@ class WerewolfGame:
                     while True:
                         player_reply = response.get(prophet.index)
                         
-                        if player_reply and player_reply.isdigit():
+                        if player_reply and player_reply.isdigit() or player_reply == "-1":
                             target_index = int(player_reply)
                             target_player = alive_player_dict.get(target_index)
                             
@@ -440,7 +460,7 @@ class WerewolfGame:
                         
                         while True:
                             player_reply = response.get(witch.index)
-                            if player_reply and player_reply.isdigit():
+                            if player_reply and player_reply.isdigit() or player_reply == "-1":
                                 target_index  = int(player_reply)
                                 if target_index == -1:
                                     # 女巫选择不救
@@ -451,7 +471,7 @@ class WerewolfGame:
                                     witch.use_healing_potion()  # 使用解药
                                     # 从victims列表中移除已救活的玩家
                                     victims.remove(victim_to_save)
-                                    prompt = f"你已经成功救回 {victim.index}. {victim.name}。"
+                                    prompt = f"你已经成功救回 {victim_to_save.index}. {victim_to_save.name}。"
                                     mes = Message(content=prompt, type='info', recipients=witch)
                                     send_message(mes, self.players)
                                     break
@@ -483,7 +503,7 @@ class WerewolfGame:
                         response = send_message(mes, self.players)
                         while True:
                             player_reply = response.get(witch.index)
-                            if player_reply and player_reply.isdigit():
+                            if player_reply and player_reply.isdigit() or player_reply == "-1":
                                 target_index  = int(player_reply)
                                 if target_index == -1:
                                     # 女巫选择不使用毒药
@@ -513,30 +533,12 @@ class WerewolfGame:
                         mes = Message(content=prompt, type='witch', recipients=witch)
                         response = send_message(mes, self.players)
                 else:
+                    victim_indices = [victim.index for victim in victims]
+                    alive_indices = [p.index for p in alive_players if p != witch]
+                    special_info = {"cure": witch.cure_count, "poison": witch.poison_count,
+                                    "victims": victim_indices, "targets": alive_indices}
 
-                    special_info = {"cure": witch.cure_count, "poison": witch.poison_count}
-                    # 初始化 prompt 内容
-                    prompt = ""
-                    # 处理解药部分
-                    if witch.cure_count:
-                        # 如果有解药，列出死亡玩家信息并询问是否使用解药
-                        death_prompt = "\n".join(f"{victim.index}. {victim.name}" for victim in victims)
-                        prompt += f"你是否要使用解药？\n" + \
-                                f"以下是已死亡的玩家：\n{death_prompt}\n"
-                    else:
-                        # 如果没有解药，提示解药已用完
-                        prompt += "解药已用完。\n"
-
-                    # 处理毒药部分
-                    if witch.poison_count > 0:
-                        # 如果有毒药，列出存活玩家信息并询问是否使用毒药
-                        poison_prompt = "\n".join(f"{p.index}. {p.name}" for p in alive_players if p != witch)
-                        prompt += f"请选择要毒杀的玩家（输入序号）：\n{poison_prompt}"
-                    else:
-                        # 如果没有毒药，提示毒药已用完
-                        prompt += "毒药已用完。\n"
-
-                    mes = Message(content=prompt, type='witch', recipients=witch, expect_reply=True, special_info=special_info)
+                    mes = Message(content="女巫操作", type='witch', recipients=witch, expect_reply=True, special_info=special_info)
                     response = send_message(mes, self.players, alive_players)
                     AI_reply = response.get(witch.index)
                     # 解析 AI 女巫的决策
@@ -547,7 +549,7 @@ class WerewolfGame:
                     if AI_reply:
                         cure_choice, poison_choice = AI_reply
 
-                        if cure_choice and cure_choice.isdigit():
+                        if cure_choice:
                             cure_index = int(cure_choice)
                             if cure_index == -1:
                                 # 女巫选择不使用解药
@@ -562,9 +564,11 @@ class WerewolfGame:
                                 prompt = f"你已经成功救回 {victim_to_save.index}. {victim_to_save.name}。"
                                 mes = Message(content=prompt, type='info', recipients=witch)
                                 send_message(mes, self.players)
+                        else:
+                            raise ValueError(f"模型返回了不当女巫操作，{AI_reply}")
 
                         # 处理杀人逻辑
-                        if poison_choice and poison_choice.isdigit():
+                        if poison_choice:
                             poison_index = int(poison_choice)
                             if poison_index == -1:
                                 # 女巫选择不使用毒药
@@ -721,12 +725,12 @@ class WerewolfGame:
             if isinstance(voted_player, Idiot):  # 假设Idiot是白痴角色类
                 voted_out = True  # 如果白痴被投票出去，则设置为True
                 break  # 如果已经找到了白痴，停止循环
-            
-        if eval(self.victory_conditions['idiot_win'], {"voted_out": voted_out}):
-            content = "游戏结束，白痴获胜！"
-            mes = Message(content=content, type='info', recipients='all')
-            send_message(mes, self.players)
-            return True
+        # TODO: 白痴逻辑这里还有问题，会报错
+        # if eval(self.victory_conditions['idiot_win'], {"voted_out": voted_out}):
+        #     content = "游戏结束，白痴获胜！"
+        #     mes = Message(content=content, type='info', recipients='all')
+        #     send_message(mes, self.players)
+        #     return True
         if eval(self.victory_conditions['good_win'], {"wolf_num": wolf_num, "good_num": good_num}):
             content = "游戏结束，好人阵营获胜！"
             mes = Message(content=content, type='info', recipients='all')

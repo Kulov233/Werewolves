@@ -1,4 +1,4 @@
-from typing import List, Optional, Union, Literal, TYPE_CHECKING
+from typing import List, Optional, Union, Literal, Any, TYPE_CHECKING
 
 
 if TYPE_CHECKING:
@@ -8,10 +8,10 @@ class Message:
     def __init__(
         self,
         content: str,
-        type: Literal["info", "reply", "speak", "vote", "kill", "check_identity", "witch", "guard"],
+        type: Literal["info", "info_team", "reply", "speak", "vote", "kill", "check", "witch", "guard"],
         recipients: Union['Player', List['Player'], str],
         expect_reply: bool = False,
-        special_info: dict[str, bool] = None,
+        special_info: dict[str, Any] = None,
         tools_functions: Optional[List[str]] = None
     ):
         """

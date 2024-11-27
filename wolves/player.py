@@ -58,7 +58,7 @@ class Witch(Player):
         if self.cure_count:
             self.cure_count -= 1
 
-    def use_poison_potion(self)  -> bool:
+    def use_poison_potion(self):
         """
         使用毒药
         """
