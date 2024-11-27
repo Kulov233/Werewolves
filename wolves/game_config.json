@@ -4,35 +4,55 @@
       "victory_conditions": {
         "good_win": "wolf_num == 0",
         "wolf_win": "wolf_num >= good_num"
-      }
+      },
+      "witch_items": {
+        "cure_count": 1,
+        "poison_count": 1
+        }
     },
     "6": {
-      "roles": ["Werewolf", "Werewolf", "Prophet", "Witch", "Villager", "Villager"],
+      "roles": ["Werewolf", "Werewolf", "Prophet", "Villager", "Villager", "Villager"],
       "victory_conditions": {
         "good_win": "wolf_num == 0",
         "wolf_win": "wolf_num >= good_num"
-      }
+      },
+      "witch_items": {
+        "cure_count": 1,
+        "poison_count": 1
+        }
     },
     "8": {
       "roles": ["Werewolf", "Werewolf", "Prophet", "Witch", "Villager", "Villager", "Villager", "Villager"],
       "victory_conditions": {
         "good_win": "wolf_num == 0",
         "wolf_win": "wolf_num >= good_num"
-      }
+      },
+      "witch_items": {
+        "cure_count": 1,
+        "poison_count": 1
+        }
     },
     "12": {
       "roles": ["Werewolf", "Werewolf", "Werewolf", "Prophet", "Witch", "Villager", "Villager", "Villager", "Villager", "Villager", "Villager", "Villager"],
       "victory_conditions": {
         "good_win": "wolf_num == 0",
         "wolf_win": "wolf_num >= good_num or not gods_alive or not villagers_alive"
-      }
+      },
+      "witch_items": {
+            "cure_count": 2,
+            "poison_count": 2
+        }
     },
     "16": {
-    "roles": ["Werewolf", "Werewolf", "Werewolf", "Werewolf", "Prophet", "Witch", "Villager", "Villager", "Villager", "Villager", "Villager", "Villager", "Villager", "Villager", "Villager", "Villager"],
-    "victory_conditions": {
-      "good_win": "wolf_num == 0",
-      "wolf_win": "wolf_num >= good_num or not gods_alive or not villagers_alive"
-      }
+      "roles": ["Werewolf", "Werewolf", "Werewolf", "Werewolf", "Prophet", "Witch", "Villager", "Villager", "Villager", "Villager", "Villager", "Villager", "Villager", "Villager", "Villager", "Villager"],
+      "victory_conditions": {
+        "good_win": "wolf_num == 0",
+        "wolf_win": "wolf_num >= good_num or not gods_alive or not villagers_alive"
+        },
+      "witch_items": {
+        "cure_count": 2,
+        "poison_count": 2
+        }
     }
 }
   

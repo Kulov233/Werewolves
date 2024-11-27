@@ -10,7 +10,7 @@ from typing import Literal, List, Dict
 from prompts import PromptGenerator
 from zhipuai.types.chat.chat_completion import Completion
 from message import Message
-from wolves.player import Player
+from player import Player
 
 config_list = [
     {
@@ -82,7 +82,7 @@ class AIPlayer():
         elif message.type == "check":
             return self.check(message, alive_players)
         elif message.type == "witch":
-            return self.witch(message, alive_players)
+            return self.witch(message, alive_players, message.special_info)
         else:
             raise ValueError(f"unknown message type: {message.type}")
 
@@ -170,7 +170,7 @@ class AIPlayer():
             return -1
 
     def check(self, message: Message, alive_players: List[Player]) -> int:
-        # 投票
+        # 预言家查验身份
         alive_indices = []
         for player in alive_players:
             if player.index != self.index:
@@ -212,12 +212,31 @@ class AIPlayer():
         pass
 
     def witch(self, message: Message, alive_players: List[Player], special_info: dict[str, bool]) -> dict[str, int]:
-        # TODO: 请照着这里的模板修改女巫接口。输入例子：["poison": 1, "cure": 0]
+        # TODO: 请照着这里的模板修改女巫接口。输入例子：["cure": 0, "poison": 1]
         alive_indices = []
         for player in alive_players:
             if player.index != self.index:
                 alive_indices.append(player.index)
-        result = {"poison": -1, "cure": -1}  # 没用为-1
+        result = {"cure": -1, "poison": -1}  # 没用为-1
+
+        cure_tool = {
+            "type": "function",
+            "function": {
+                "name": "cure",
+                "description": f"选择对一位玩家使用解药，输入为玩家序号，范围为{alive_indices.__str__()}",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "target": {
+                            "type": "int",
+                            "description": "解药目标的序号",
+                        },
+                    },
+                    "required": ["target"],
+                },
+            }
+        }
+
         poison_tool = {
             "type": "function",
             "function": {
@@ -235,30 +254,13 @@ class AIPlayer():
                 },
             }
         }
-        cure_tool = {
-            "type": "function",
-            "function": {
-                "name": "cure",
-                "description": f"选择对一位玩家使用毒药，输入为玩家序号，范围为{alive_indices.__str__()}",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "target": {
-                            "type": "int",
-                            "description": "毒药目标的序号",
-                        },
-                    },
-                    "required": ["target"],
-                },
-            }
-        }
 
         tools = []
-        if special_info["poison"]:
-            tools.append(poison_tool)
+        
         if special_info["cure"]:
             tools.append(cure_tool)
-
+        if special_info["poison"]:
+            tools.append(poison_tool)
         if tools:
             prompt = self.prompt_generator.witch_prompt(self.messages)
             response = self.client.chat.completions.create(

@@ -41,24 +41,24 @@ class Prophet(Player):
         super().__init__(name, index)
 
 class Witch(Player):
-    def __init__(self, name, index):
+    def __init__(self, name, index, cure_count, poison_count):
         super().__init__(name, index)
-        self.has_healing_potion:int = 1  # 初始状态：女巫有解药
-        self.has_poison_potion:int = 1  # 初始状态：女巫有毒药
+        self.cure_count:int = cure_count  # 初始状态：女巫有解药
+        self.poison_count:int = poison_count  # 初始状态：女巫有毒药
 
     def use_healing_potion(self):
         """
         使用解药
         """
-        if self.has_healing_potion:
-            self.has_healing_potion -= 1
+        if self.cure_count:
+            self.cure_count -= 1
 
     def use_poison_potion(self)  -> bool:
         """
         使用毒药
         """
-        if self.has_poison_potion:
-            self.has_poison_potion -= 1
+        if self.poison_count:
+            self.poison_count -= 1
 
 class Werewolf(Player):
     def __init__(self, name, index):

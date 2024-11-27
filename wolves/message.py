@@ -11,6 +11,7 @@ class Message:
         type: Literal["info", "reply", "speak", "vote", "kill", "check_identity", "witch", "guard"],
         recipients: Union['Player', List['Player'], str],
         expect_reply: bool = False,
+        special_info: dict[str, bool] = None,
         tools_functions: Optional[List[str]] = None
     ):
         """
@@ -18,12 +19,14 @@ class Message:
         :param type: 消息类型，如 'info' 或 'action_request'。
         :param recipients: 消息接收者，可以是 Player 对象、Player 对象列表或 'all'。
         :param expect_reply: 是否需要回复。
+        :param special_info: 特殊信息，如女巫的解药和毒药数量。
         :param tools_functions: 需要发送给AI的工具函数名称列表。
         """
         self.content = content
         self.type = type
         self.recipients = recipients
         self.expect_reply = expect_reply
+        self.special_info = special_info
         self.tools_functions = tools_functions or []
 
 def send_message(mes: Message, all_players: List['Player'],
