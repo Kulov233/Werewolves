@@ -93,15 +93,15 @@ class WerewolfGame:
         随机分配角色，优先分配限定角色给真人玩家，限定角色分配完后再分配剩余角色
         :return:
         """
+        # TODO:若没有优先分配角色存在点bug
         roles_assigned = []
+        # 获取真人玩家和 AI 玩家
+        human_players = [player for player in self.players if player.is_human]
+        ai_players = [player for player in self.players if not player.is_human]
         remaining_roles = self.role_classes.copy()
         if self.roles_for_humans_first:
             # 1. 定义优先分配给真人玩家的角色
             roles_for_humans_first = self.roles_for_humans_first.copy()
-
-            # 2. 获取真人玩家和 AI 玩家
-            human_players = [player for player in self.players if player.is_human]
-            ai_players = [player for player in self.players if not player.is_human]
 
             # 3. 打乱所有角色列表，准备后续分配
             random.shuffle(roles_for_humans_first) 
@@ -157,7 +157,9 @@ class WerewolfGame:
             roles_assigned.append(new_player)
 
         # 5. 更新玩家列表
+        print("分配后角色：", roles_assigned)  # 调试用
         self.players = roles_assigned
+        print(self.players)
 
     #告诉玩家角色
     def notify_players_of_roles(self) -> None:
@@ -184,15 +186,16 @@ class WerewolfGame:
             #处理狼人角色的特殊通知
             if isinstance(player, Werewolf):
                 werewolves.append(player)  # 将狼人加入狼人队列
-            
-        for werewolf in werewolves:
-            # 获取该狼人队友的信息
-            werewolf_team_members = [p for p in werewolves if p != werewolf]  # 排除自己
-            werewolf_team_indices = [p.index for p in werewolf_team_members]  # 获取队友的索引
-            werewolf_content = f"你的狼人队友是：{', '.join(str(i) for i in werewolf_team_indices)}"
-            mes = Message(content=werewolf_content, type="info_team", recipients=werewolf)
-            send_message(mes, self.players)
-
+        try:
+            for werewolf in werewolves:
+                # 获取该狼人队友的信息
+                werewolf_team_members = [p for p in werewolves if p != werewolf]  # 排除自己
+                werewolf_team_indices = [p.index for p in werewolf_team_members]  # 获取队友的索引
+                werewolf_content = f"你的狼人队友是：{', '.join(str(i) for i in werewolf_team_indices)}"
+                mes = Message(content=werewolf_content, type="info_team", recipients=werewolf)
+                send_message(mes, self.players)
+        except:
+            pass
         
     def setup_players(self) -> None:
         self.get_player_names()
@@ -225,9 +228,6 @@ class WerewolfGame:
             wolf_indices = [wolf.index for wolf in wolves]
             alive_player_indices = [player.index for player in alive_players]
             alive_player_dict = {player.index: player for player in alive_players}
-
-            wolf_names = [wolf.name for wolf in wolves]
-            alive_player_names = [player.name for player in self.get_alive_players()]
         
             consensus_target_index = None
             if human_wolves:
@@ -359,7 +359,6 @@ class WerewolfGame:
             
         
         # 预言家查验身份
-        # TODO: 如果看起来好搞的话，可以照着狼人的实现把预言家和女巫改了。不用管ai那边的prompt，我来处理。 --hts
         content = "狼人请闭眼，预言家请睁眼："
         mes = Message(content=content, type='info', recipients='all')
         send_message(mes, self.players)
@@ -718,19 +717,24 @@ class WerewolfGame:
 
         gods_alive = any(isinstance(p, (Prophet, Witch)) for p in self.get_alive_players() if p.is_alive)
         villagers_alive = any(isinstance(p, Villager) for p in self.get_alive_players() if p.is_alive)
-        for death_info in self.voted_victims_info:
-            voted_player = death_info['voted_victim']
+        
+        try:
+            for death_info in self.voted_victims_info:
+                voted_player = death_info['voted_victim']
+                
+                # 检查是否是白痴角色
+                if isinstance(voted_player, Idiot):  # 假设Idiot是白痴角色类
+                    voted_out = True  # 如果白痴被投票出去，则设置为True
+                    break  # 如果已经找到了白痴，停止循环
             
-            # 检查是否是白痴角色
-            if isinstance(voted_player, Idiot):  # 假设Idiot是白痴角色类
-                voted_out = True  # 如果白痴被投票出去，则设置为True
-                break  # 如果已经找到了白痴，停止循环
-        # TODO: 白痴逻辑这里还有问题，会报错
-        # if eval(self.victory_conditions['idiot_win'], {"voted_out": voted_out}):
-        #     content = "游戏结束，白痴获胜！"
-        #     mes = Message(content=content, type='info', recipients='all')
-        #     send_message(mes, self.players)
-        #     return True
+            if eval(self.victory_conditions['idiot_win'], {"voted_out": voted_out}):
+                content = "游戏结束，白痴获胜！"
+                mes = Message(content=content, type='info', recipients='all')
+                send_message(mes, self.players)
+                return True
+        #若没有白痴角色，则不用管
+        except:
+            pass
         if eval(self.victory_conditions['good_win'], {"wolf_num": wolf_num, "good_num": good_num}):
             content = "游戏结束，好人阵营获胜！"
             mes = Message(content=content, type='info', recipients='all')
