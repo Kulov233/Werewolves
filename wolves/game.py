@@ -1,6 +1,5 @@
 import random
 
-from numpy.ma.core import count
 
 from player import Player, Werewolf, Villager, Prophet, Witch, Idiot, role_translations
 from message import Message, send_message
