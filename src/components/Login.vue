@@ -52,18 +52,20 @@
             label="验证码"
             name="ver_code"
           >
-            <a-input
-              class="login-placeholder"
-              type="text"
-              v-model="ver_code"
-              placeholder="请输入验证码"
-              prefix-icon="ant-design:lock-outlined"
-            />
-            <canvas
-              id="canvas"
-              class="canvascs"
-              @click="draw()"
-            ></canvas>
+            <div class="verification-container">
+              <a-input
+                class="login-placeholder"
+                type="text"
+                v-model="ver_code"
+                placeholder="请输入验证码"
+                prefix-icon="ant-design:lock-outlined"
+              />
+              <canvas
+                id="canvas"
+                class="canvascs"
+                @click="draw()"
+              ></canvas>
+            </div>
           </a-form-item>
 
           <a-form-item>
@@ -321,9 +323,7 @@ a-row, a-col {
 /* 统一设置所有使用 login-label 的元素样式 */
 .login-label {
   margin-bottom: 16px; /* 调整每个表单项的底部间距 */
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  text-align: left; /* 使 label 左对齐 */
 }
 
 /* 控制 label 文字颜色 */
@@ -334,10 +334,8 @@ a-row, a-col {
 
 /* 统一设置所有使用 login-placeholder 的输入框样式 */
 .login-placeholder {
-  width: 275%; /* 使输入框宽度占满整个父容器 */
+  width: 100%; /* 使输入框宽度占满整个父容器 */
   border-radius: 5px; /* 输入框圆角 */
-  
-  background-color: #f4f7fa; /* 输入框背景色 */
   padding: 8px 12px; /* 内边距 */
   font-size: 14px; /* 字体大小 */
   background-color: var(--input-bg);
@@ -347,25 +345,6 @@ a-row, a-col {
 /* 修改占位符（placeholder）文字颜色 */
 .login-placeholder::placeholder {
   color: var(--placeholder-color); /* 占位符文字颜色 */
-}
-
-a-button {
-  transition: all 0.3s ease;
-  position: absolute;
-  top: 15px;
-  right: 15px;
-  border: none;
-}
-
-a-button:hover {
-  background-color: #45a049;
-  border-color: #45a049;
-}
-
-a-input {
-  background-color: var(--input-bg);
-  color: var(--input-color);
-  transition: all 0.3s ease;
 }
 
 .theme-toggle-button {
@@ -386,11 +365,14 @@ a-input {
   border: 1px solid #ccc;
   background-color: var(--input-bg);
 }
- 
+ .verification-container {
+  display: flex;
+  align-items: center; /* 垂直居中对齐 */
+}
 #Verification  input {
-  width: 110px;
+  width: 22%;
   margin-right: 10px; /* 保证输入框和 canvas 之间有适当间距 */
-  margin-top: 0px;
+  margin-top: 2px;
 }
 
 </style>
