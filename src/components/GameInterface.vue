@@ -31,11 +31,16 @@
         <div class="chat-box" ref="chatBox">
           <div class="chat-messages">
             <div v-for="(message, index) in messages" :key="index" class="message">
-            <div class="message-avatar">
-              <img :src="message.avatar" alt="avatar" class="avatar1"/>
+            <div class="message-avatar-container">
+              <div class="message-avatar">
+                <img :src="message.avatar" alt="avatar" class="avatar1"/>
+              </div>
+              <span class="recipient-label">({{ message.recipient === 'all' ? '所有人' : '团队' }})</span>
             </div>
             <div class="message-content">
-              <div class="message-sender">{{ message.sender }}</div>
+              <div class="message-sender">
+                {{ message.sender }}
+              </div>
               <div class="message-text">{{ message.text }}</div>
             </div>
           </div>
@@ -43,6 +48,10 @@
         </div>
         <!-- 输入框和发送按钮在聊天框外部 -->
         <div class="message-input-section">
+          <select v-model="messageRecipient" class="recipient-select">
+            <option value="all">所有人</option>
+            <option value="team">团队</option>
+          </select>
           <input
             v-model="userMessage"
             @keyup.enter="sendMessage"
@@ -170,15 +179,28 @@
         playerDetailsLeft: 0,  // 玩家详情框的left位置
         // 日夜切换
         isDayTime: true,  // 默认是白天
-        sunMoonIcon: require('@/assets/sun.svg')  // 默认图标是太阳
+        sunMoonIcon: require('@/assets/sun.svg') , // 默认图标是太阳
+        messageRecipient: "all", // 消息的接收者，默认为"所有人"
       };
     },
     methods: {
       sendMessage() {
-        if (this.userMessage.trim()) {// 假设当前玩家的名字和头像
-        const currentPlayer = { sender: "你", avatar: require('@/assets/head.png'), text: this.userMessage };
-        this.messages.push(currentPlayer);
+        if (this.userMessage.trim()) {
+          // 创建消息对象
+          const newMessage = {
+            sender: "你", // 假设当前玩家是“你”
+            avatar: require('@/assets/head.png'),
+            text: this.userMessage,
+            recipient: this.messageRecipient // 将选择的接收者添加到消息中
+          };
+          
+          // 将消息推送到消息列表
+          this.messages.push(newMessage);
+
+          // 清空输入框
           this.userMessage = "";
+          
+          // 滚动到底部
           this.scrollToBottom();
         }
       },
@@ -328,7 +350,7 @@ p {
   margin-bottom: 10px;
   max-height: 300px;
   overflow-y: auto;
-border-radius: 15px;
+  border-radius: 15px;
 }
 
 /* 聊天框 */
@@ -365,16 +387,29 @@ border-radius: 15px;
   transform: translateX(10px);  /* 消息框悬浮时向右偏移 */
 }
 
-.message-avatar {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
+.message-avatar-container {
+  display: flex;
+  align-items: center;  /* 使头像和标签垂直居中 */
+  gap: 3px;  /* 控制头像与标签之间的距离 */
 }
-.message-avatar img {
+
+.message-avatar {
   width: 40px;
   height: 40px;
   border-radius: 50%;
+}
+
+.message-avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
   background-color: #f0f0f0;
+}
+
+.recipient-label {
+  font-size: 0.9em;
+  color: #999;
+  margin-left: 0;  /* 去除与头像的距离 */
 }
 .message-content {
   display: flex;
@@ -404,7 +439,55 @@ border-radius: 15px;
   display: flex;
   width: 100%;
   align-items: center;
+  gap: 10px; 
 }
+
+.recipient-select {
+  padding: 8px 30px 8px 12px;  /* 左边内边距用于文本，右边留出空间给箭头 */
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 25px; /* 更圆的边角 */
+  background-color: var(--background-color);
+  color: #333;
+  outline: none; /* 去除默认的聚焦边框 */
+  cursor: pointer;
+  transition: border-color 0.3s ease, background-color 0.3s ease; /* 平滑过渡效果 */
+}
+
+.recipient-select:focus {
+  border-color: #007bff; /* 聚焦时改变边框颜色 */
+  background-color: #fff; /* 聚焦时改变背景颜色 */
+}
+
+.recipient-select option {
+  background-color: #fff;
+  color: #333;
+  padding: 10px;
+}
+
+.recipient-select::-ms-expand {
+  display: none; /* 隐藏 IE 下拉箭头 */
+}
+
+.recipient-select::after {
+  content: '\f078'; /* 使用Font Awesome的下拉箭头图标 */
+  font-family: 'FontAwesome';
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none; /* 确保箭头不可点击 */
+}
+
+/* 自定义下拉箭头 */
+.recipient-select {
+  position: relative;
+}
+
+.recipient-select option:hover {
+  background-color: #f1f1f1; /* 选项悬停时改变背景 */
+}
+
 /* 输入框 */
 .message-input {
   border: 1px solid #ccc;
