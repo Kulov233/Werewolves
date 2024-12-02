@@ -10,5 +10,6 @@
     --button-color: #333; /* 默认按钮文字颜色 */
     --img-filter: invert(0); /* 初始状态图标为黑色 */
     --svg-color: #333; /* 默认SVG图标颜色为黑色 */
+    --name-color: #333;
   }
   

@@ -22,7 +22,7 @@
             class="avatar0"
             @click.stop="showPlayerDetails(player, $event)" 
             /><!-- 点击头像触发查看详情 -->
-          <p>{{ player.name }}</p>
+          <p>{{ player.id }}号{{" "}}{{ player.name }}<span v-if="player.id === currentPlayerId"> (你)</span></p> <!-- 如果是当前玩家，显示 "(你)" -->
         </div>
       </div>
   
@@ -30,16 +30,22 @@
       <div class="chat-section">
         <div class="chat-box" ref="chatBox">
           <div class="chat-messages">
-            <div v-for="(message, index) in messages" :key="index" class="message">
+            <div  v-for="message in filteredMessages" :key="message.senderid" class="message">
             <div class="message-avatar-container">
               <div class="message-avatar">
                 <img :src="message.avatar" alt="avatar" class="avatar1"/>
               </div>
-              <span class="recipient-label">({{ message.recipient === 'all' ? '所有人' : '团队' }})</span>
+              <span class="recipient-label">
+                 <!-- 根据接收者判断是否是“所有人”、“团队”或“死亡者” -->
+                ({{ getRecipientLabel(message.recipients) }})
+              </span>
             </div>
             <div class="message-content">
               <div class="message-sender">
-                {{ message.sender }}
+                <p>
+                  {{ message.senderid }}号{{" "}}{{ message.sendername }}
+                  <span v-if="message.senderid === currentPlayerId"> (你)</span>
+                </p>
               </div>
               <div class="message-text">{{ message.text }}</div>
             </div>
@@ -51,6 +57,7 @@
           <select v-model="messageRecipient" class="recipient-select">
             <option value="all">所有人</option>
             <option value="team">团队</option>
+            <option value="dead" v-if="isDead">死亡</option> <!-- 死亡玩家只能选择死亡 -->
           </select>
           <input
             v-model="userMessage"
@@ -120,9 +127,11 @@
   export default {
     data() {
       return {
+        
         players: [
           { 
-            name: "1号 Wang", 
+            id: 1, 
+            name: "Wang",
             avatar: require('@/assets/head.png'), 
             isDead: false, 
             role: "狼人", 
@@ -130,23 +139,8 @@
             victoryCondition: "淘汰所有人类"
           },
           { 
-            name: "2号 Huang", 
-            avatar: require('@/assets/head.png'), 
-            isDead: false, 
-            role: "平民", 
-            team: "人类阵营", 
-            victoryCondition: "找出所有狼人"
-          },
-          { 
-            name: "3号 Zhao", 
-            avatar: require('@/assets/head.png'), 
-            isDead: false, 
-            role: "狼人", 
-            team: "狼人阵营", 
-            victoryCondition: "淘汰所有人类"
-          },
-          { 
-            name: "4号 Li", 
+            id: 2, 
+            name: "Huang", 
             avatar: require('@/assets/head.png'), 
             isDead: true, 
             role: "平民", 
@@ -154,7 +148,26 @@
             victoryCondition: "找出所有狼人"
           },
           { 
-            name: "5号 Liu", 
+            id: 3, 
+            name: "Zhao", 
+            avatar: require('@/assets/head.png'), 
+            isDead: false, 
+            role: "狼人", 
+            team: "狼人阵营", 
+            victoryCondition: "淘汰所有人类"
+          },
+          { 
+            id: 4, 
+            name: "Li", 
+            avatar: require('@/assets/head.png'), 
+            isDead: true, 
+            role: "平民", 
+            team: "人类阵营", 
+            victoryCondition: "找出所有狼人"
+          },
+          { 
+            id: 5, 
+            name: "Liu", 
             avatar: require('@/assets/head.png'), 
             isDead: true, 
             role: "平民", 
@@ -164,34 +177,83 @@
           
         ],
         messages: [
-        { sender: "1号 Wang", avatar: require('@/assets/head.png'), text: "天亮请睁眼。昨晚，4号玩家被杀了。" },
-        { sender: "2号 Huang", avatar: require('@/assets/head.png'), text: "我只是个平民，什么也不知道，但我们绝对找出狼人了。" },
-        { sender: "3号 Zhao", avatar: require('@/assets/head.png'), text: "他肯定有问题！" }
-      ],
+          { senderid: 1, sendername: "Wang", recipients: "all", avatar: require('@/assets/head.png'), text: "天亮请睁眼。昨晚，4号玩家被杀了。" },
+          { senderid: 2, sendername: "Huang", recipients: "dead", avatar: require('@/assets/head.png'), text: "我只是个平民，什么也不知道，但我们绝对找出狼人了。" },
+          { senderid: 3, sendername: "Zhao", recipients: "all", avatar: require('@/assets/head.png'), text: "他肯定有问题！" }
+        ],
         userMessage: "",
+
         role: "狼人",
         objective: "淘汰全部人类",
         victoryCondition: "再淘汰1名人类",
         livingTeammates: 0,
         showDetails: false,   // 控制显示详细信息
+        isDead: false, // 当前玩家是否死亡
         selectedPlayer: null,  // 被选中的玩家
+        
         playerDetailsTop: 0,  // 玩家详情框的top位置
         playerDetailsLeft: 0,  // 玩家详情框的left位置
         // 日夜切换
         isDayTime: true,  // 默认是白天
         sunMoonIcon: require('@/assets/sun.svg') , // 默认图标是太阳
         messageRecipient: "all", // 消息的接收者，默认为"所有人"
+
+        currentPlayerId: 1,  // 当前玩家ID
+        currentPlayerName: "Wang",
       };
     },
+    created() {
+      // 初始化数据
+      this.initializeMessages();
+    },
+    computed: {
+       // 过滤消息，确保死亡玩家可以看到所有消息，活着的玩家不能看到死亡者的消息
+      filteredMessages() {
+        console.log('filteredMessages 被计算');
+        if (this.isDead) {
+          return this.messages;
+        }
+        return this.messages.filter(msg => msg.recipients !== 'dead');
+      }
+    },
+
     methods: {
+
+      initializeMessages() {
+        this.messages = [
+          { senderid: 1, sendername: "Wang", recipients: "all", avatar: require('@/assets/head.png'), text: "天亮请睁眼。昨晚，4号玩家被杀了。" },
+          { senderid: 2, sendername: "Huang", recipients: "dead", avatar: require('@/assets/head.png'), text: "我只是个平民，什么也不知道，但我们绝对找出狼人了。" },
+          { senderid: 3, sendername: "Zhao", recipients: "all", avatar: require('@/assets/head.png'), text: "他肯定有问题！" }
+        ];
+      },
+      // 可以设置一个动态方法来更新当前玩家名字
+      setCurrentPlayer(playerId) {
+        this.currentPlayerId = playerId;  // 设置当前玩家ID
+      },
+      getRecipientLabel(recipients) {
+        if (recipients === 'all') {
+          return '所有人';
+        } else if (recipients === 'team') {
+          return '团队';
+        } else if (recipients === 'dead') {
+          return '死亡';
+        }
+        else{
+          return '未知';
+        }
+
+      },
+
       sendMessage() {
+        
         if (this.userMessage.trim()) {
           // 创建消息对象
           const newMessage = {
-            sender: "你", // 假设当前玩家是“你”
+            senderid: this.currentPlayerId, // 假设当前玩家是“你”
+            sendername: this.currentPlayerName, 
             avatar: require('@/assets/head.png'),
             text: this.userMessage,
-            recipient: this.messageRecipient // 将选择的接收者添加到消息中
+            recipients: this.isDead ? "dead" : this.messageRecipient // 死亡玩家只能发送给"dead"
           };
           
           // 将消息推送到消息列表
@@ -254,7 +316,14 @@
       if (newVal) {
         window.scrollTo(0, 0);
       }
-    }
+    },
+    isDead(newVal) {
+      if (newVal) {
+        this.messageRecipient = "dead"; // 死亡玩家自动选择“死亡”频道
+      } else {
+        this.messageRecipient = "all";  // 活着的玩家可以选择所有人频道
+      }
+    },
   }
   };
   </script>
@@ -292,6 +361,7 @@ p {
   width: 50px; /* 固定宽度 */
   height: 50px; /* 固定高度 */
 }
+
 .avatar1 {
   max-width: 100%; /* 设置图像最大宽度 */
   max-height: 100%; /* 设置图像最大高度 */
@@ -324,16 +394,51 @@ p {
   gap: 10px;
 }
 
+.currentPlayer {
+  border: 3px solid #f39c12; /* 为当前玩家头像添加黄色边框 */
+  box-shadow: 0px 0px 10px rgba(255, 165, 0, 0.8); /* 添加一个光辉效果 */
+}
+
 .player {
   display: flex;
   align-items: center;
   gap: 10px;
+  transition: all 0.3s ease;
+
 }
 
 .player.dead {
   text-decoration: line-through;
+  background-color: #e0e0e0; 
+  color: #b0b0b0;
+  opacity: 0.6; 
 }
 
+.avatar0 {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  transition: filter 0.3s ease; 
+}
+
+.player.dead .avatar0 {
+  filter: grayscale(100%) brightness(0.5); 
+}
+
+.player.dead p {
+  font-style: italic; 
+}
+.player p {
+  margin: 0;
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--name-color);
+}
+
+.player span {
+  font-size: 12px;
+  color: var(--name-color);
+}
 .chat-section {
   width: 50%;
   display: flex;
@@ -460,7 +565,7 @@ p {
 }
 
 .recipient-select option {
-  background-color: #fff;
+  background-color: var(--background-color);
   color: #333;
   padding: 10px;
 }
