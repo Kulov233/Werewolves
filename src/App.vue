@@ -10,6 +10,7 @@
       <router-link to="/register">Register</router-link>
       <router-link to="/Home">主页</router-link>
       <router-link to="/RoomCard">房间卡片组件</router-link>
+      <router-link to="/GameInterface">对战房间</router-link>
     </nav>
     <!-- 显示当前路由对应的页面内容 -->
     <router-view></router-view>

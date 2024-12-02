@@ -357,6 +357,7 @@ a-row, a-col {
 .theme-toggle-button:hover {
   background-color: #aaa;
   border-color: transparent;
+  transform: scale(1.1);
 }
 .canvascs {
   width: 92px;

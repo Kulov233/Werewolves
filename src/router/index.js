@@ -12,6 +12,7 @@ const routes = [
   { path: '/register', name: 'Register', component: Register },
   { path: '/Home', name: 'Home', component: Home },
   { path: '/RoomCard', name: 'RoomCard', component: RoomCard },
+  { path: '/GameInterface', name: 'GameInterface', component: GameInterface },
 ]
 
 const router = createRouter({
