@@ -1,18 +1,48 @@
 <template>
-    <div class="game-container" @click="closePlayerDetails">
+    <div class="game-container" @click="closeALL" >
+      <!-- 顶部菜单栏 -->
       <div class="top-bar">
-      <button class="icon-button" @click="toggleMenu">
-        <img class="icon" src="@/assets/menu.svg" alt="Menu" />
-      </button>
-      <button class="icon-button" @click="openFriends">
-        <img class="icon" src="@/assets/friends.svg" alt="Friends" />
-      </button>
-      <button class="icon-button" @click="openHistory">
-        <img class="icon" src="@/assets/history.svg" alt="History" />
-      </button>
-    
-    
-    </div>
+        <button class="icon-button left" @click.stop="toggleSidebar('menu')">
+          <img class="icon" src="@/assets/menu.svg" alt="Menu" />
+        </button>
+        <!-- 右侧按钮组 -->
+        <div class="right-buttons">
+          <button class="icon-button" @click.stop="toggleSidebar('friends')">
+            <img class="icon" src="@/assets/friends.svg" alt="Friends" />
+          </button>
+          <button class="icon-button" @click.stop="toggleSidebar('history')">
+            <img class="icon" src="@/assets/history.svg" alt="History" />
+          </button>
+        </div>
+      </div>
+
+      <!-- 左侧滑出菜单 -->
+      <div class="sidebar menu-sidebar" v-show="showMenuSidebar" @click.stop="stopClick">
+        <div class="sidebar-content">
+          <h3>菜单内容</h3>
+          <p>这里是一些内容，点击其他地方关闭。</p>
+          <button @click="toggleSidebar('menu')">关闭</button>
+        </div>
+      </div>
+
+      <!-- 右侧滑出菜单 Friends -->
+      <div class="sidebar friends-sidebar" v-show="showFriendsSidebar" @click.stop>
+        <div class="sidebar-content">
+          <h3>朋友列表</h3>
+          <p>这里显示朋友的信息。</p>
+          <button @click="toggleSidebar('friends')">关闭</button>
+        </div>
+      </div>
+
+      <!-- 右侧滑出菜单 History -->
+      <div class="sidebar history-sidebar" v-show="showHistorySidebar" @click.stop>
+        <div class="sidebar-content">
+          <h3>历史记录</h3>
+          <p>这里显示历史记录信息。</p>
+          <button @click="toggleSidebar('history')">关闭</button>
+        </div>
+      </div>
+
       <!-- 左侧玩家列表 -->
       <div class="player-list">
         <div v-for="(player, index) in players" :key="index" :class="['player', { dead: player.isDead }]">
@@ -67,7 +97,7 @@
           />
           <!-- 图标按钮 -->
           <button @click="sendMessage" class="send-button">
-            <img class="send-icon" src="@/assets/send.png" alt="发送图标" /> <!-- 或者使用一个自定义图标图片 -->
+            <img class="send-icon" src="@/assets/send.svg" alt="发送图标" /> <!-- 或者使用一个自定义图标图片 -->
           </button>
         </div>
       </div>
@@ -188,6 +218,11 @@
         victoryCondition: "再淘汰1名人类",
         livingTeammates: 0,
         showDetails: false,   // 控制显示详细信息
+
+        showMenuSidebar: false, // 控制侧边栏的显示与否
+        showFriendsSidebar: false,
+        showHistorySidebar: false,
+
         isDead: false, // 当前玩家是否死亡
         selectedPlayer: null,  // 被选中的玩家
         
@@ -226,7 +261,7 @@
           { senderid: 3, sendername: "Zhao", recipients: "all", avatar: require('@/assets/head.png'), text: "他肯定有问题！" }
         ];
       },
-      // 可以设置一个动态方法来更新当前玩家名字
+      // 可以设置一个动态方法来更新当前玩家名字,后续优化接口
       setCurrentPlayer(playerId) {
         this.currentPlayerId = playerId;  // 设置当前玩家ID
       },
@@ -241,7 +276,50 @@
         else{
           return '未知';
         }
+      },
 
+      toggleSidebar(type) {
+        if (type === 'menu') {
+          this.showMenuSidebar = !this.showMenuSidebar;
+          this.showFriendsSidebar = false;
+          this.showHistorySidebar = false;
+        } else if (type === 'friends') {
+          this.showFriendsSidebar = !this.showFriendsSidebar;
+          this.showMenuSidebar = false;
+          this.showHistorySidebar = false;
+        } else if (type === 'history') {
+          this.showHistorySidebar = !this.showHistorySidebar;
+          this.showMenuSidebar = false;
+          this.showFriendsSidebar = false;
+        }
+      },
+
+      // 关闭侧边栏
+      closeALL(){
+        this.closeMenuSidebar();
+        this.closeFriendsSidebar();
+        this.closeHistorySidebar();
+        this.closePlayerDetails();
+      },
+      
+      closeMenuSidebar() {
+        this.showMenuSidebar = false;
+      },
+      closeFriendsSidebar() {
+        this.showMenuSidebar = false;
+      },
+      closeHistorySidebar() {
+        this.showMenuSidebar = false;
+      },
+      closePlayerDetails() {
+        this.showDetails = false;
+        this.selectedPlayer = null;
+      },
+
+
+      // 阻止点击菜单内部时关闭
+      stopClick(event) {
+        event.stopPropagation();
       },
 
       sendMessage() {
@@ -288,10 +366,7 @@
         this.playerDetailsTop = rect.top + window.scrollY; // 距离页面顶部的距离
         this.playerDetailsLeft = rect.left + window.scrollX + avatar.offsetWidth + 10; // 距离页面左侧的距离，加10像素的间隔
       },
-      closePlayerDetails() {
-        this.showDetails = false;
-        this.selectedPlayer = null;
-      },
+      
       reportPlayer(player) {
         alert(`${player.name} 已被举报！`);
       },
@@ -613,13 +688,20 @@ p {
   background-color: transparent;
   border: none;
   cursor: pointer;
+  border-radius: 50%; 
   font-size: 1.5em;
   margin-left: 5px;
   cursor: pointer;
   transition: background-color 0.3s ease;
 }
-
+.send-button img {
+  width: 40px;  /* 设置图标的宽度 */
+  height: 40px; /* 设置图标的高度 */
+  transition: transform 0.3s ease;
+}
 .send-button:hover{
+  background-color: #aaa;
+  border-color: transparent;
   transform: scale(1.1);
 }
 /*TODO:改悬浮样式*/
@@ -793,13 +875,14 @@ p {
 /* 横向工具栏样式 */
 .top-bar {
   display: flex;
-  justify-content: flex-start;
+  justify-content: space-between;
   align-items: center;
   background-color: #fff;
   padding: 10px 20px;
   position: fixed;
   top: 0;
   width: 100%;
+  height: 5%;
   z-index: 100;
 }
 
@@ -819,6 +902,56 @@ p {
 .icon-button:hover {
   transform: scale(1.1);
 }
+
+/* 特别设置左侧菜单按钮 */
+.top-bar .left {
+  margin-left: 0; /* 保证左侧按钮不会被推到中间 */
+}
+
+/* 右侧按钮组 */
+.right-buttons {
+  display: flex;
+  gap: 10px; /* 让右边的按钮之间有间距 */
+}
+
+/* 侧边栏的样式 */
+.sidebar {
+  position: fixed;
+  top: 5%;
+  width: 250px;
+  height: calc(95%);
+  background-color: #fff;
+  color: white;
+  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.5);
+  border-radius: 0 10px 10px 0; /* 圆角 */
+  transition: transform 0.5s ease, opacity 0.5s ease; /* 控制平滑过渡 */
+  z-index: 999;
+  overflow: hidden;
+}
+
+.sidebar-content {
+  padding: 20px;
+}
+.menu-sidebar {
+  left: 0; 
+}
+
+.friends-sidebar, .history-sidebar {
+  right: 0;
+}
+
+/* 侧边栏打开时 */
+.menu-sidebar.open{
+  transform: translateX(250px); /* 从左侧或右侧滑入 */
+  opacity: 1; /* 显示 */
+}
+
+.friends-sidebar.open, .history-sidebar.open {
+  transform: translateX(250px); /* 从右侧滑入 */
+  opacity: 1; /* 显示 */
+}
+
+
 
 /* 大的日夜切换图标样式 */
 .sun-moon-icon {
