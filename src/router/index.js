@@ -5,6 +5,7 @@ import Login from '@/components/Login.vue'
 import Register from '@/components/Register.vue'
 import Home from '@/components/Home.vue'
 import RoomCard from '@/components/RoomCard.vue'
+import search from '@/components/search.vue'
 const routes = [
   { path: '/', name: 'GameInterface', component: GameInterface },
   { path: '/profile', name: 'UserProfile', component: UserProfile }, // 新页面路由
@@ -13,6 +14,7 @@ const routes = [
   { path: '/Home', name: 'Home', component: Home },
   { path: '/RoomCard', name: 'RoomCard', component: RoomCard },
   { path: '/GameInterface', name: 'GameInterface', component: GameInterface },
+  { path: '/search', name: 'search', component: search },
 ]
 
 const router = createRouter({

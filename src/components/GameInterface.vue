@@ -213,6 +213,7 @@
         ],
         userMessage: "",
 
+
         role: "狼人",
         objective: "淘汰全部人类",
         victoryCondition: "再淘汰1名人类",
