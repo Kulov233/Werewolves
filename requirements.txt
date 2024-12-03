@@ -9,3 +9,4 @@ pillow==11.0.0
 django-redis==5.4.0
 channels-redis==4.2.1
 uvicorn[standard]==0.32.0
+celery==5.34.0

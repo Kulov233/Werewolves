@@ -10,6 +10,7 @@ https://docs.djangoproject.com/en/5.1/howto/deployment/asgi/
 import os
 from channels.routing import ProtocolTypeRouter, URLRouter
 from lobby.routing import websocket_urlpatterns as lobby_websocket_urlpatterns
+from game.routing import websocket_urlpatterns as game_websocket_urlpatterns
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "app.settings")
 
@@ -20,7 +21,7 @@ application = ProtocolTypeRouter({
     "http": get_asgi_application(),
     "websocket": JWTAuthMiddleware(
         URLRouter(
-            lobby_websocket_urlpatterns
+            lobby_websocket_urlpatterns + game_websocket_urlpatterns
         )
     ),
 })

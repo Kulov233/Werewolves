@@ -40,10 +40,11 @@ INSTALLED_APPS = [
     'rest_framework', # REST 框架
     'channels', # Channels
     'channels_redis', # Channels Redis
+    'celery', # Celery
     'corsheaders', # 跨域请求
     'accounts',  # 用户
-    'lobby',
-    'game' # 游戏大厅
+    'lobby', # 游戏大厅
+    'game' # 游戏内逻辑
 ]
 
 MIDDLEWARE = [
@@ -196,13 +197,25 @@ CACHES = {
         },
         "KEY_PREFIX": "lobby"
     },
-    # 房间缓存
-    "room_cache": {
+    # 游戏房间缓存
+    "game_cache": {
         "BACKEND": "django_redis.cache.RedisCache",
         "LOCATION": "redis://127.0.0.1:63790/1",
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         },
-        "KEY_PREFIX": "room"
+        "KEY_PREFIX": "game"
     },
 }
+
+# Celery 配置
+
+CELERY_BROKER_URL = 'redis://localhost:63790/2'
+
+CELERY_RESULT_BACKEND = 'redis://localhost:63790/2'
+
+CELERY_ACCEPT_CONTENT = ['json']  # Celery 接受的消息内容类型
+
+CELERY_TASK_SERIALIZER = 'json'  # 任务序列化格式
+
+CELERY_RESULT_SERIALIZER = 'json'  # 结果序列化格式
