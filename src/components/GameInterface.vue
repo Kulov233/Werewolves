@@ -1,5 +1,7 @@
 <template>
     <div class="game-container" @click="closeALL" >
+
+  
       <!-- 顶部菜单栏 -->
       <div class="top-bar">
         <button class="icon-button left" @click.stop="toggleSidebar('menu')">
@@ -17,31 +19,37 @@
       </div>
 
       <!-- 左侧滑出菜单 -->
-      <div class="sidebar menu-sidebar" v-show="showMenuSidebar" @click.stop="stopClick">
-        <div class="sidebar-content">
-          <h3>菜单内容</h3>
-          <p>这里是一些内容，点击其他地方关闭。</p>
-          <button @click="toggleSidebar('menu')">关闭</button>
+      <transition name="slide-left">
+        <div v-if="showMenuSidebar" class="sidebar menu-sidebar" @click.stop>
+          <div class="sidebar-content">
+            <h3>菜单内容</h3>
+            <p>这里是一些内容。</p>
+            <button @click="toggleSidebar('menu')">关闭</button>
+          </div>
         </div>
-      </div>
+      </transition>
 
       <!-- 右侧滑出菜单 Friends -->
-      <div class="sidebar friends-sidebar" v-show="showFriendsSidebar" @click.stop>
-        <div class="sidebar-content">
-          <h3>朋友列表</h3>
-          <p>这里显示朋友的信息。</p>
-          <button @click="toggleSidebar('friends')">关闭</button>
+      <transition name="slide-right">
+        <div v-if="showFriendsSidebar" class="sidebar friends-sidebar" @click.stop>
+          <div class="sidebar-content">
+            <h3>朋友列表</h3>
+            <p>这里显示朋友的信息。</p>
+            <button @click="toggleSidebar('friends')">关闭</button>
+          </div>
         </div>
-      </div>
+      </transition>
 
       <!-- 右侧滑出菜单 History -->
-      <div class="sidebar history-sidebar" v-show="showHistorySidebar" @click.stop>
-        <div class="sidebar-content">
-          <h3>历史记录</h3>
-          <p>这里显示历史记录信息。</p>
-          <button @click="toggleSidebar('history')">关闭</button>
+      <transition name="slide-right">
+        <div v-if="showHistorySidebar" class="sidebar history-sidebar" @click.stop>
+          <div class="sidebar-content">
+            <h3>历史记录</h3>
+            <p>这里显示历史记录信息。</p>
+            <button @click="toggleSidebar('history')">关闭</button>
+          </div>
         </div>
-      </div>
+      </transition>
 
       <!-- 左侧玩家列表 -->
       <div class="player-list">
@@ -681,7 +689,7 @@ p {
 }
 
 .message-input:focus {
-
+  border-color: #007bff; /* 聚焦时改变边框颜色 */
   outline: none;
 }
 
@@ -885,6 +893,7 @@ p {
   width: 100%;
   height: 5%;
   z-index: 100;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 /* 图标按钮样式 */
@@ -922,7 +931,7 @@ p {
   width: 250px;
   height: calc(95%);
   background-color: #fff;
-  color: white;
+  color: black;
   box-shadow: 2px 0 5px rgba(0, 0, 0, 0.5);
   border-radius: 0 10px 10px 0; /* 圆角 */
   transition: transform 0.5s ease, opacity 0.5s ease; /* 控制平滑过渡 */
@@ -941,15 +950,32 @@ p {
   right: 0;
 }
 
-/* 侧边栏打开时 */
-.menu-sidebar.open{
-  transform: translateX(250px); /* 从左侧或右侧滑入 */
-  opacity: 1; /* 显示 */
+/* 左侧滑动动画 */
+.slide-left-enter-active,
+.slide-left-leave-active {
+  transition: transform 0.3s ease;
 }
 
-.friends-sidebar.open, .history-sidebar.open {
-  transform: translateX(250px); /* 从右侧滑入 */
-  opacity: 1; /* 显示 */
+.slide-left-enter-from {
+  transform: translateX(-100%);
+}
+
+.slide-left-leave-to {
+  transform: translateX(-100%);
+}
+
+/* 右侧滑动动画 */
+.slide-right-enter-active,
+.slide-right-leave-active {
+  transition: transform 0.3s ease;
+}
+
+.slide-right-enter-from {
+  transform: translateX(100%);
+}
+
+.slide-right-leave-to {
+  transform: translateX(100%);
 }
 
 
