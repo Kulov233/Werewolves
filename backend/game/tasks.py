@@ -117,18 +117,51 @@ def assign_roles_to_players(room_id):
         game_cache = caches['game_cache']
         game_data = game_cache.get(f"room:{room_id}")
 
-        human_players = [player for player, _ in game_data["players"].items()]
-
         roles_assigned = []
-        remaining_roles = [role for role, count in game_data["roles"].items()]
-
+        human_players = [player for player, _ in game_data["players"].items()] # 以UserID表示
+        ai_players = [player for player, _ in game_data["ai_players"].items()] # 以uuid表示
+        remaining_roles = [role for role, count in game_data["roles"].items() for _ in range(count)]
         if game_data["roles_for_humans_first"]:
             roles_for_humans_first = game_data["roles_for_humans_first"].copy()
 
             random.shuffle(roles_for_humans_first)
 
             for role_class in roles_for_humans_first:
-                pass
+                if human_players:
+                    player = human_players.pop(0)
+                    if role_class == "Witch":
+                        cure_count = game_data["witch_config"]["cure_count"]
+                        poison_count = game_data["witch_config"]["poison_count"]
+                        game_data["players"][player] = {"role": role_class, "role_skills": {"cure_count": cure_count, "poison_count": poison_count}}
+                    else:
+                        game_data["players"][player] = {"role": role_class}
+                    remaining_roles.remove(role_class)
+                else:
+                    if ai_players:
+                        player = ai_players.pop(0)
+                        if role_class == "Witch":
+                            cure_count = game_data["witch_config"]["cure_count"]
+                            poison_count = game_data["witch_config"]["poison_count"]
+                            game_data["ai_players"][player] = {"role": role_class, "role_skills": {"cure_count": cure_count, "poison_count": poison_count}}
+                        else:
+                            game_data["ai_players"][player] = {"role": role_class}
+                        remaining_roles.remove(role_class)
+            random.shuffle(remaining_roles)
+
+            remaining_players = human_players + ai_players
+
+            for role_class, player in zip(remaining_roles, remaining_players):
+                if role_class == "Witch":
+                    cure_count = game_data["witch_config"]["cure_count"]
+                    poison_count = game_data["witch_config"]["poison_count"]
+                    game_data["players"][player] = {"role": role_class, "role_skills": {"cure_count": cure_count, "poison_count": poison_count}}
+                else:
+                    game_data["players"][player] = {"role": role_class}
+                roles_assigned.append(player)
+
+            game_cache.set(f"room:{room_id}", game_data)
+            # TODO: 完成分配角色后，发送消息
+
 
     except Exception as e:
         return {"room_id": room_id, "status": "error", "message": "分配角色失败。", "error": str(e)}

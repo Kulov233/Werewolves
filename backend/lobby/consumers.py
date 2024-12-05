@@ -444,12 +444,19 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                                 'alive': True,
                                 'online': False,
                                 'role': None, # 敏感
-                                'role_skills': None, # 敏感
+                                'role_skills': None, # 技能信息（女巫），敏感
                                 }
                                 for idx, player in enumerate(room_data["players"])
                         },
                         "ai_players": {
-                            # TODO: AI 玩家配置
+                            player_id: {
+                                'index': idx + 1 + len(room_data["players"]),
+                                'name': player_info["name"],
+                                'alive': True,
+                                'role': None,
+                                'role_skills': None
+                            }
+                            for idx, (player_id, player_info) in enumerate(room_data["ai_players"].items())
                         },
                         "victory_conditions": {},
                         "game_specified_prompt": "", # 敏感
