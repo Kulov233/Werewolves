@@ -1634,7 +1634,6 @@ textarea.text-input {
 }
 
 
-
 .create-room-button:hover {
   background-color: #0056b3;
 }
@@ -1650,7 +1649,6 @@ textarea.text-input {
   transition: background-color var(--transition-speed) ease;
 }
 
-.quick-match-button:hover,
 .create-room-button:hover {
   background-color: var(--button-hover);
 }
@@ -1670,7 +1668,7 @@ textarea.text-input {
 .quick-match-button {
   width: 50px;
   height: 50px;
-  background-color: transparent;
+  background-color: #409eff;
   border: none;
   border-radius: 50%;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
@@ -1683,10 +1681,11 @@ textarea.text-input {
 .quick-match-button img {
   width: 24px;
   height: 24px;
+  filter: brightness(0) invert(1);
 }
 
 .quick-match-button:hover {
-  background-color: transparent;
+  background-color: #3a8ee6;
   transform: scale(1.1);
 }
 
@@ -1709,10 +1708,7 @@ textarea.text-input {
     opacity: 0;
     transform: translateY(10px);
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+
 }
 
 .quick-match-panel h3 {
