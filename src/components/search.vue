@@ -51,87 +51,246 @@
       </transition>
   
       <!-- 主体内容 -->
-      <main class="content">
-        <!-- 房间列表 -->
-        <section class="room-list">
-          <h2>房间列表</h2>
-          <div class="room-cards">
-            <div class="room-card" v-for="room in filteredRooms" :key="room.id">
-              <h3>{{ room.name }}</h3>
-              <p>房间类型: {{ room.type }}</p>
-              <p>人数: {{ room.currentPeople }}/{{ room.maxPeople }}</p>
-              <button class="join-button" @click.stop="joinRoom(room.id)">加入房间</button>
+      <main class="content" :class="{ 'show-create-room': showCreateRoomPanel }">
+        <!-- 房间列表部分 -->
+        <section class="room-list" :class="{ 'shrink': showCreateRoomPanel }" ref="roomList">
+          
+          <div class="room-list-header">
+            <h2>房间列表</h2>
+            <div class="search-bar" @click.stop>
+              <!-- 左侧 search.svg 组件 -->
+              <div class="search-icon" v-show="showSearchIcon">
+                <img src="@/assets/search.svg" alt="Search" />
+              </div>
+
+              <!-- 中间输入框 -->
+              <input
+                type="text"
+                v-model="searchQuery"
+                @focus="onFocus"
+                @blur="onBlur"
+                placeholder="搜索房间"
+                ref="inputBox"
+                @keyup.enter="searchRoom"
+              />
+
+              <!-- 删除按钮和分隔符 -->
+              <div v-if="searchQuery.length > 0" class="clear-container">
+                <button class="clear-button" @click="clearSearch" title="清空输入">
+                  <img src="@/assets/clear.svg" alt="Clear" />
+                </button>
+                <div class="separator"></div>
+              </div>
+
+              <!-- 右侧搜索按钮 -->
+              <button class="search-button" @click="searchRoom" title="点击搜索">
+                <img src="@/assets/search.svg" alt="Search" />
+              </button>
+
+              <!-- 历史搜索（点击输入框时显示） -->
+              <transition name="fade">
+                <div v-show="showHistory && searchQuery.length === 0" class="history">
+                  <div class="history-header">
+                    <span>搜索历史</span>
+                    <button @click.stop="clearAllHistory" class="clear-all-button" title="清空历史记录">
+                      <img src="@/assets/clearAll.svg" alt="Clear" class="clear-icon" />
+                    </button>
+                  </div>
+                  <ul>
+                    <li v-for="item in history" 
+                        :key="item" 
+                        @click.stop="selectHistory(item)" 
+                        class="history-item">
+                      <img src="@/assets/history.svg" alt="History" class="history-icon"/>
+                      <span>{{ item }}</span>
+                      <button @click.stop="removeHistoryItem(item)" class="remove-item" title="删除历史记录">
+                        <img src="@/assets/clear.svg" alt="Clear" class="clear-icon" />
+                      </button>
+                    </li>
+                  </ul>
+                </div>
+              </transition>
             </div>
+
+            <!-- 在搜索框右边添加一个创建房间按钮 -->
+            <button class="create-Room-button" @click="toggleCreateRoom" title="创建房间">
+              <img src="@/assets/createRoom.svg" alt="Create Room" />
+            </button>
           </div>
+          <!-- 添加过渡动画容器 -->
+          <transition-group 
+            name="room-card" 
+            tag="div" 
+            class="room-cards">
+            <div v-for="room in filteredRooms" 
+                :key="room.id" 
+                class="room-card">
+              <div class="room-card-header">
+                <h3>{{ room.name }}</h3>
+                <span class="room-type" :class="{ 'ai': room.type === '有AI' }">
+                  {{ room.type }}
+                </span>
+                <!-- 添加房主头像 -->
+                <div class="owner-avatar" @click.stop="showProfile(room.id)">
+                  <img src="@/assets/profile-icon.png" alt="房主头像" />
+                  <!-- 个人资料卡弹窗 -->
+                  <transition name="profile">
+                    <div v-if="selectedRoom === room.id" class="profile-card" @click.stop>
+                      <div class="profile-header">
+                         <img src="@/assets/profile-icon.png"
+                            alt="房主头像" 
+                            class="large-avatar"/>
+                        <div class="profile-info">
+                          <h4>{{ userProfile.name || '房主昵称' }}</h4>
+                          <span class="profile-status" :class="{'online': userProfile.isOnline}">
+                            {{ userProfile.isOnline ? '在线' : '离线' }}
+                          </span>
+                        </div>
+                      </div>
+                      <div class="profile-stats">
+                        <div v-for="(stat, index) in userProfile.stats" 
+                            :key="index" 
+                            class="stat-item">
+                          <span class="stat-value">{{ stat.value }}</span>
+                          <span class="stat-label">{{ stat.label }}</span>
+                        </div>
+                      </div>
+                      <div class="profile-actions">
+                        <button class="action-btn add-friend-btn" 
+                                @click="sendFriendRequest(userProfile.userId)"
+                                :disabled="userProfile.isFriend">
+                          <img src="@/assets/addFriend.svg" alt="加好友" class="action-icon"/>
+                          {{ userProfile.isFriend ? '已是好友' : '加好友' }}
+                        </button>
+                        <button class="action-btn report-btn" @click="reportUser(userProfile.userId)">
+                          <img src="@/assets/report.svg" alt="举报" class="action-icon"/>
+                          举报
+                        </button>
+                      </div>
+                      <div class="recent-games">
+                        <h5>最近对战</h5>
+                        <div class="game-list">
+                          <div v-for="game in userProfile.recentGames" 
+                              :key="game.id" 
+                              class="game-item">
+                            <span class="game-result" :class="game.result">
+                              {{ game.result === 'win' ? '胜利' : '失败' }}
+                            </span>
+                            <span class="game-date">{{ game.date }}</span>
+                          </div>
+                        </div>
+                    </div>
+                    </div>
+                  </transition>
+                </div>
+              </div>
+
+              <div class="room-description">
+                <span class="description">
+                    {{ room.description }}
+                </span>
+              </div>
+
+              <div class="room-info">
+                <div class="info-item">
+                  <img src="@/assets/sun.svg" alt="Users" class="info-icon" />
+                  <span class="player-count">
+                    {{ room.currentPeople }}/{{ room.maxPeople }}
+                  </span>
+                </div>
+                
+                <!-- 可以根据需要添加更多房间信息 -->
+                <div class="info-item">
+                  <img src="@/assets/status.svg" alt="Status" class="info-icon" />
+                  <span :class="{'status-full': room.currentPeople === room.maxPeople}">
+                    {{ room.currentPeople === room.maxPeople ? '已满' : '可加入' }}
+                  </span>
+                </div>
+              </div>
+
+              <button 
+                class="join-button" 
+                @click.stop="joinRoom(room.id)"
+                :disabled="room.currentPeople === room.maxPeople">
+                <span v-if="room.currentPeople === room.maxPeople">房间已满</span>
+                <span v-else>加入房间</span>
+              </button>
+            </div>
+          </transition-group>
         </section>
     
-          <!-- 创建房间 -->
-        <section class="create-room">
-          <h2>创建房间</h2>
-          <div class="search-bar" @click="handleBarClick">
-            <!-- 左侧 search.svg 组件 -->
-            <div class="search-icon" v-show="showSearchIcon">
-              <img src="@/assets/search.svg" alt="Search" />
-            </div>
-
-            <!-- 中间输入框 -->
-            <input
-              type="text"
-              v-model="searchQuery"
-              @focus="onFocus"
-              @blur="onBlur"
-              placeholder="搜索房间"
-              ref="inputBox"
-
-            />
-
-            <!-- 删除按钮和分隔符 -->
-            <div v-if="searchQuery.length > 0" class="clear-container">
-              <button class="clear-button" @click="clearSearch" title="清空输入">
-                <img src="@/assets/clear.svg" alt="Clear" />
+        <!-- 创建房间面板 -->
+        <transition name="slide-create">
+          <section v-if="showCreateRoomPanel" class="create-room">
+            <div class="create-room-header">
+              <button class="close-create-room" @click="toggleCreateRoom" title="关闭">
+                <img src="@/assets/close-createRoom.svg" alt="Close" />
               </button>
-              <div class="separator"></div>
+              <h2>创建房间</h2>
             </div>
 
-            <!-- 右侧搜索按钮 -->
-            <button class="search-button" @click="searchRoom" title="点击搜索">
-              <img src="@/assets/search.svg" alt="Search" />
-            </button>
+            <div class="create-room-content">
 
-            <!-- 历史搜索（点击输入框时显示） -->
-            <div v-show="showHistory && searchQuery.length === 0" class="history">
-              <ul>
-                <li v-for="item in history" :key="item" @click="selectHistory(item)">
-                  {{ item }}
-                </li>
-              </ul>
+              <!-- 房间名称输入 -->
+              <div class="form-group">
+                <label for="roomName">房间名称</label>
+                <input 
+                  type="text" 
+                  id="roomName" 
+                  v-model="newRoom.name" 
+                  class="text-input"
+                  placeholder="输入房间名称"
+                >
+              </div>
+
+              <!-- 房间简介输入 -->
+              <div class="form-group">
+                <label for="roomDescription">房间简介</label>
+                <textarea 
+                  id="roomDescription" 
+                  v-model="newRoom.description" 
+                  class="text-input"
+                  placeholder="输入房间简介"
+                  rows="3"
+                ></textarea>
+              </div>
+              <!-- 选择人数 -->
+              <div class="form-group">
+                <label for="peopleCount">选择人数</label>
+                <select id="peopleCount" v-model="selectedPeopleCount" class="select-input">
+                  <option v-for="count in peopleOptions" :key="count" :value="count">
+                    {{ count }} 人
+                  </option>
+                </select>
+              </div>
+
+              <!-- 房间类型选择 -->
+              <div class="form-group">
+                <label>房间类型</label>
+                <div class="radio-group">
+                  <label class="radio-label">
+                    <input type="radio" value="有AI" v-model="roomType" />
+                    <span class="radio-text">有AI</span>
+                  </label>
+                  <label class="radio-label">
+                    <input type="radio" value="无AI" v-model="roomType" />
+                    <span class="radio-text">无AI</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- 按钮组 -->
+              <div class="action-buttons">
+                <button class="quick-match-button" @click="quickMatch">
+                  快速匹配
+                </button>
+                <button class="create-room-button" @click="createRoom">
+                  创建房间
+                </button>
+              </div>
             </div>
-          </div>
-          
-          <!-- 添加下拉框 -->
-          <div class="select-people">
-            <label for="peopleCount">选择人数：</label>
-            <select id="peopleCount" v-model="selectedPeopleCount">
-              <option v-for="count in peopleOptions" :key="count" :value="count">
-                {{ count }} 人
-              </option>
-            </select>
-          </div>
-          <div class="room-type">
-            <label>
-              <input type="radio" value="AI" v-model="roomType" />
-              有AI
-            </label>
-            <label>
-              <input type="radio" value="NoAI" v-model="roomType" />
-              无AI
-            </label>
-          </div>
-          <div class="action-buttons">
-            <button class="quick-match-button" @click="quickMatch">快速匹配</button>
-            <button class="create-room-button" @click="createRoom">创建房间</button>
-          </div>
-        </section>
+          </section>
+        </transition>
       </main>
     </div>
 </template>
@@ -145,18 +304,48 @@ export default {
       showHistory: false,      // 控制历史搜索的显示
       history: ['房间1', '房间2', '房间3'], // 历史记录
 
-      roomType: "NoAI", // 房间类型（默认无AI）
+      roomType: "无AI", // 房间类型（默认无AI）
       filteredRooms: [
-      { id: 1, name: "房间1", type: "有AI", currentPeople: 2, maxPeople: 6 },
-      { id: 2, name: "房间2", type: "无AI", currentPeople: 4, maxPeople: 10 },
-      { id: 3, name: "房间3", type: "有AI", currentPeople: 1, maxPeople: 4 },
+      { id: 1, name: "房间1", type: "有AI", description:"这是一个六人局房间且有AI", currentPeople: 2, maxPeople: 6 },
+      { id: 2, name: "房间2", type: "无AI", description:"无", currentPeople: 4, maxPeople: 10 },
+      { id: 3, name: "房间3", type: "有AI", description:"无", currentPeople: 1, maxPeople: 4 },
     ],
       selectedPeopleCount: 2, // 默认选中2人
-      peopleOptions: [2,3, 4,5, 6,7, 8,9, 10,11,12,13,14,15,16,17,18,19,20,21,22,23,24], // 可选人数列表
+      peopleOptions: [4, 6, 8, 10, 12, 16], // 可选人数列表
       
       showMenuSidebar: false, // 控制侧边栏的显示与否
       showFriendsSidebar: false,
       showHistorySidebar: false,
+
+      showCreateRoomPanel: false, // 控制创建房间面板的显示
+      selectedRoom: null, // 用于控制显示哪个房间的个人资料卡
+      
+
+      userProfile: {
+          userId: "user1",
+          name: "云想衣裳花想容",
+          avatar: "@/assets/profile-icon.png",
+          isOnline: true,
+          isFriend: false,
+          stats: [
+            { label: '游戏场数', value: 128 },
+            { label: '胜率', value: '76%' },
+            { label: '评分', value: 4.8 }
+          ],
+          recentGames: [
+            { id: 'g1', result: 'win', date: '2024-12-04' },
+            { id: 'g2', result: 'win', date: '2024-12-03' },
+            { id: 'g3', result: 'lose', date: '2024-12-03' }
+          ]
+      },
+      //userProfile: null,
+      newRoom: {
+        name: `云想衣裳花想容的房间`,  // 这里需要替换实际的用户名
+        description: "无",
+        type: "无AI",
+        currentPeople: 1,
+        maxPeople: 2
+      }
     };
   },
   computed: {
@@ -170,9 +359,50 @@ export default {
     //},
   },
   methods: {
+    //async showProfile(roomId) {
+    //  this.selectedRoom = this.selectedRoom === roomId ? null : roomId;
+    //  if (this.selectedRoom) {
+    //    // 获取用户资料
+    //    try {
+    //      const response = await this.getUserProfile(roomId);
+    //      this.userProfile = response.data;
+    //    } catch (error) {
+    //      console.error('Failed to fetch user profile:', error);
+    //    }
+    //  }
+    //},
+//
+    //// 获取用户资料接口
+    //async getUserProfile(roomId) {
+    //  // TODO: 实现接口调用
+    //  // return await api.get(`/api/user/profile/${roomId}`);
+    //},
+//
+    //// 发送好友请求
+    //async sendFriendRequest(userId) {
+    //  try {
+    //    // await api.post('/api/friend/request', { userId });
+    //    // 处理成功响应
+    //  } catch (error) {
+    //    console.error('Failed to send friend request:', error);
+    //  }
+    //},
+//
+    //// 举报用户
+    //async reportUser(userId) {
+    //  try {
+    //    // await api.post('/api/user/report', { userId });
+    //    // 处理成功响应
+    //  } catch (error) {
+    //    console.error('Failed to report user:', error);
+    //  }
+    //},
     // 输入框点击事件，展开左侧 search.svg 图标
+
+
     onFocus() {
       this.showSearchIcon = true;
+      this.showHistory = true; // 显示历史记录
     },
     onBlur() {
       if (this.searchQuery.length === 0) {
@@ -182,23 +412,28 @@ export default {
     // 清空输入框内容
     clearSearch() {
       this.searchQuery = '';
+      this.showHistory = true;
     },
     // 执行搜索操作
     searchRoom() {
-      alert(`搜索内容：${this.searchQuery}`);
-      // 这里可以执行后台搜索接口调用
+      if (this.searchQuery.trim()) {
+        // 添加到历史记录
+        if (!this.history.includes(this.searchQuery)) {
+          this.history.unshift(this.searchQuery);
+        }
+        alert(`搜索内容：${this.searchQuery}`);
+      }
     },
     // 选择历史搜索项
     selectHistory(item) {
       this.searchQuery = item;
       this.showHistory = false;
     },
-    // 点击搜索框外部区域关闭左侧的 search.svg
-    handleBarClick(event) {
-      const inputBox = this.$refs.inputBox;
-      if (inputBox && !inputBox.contains(event.target)) {
-        this.showSearchIcon = false;
-      }
+    removeHistoryItem(item) {
+      this.history = this.history.filter(h => h !== item);
+    },
+    clearAllHistory() {
+      this.history = [];
     },
 
 
@@ -243,6 +478,7 @@ export default {
     closePlayerDetails() {
       this.showDetails = false;
       this.selectedPlayer = null;
+      this.selectedRoom = null
     },
     closeHistory() {
       this.showHistory = false; 
@@ -258,11 +494,47 @@ export default {
       alert(`快速匹配：${this.roomType}`);
     },
     createRoom() {
-      alert(`创建房间：${this.roomType}`);
+      const roomId = this.filteredRooms.length + 1;
+      const newRoom = {
+        id: roomId,
+        name: this.newRoom.name,
+        type: this.roomType,
+        description: this.newRoom.description,
+        currentPeople: 1,
+        maxPeople: this.selectedPeopleCount
+      };
+      
+      this.filteredRooms.push(newRoom);
+      this.toggleCreateRoom(); // 关闭创建面板
+      
+      // 重置表单
+      this.newRoom.name = `云想衣裳花想容的房间`;
+      this.newRoom.description = "无";
+      this.roomType = "无AI";
+      this.selectedPeopleCount = 2;
     },
     joinRoom(roomId) {
     alert(`加入房间 ID: ${roomId}`);
     },
+
+    toggleCreateRoom() {
+      this.showCreateRoomPanel = !this.showCreateRoomPanel;
+      // 添加延迟以确保动画效果同步
+      if (this.showCreateRoomPanel) {
+        setTimeout(() => {
+          this.$refs.roomList.classList.add('shrink');
+        }, 50);
+      } else {
+        this.$refs.roomList.classList.remove('shrink');
+      }
+    },
+
+    
+
+    showProfile(roomId) {
+      this.selectedRoom = this.selectedRoom === roomId ? null : roomId;
+    }
+    
   },
 };
 </script>
@@ -413,7 +685,7 @@ export default {
   padding: 5px;
   border: 1px solid #ccc;
   border-radius: 25px;
-  width: 100%;
+  width: 40%;
   position: relative;
   background-color: #fff;
 }
@@ -430,7 +702,7 @@ export default {
   margin-right: 8px;
   transition: width 0.3s ease;
   display: flex;
-  margin-top: 10px;
+  margin-top: -1px;
 }
 
 
@@ -450,7 +722,7 @@ export default {
 }
   
 .clear-container {
-  top: 23%;
+  top: 20%;
   display: flex;
   align-items: center;
   position: absolute;
@@ -500,34 +772,115 @@ export default {
   height: 20px;
   background-color: #333;
   position: absolute;
-  top: 21%;
-  right: 15%; /* 右侧对齐 */
+  top: 12%;
+  right: -8%; /* 右侧对齐 */
+}
+
+/* 淡入淡出动画 */
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
 }
 
 .history {
   position: absolute;
-  top: 100%;
+  top: calc(100% + 8px);
   left: 0;
   width: 100%;
-  background-color: #fff;
-  border: 1px solid #ccc;
-  z-index: 10;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  overflow: hidden;
 }
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #eee;
+}
+
+.history-header span {
+  color: #666;
+  font-size: 14px;
+  font-weight: 500;
+}
+
 
 .history ul {
-  list-style: none;
-  padding: 0;
   margin: 0;
+  padding: 8px 0;
+  list-style: none;
 }
 
-.history li {
-  padding: 8px;
+.history-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
   cursor: pointer;
+  transition: background-color 0.3s ease;
 }
 
-.history li:hover {
-  background-color: #f1f1f1;
+.history-item:hover {
+  background-color: #f5f5f5;
 }
+
+.history-icon {
+  width: 16px;
+  height: 16px;
+  margin-right: 12px;
+  opacity: 0.5;
+}
+
+.history-item span {
+  flex: 1;
+  color: #333;
+  font-size: 14px;
+}
+.clear-all-button,
+.remove-item {
+  background-color: transparent !important;
+  border: none;
+  padding: 6px;
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.clear-all-button:hover .clear-icon,
+.remove-item:hover .clear-icon {
+  filter: invert(31%) sepia(98%) saturate(1640%) hue-rotate(201deg) brightness(96%) contrast(107%);
+}
+
+.clear-icon {
+  width: 16px;
+  height: 16px;
+  transition: filter 0.3s ease;
+}
+
+.remove-item {
+  visibility: hidden;
+  opacity: 0;
+  transition: all 0.3s ease;
+}
+
+.history-item:hover .remove-item {
+  visibility: visible;
+  opacity: 1;
+}
+
+.history-item:hover .remove-item {
+  visibility: visible;
+}
+
 
   .header-actions button {
     margin-left: 10px;
@@ -538,141 +891,623 @@ export default {
     cursor: pointer;
   }
   
-/* 主体内容样式 */
+/* 主内容区域样式调整 */
 .content {
   display: flex;
   flex: 1;
-  padding: 10px; /* 顶部留出导航栏空间 */
+  padding: 20px;
   gap: 20px;
-  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
+  transition: all 0.3s ease;
 }
   
 /* 房间列表样式 */
 .room-list {
   flex: 2;
-  background-color: #ffffff;
-  padding: 20px;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  background-color: #f4f7fc;
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+.room-list {
+  transition: transform 0.3s ease, flex 0.3s ease;
+}
+.room-list.shrink {
+  transform: translateX(-2%);
 }
 
-.room-list h2 {
-  margin-bottom: 20px;
-  color: var(--text-color);
-}
-  
-  .room-list ul {
-    list-style: none;
-    padding: 0;
-  }
-  
-  .room-list li {
-    padding: 5px;
-    border-bottom: 1px solid #eee;
-  }
-  
-/* 创建房间样式 */
-.create-room {
-  flex: 1;
-  background-color: #ffffff;
-  padding: 20px;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-  
-.create-room h2 {
-  margin-bottom: 20px;
-  color: var(--text-color);
-}
-  .create-room div {
-    margin-bottom: 10px;
-  }
-  
-  .create-room button {
-    margin-right: 10px;
-    background-color: #007bff;
-    color: white;
-    border: none;
-    padding: 5px 10px;
-    cursor: pointer;
-  }
-
-.select-people {
-  margin-bottom: 15px;
-}
-
-.select-people label {
-  margin-right: 10px;
-  color: var(--text-color);
-}
-
-.select-people select {
-  padding: 8px 12px;
-  font-size: 14px;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  outline: none;
-}
-
-.room-cards {
+/* 房间列表头部布局 */
+.room-list-header {
   display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
+  justify-content: space-between; /* 元素分布在两端和中间 */
+  align-items: center;
+  margin-bottom: 24px;
+  padding: 0 10px;
+  height: 50px;
 }
+.create-Room-button {
+  background-color: transparent !important;;
+  border: none;
+  cursor: pointer;
+  padding: 10px;
+}
+
+.create-Room-button:hover {
+  transform: scale(1.1);
+  filter: brightness(0) saturate(100%) invert(41%) sepia(93%) saturate(390%) hue-rotate(188deg) brightness(98%) contrast(89%);
+}
+
+.create-Room-button img {
+  width: 30px; /* 设置图标的大小 */
+  height: 30px;
+}
+
+/* 右侧创建房间面板动画 */
+.content {
+  overflow: hidden;
+}
+
+/* 创建房间面板滑动动画 */
+.slide-create-enter-active,
+.slide-create-leave-active {
+  transition: transform 0.3s ease;
+}
+
+.slide-create-enter-from,
+.slide-create-leave-to {
+  transform: translateX(100%);
+}
+
+.room-list-header h2 {
+  font-size: 1.5em;
+  color: #2c3e50;
+  margin: 0;
+}
+
+/* 房间卡片网格布局 */
+.room-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 24px;
+  padding: 8px 4px;
+}
+
+/* 卡片动画效果 */
+.room-card-enter-active,
+.room-card-leave-active {
+  transition: all 0.5s ease;
+}
+
+.room-card-enter-from,
+.room-card-leave-to {
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+.room-card-move {
+  transition: transform 0.5s ease;
+}
+
+/* 房间卡片样式 */
 .room-card {
-  background-color: #f9f9f9;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 16px;
-  width: 220px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  transition: transform var(--transition-speed) ease, box-shadow var(--transition-speed) ease;
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s ease;
+  border: 1px solid #eef1f5;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .room-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 12px rgba(0, 0, 0, 0.08);
+  border-color: #e1e8f0;
 }
 
-.room-card h3 {
-  margin: 0 0 10px;
-  color: var(--text-color);
+/* 卡片头部样式 */
+.room-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
 }
 
-.room-card p {
-  margin: 5px 0;
-  color: var(--text-color);
+/* 房主头像样式 */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
-.room-card button {
-  background-color: #007bff;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  padding: 8px 12px;
+.owner-avatar {
+  position: relative;
+  width: 32px;
+  height: 32px;
   cursor: pointer;
-  margin-top: 8px;
-  font-size: 14px;
-  border: none;
-  transition: background-color var(--transition-speed) ease;
+  transition: transform 0.3s ease;
 }
 
-.room-card button:hover {
-  background-color: #0056b3;
+.owner-avatar:hover {
+  transform: scale(1.1);
+}
+
+.owner-avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* 个人资料卡动画 */
+.profile-enter-active,
+.profile-leave-active {
+  transition: all 0.3s ease;
+}
+
+.profile-enter-from,
+.profile-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+/* 个人资料卡样式 */
+.profile-card {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: -8px;
+  width: 240px; /* 减小宽度 */
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 16px;
+  z-index: 1000;
+}
+
+.profile-card::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  right: 20px;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  transform: rotate(45deg);
+  box-shadow: -2px -2px 5px rgba(0, 0, 0, 0.04);
+}
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.large-avatar {
+  width: 48;
+  height: 48;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.profile-info {
+  flex: 1;
+}
+
+.profile-info h4 {
+  margin: 0 0 4px;
+  font-size: 0.95em;
+  color: #2c3e50;
+}
+
+.profile-status {
+  display: inline-block;
+  padding: 2px 6px;
+  background: #ecf5ff;
+  color: #409eff;
+  border-radius: 12px;
+  font-size: 0.85em;
+}
+
+.profile-status.online {
+  background: #ecf5ff;
+  color: #409eff;
+}
+
+.profile-stats {
+  display: flex;
+  justify-content: space-around;
+  padding: 12px 0;
+  border-top: 1px solid #eee;
+  border-bottom: 1px solid #eee;
+  margin-bottom: 16px;
+}
+
+.stat-item {
+  text-align: center;
+}
+
+.stat-value {
+  display: block;
+  font-size: 1em;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.stat-label {
+  font-size: 0.75em;
+  color: #666;
+}
+
+.profile-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.action-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.8em;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background-color: transparent;
+}
+
+.add-friend-btn {
+  background-color: transparent;
+  color: #333;
+}
+
+.add-friend-btn:disabled {
+  background-color: #a0cfff;
+  cursor: not-allowed;
+}
+
+.report-btn {
+  background-color: transparent;
+  color: red;
+}
+
+.action-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: brightness(1.1);
+}
+
+.action-icon {
+  width: 14px;
+  height: 14px;
+  opacity: 0.9;
+}
+
+.action-btn img{
+  width: 24px;
+  height: 24px;
+}
+
+
+.recent-games {
+  background: #f8fafc;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.recent-games h5 {
+  margin: 0 0 8px;
+  color: #2c3e50;
+  font-size: 0.85em;
+}
+
+.game-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px;
+  background: #fff;
+  border-radius: 4px;
+  font-size: 0.8em;
+  margin-bottom: 4px;
+}
+
+.game-result {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.game-result.win {
+  background: #f0f9eb;
+  color: #67c23a;
+}
+
+.game-result.lose {
+  background: #fef0f0;
+  color: #f56c6c;
+}
+
+.game-date {
+  color: #666;
+  font-size: 0.85em;
+}
+
+/* 添加 room-description 样式 */
+.room-description {
+  padding: 8px 0;
+  border-top: 1px solid #f0f2f5;
+  border-bottom: 1px solid #f0f2f5;
+}
+
+.room-description .description {
+  color: #666;
+  font-size: 0.9em;
+  line-height: 1.4;
+  display: block;
+  /* 超出两行显示省略号 */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.room-card-header h3 {
+  margin: 0;
+  font-size: 1.1em;
+  color: #2c3e50;
+  font-weight: 600;
 }
 
 .room-type {
-  margin-bottom: 15px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.85em;
+  background-color: #f0f2f5;
+  color: #606a78;
 }
 
-.room-type label {
-  margin-right: 20px;
-  color: var(--text-color);
+.room-type.ai {
+  background-color: #ecf5ff;
+  color: #409eff;
 }
 
+/* 房间信息样式 */
+.room-info {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #606a78;
+  font-size: 0.9em;
+}
+
+.info-icon {
+  width: 16px;
+  height: 16px;
+  opacity: 0.7;
+}
+
+.player-count {
+  font-family: 'Monaco', monospace;
+}
+
+.status-full {
+  color: #f56c6c;
+}
+
+/* 加入按钮样式 */
+.join-button {
+  margin-top: auto;
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  background-color: #409eff;
+  color: white;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.join-button:hover:not(:disabled) {
+  background-color: #3a8ee6;
+  transform: translateY(-2px);
+}
+
+.join-button:disabled {
+  background-color: #a0cfff;
+  cursor: not-allowed;
+  transform: none;
+}
+
+  
+/* 创建房间面板样式 */
+.create-room {
+  position: relative;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1);
+  padding: 24px;
+  width: 400px;
+  transition: all 0.3s ease;
+  overflow-y: auto;
+}
+
+/* 创建房间滑动动画 */
+.slide-create-enter-active,
+.slide-create-leave-active {
+  transition: transform 0.3s ease;
+}
+
+.slide-create-enter-from,
+.slide-create-leave-to {
+  transform: translateX(100%);
+}
+
+/* 创建房间头部样式 */
+.create-room-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 30px;
+  position: relative;
+}
+
+.close-create-room {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  padding: 8px;
+  cursor: pointer;
+  transition: transform 0.3s ease;
+}
+
+.close-create-room:hover {
+  transform: translateY(-50%) scale(1.1);
+}
+
+.close-create-room img {
+  width: 24px;
+  height: 24px;
+}
+
+.create-room h2 {
+  flex: 1;
+  text-align: center;
+  margin: 0;
+  color: #333;
+  font-size: 1.5em;
+}
+
+/* 表单样式美化 */
+.create-room-content {
+  padding: 20px 0;
+}
+
+.form-group {
+  margin-bottom: 24px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  color: #666;
+  font-weight: 500;
+  text-align: left; /* 确保文本左对齐 */
+}
+.text-input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #e1e1e1;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #333;
+  background-color: #fff;
+  transition: all 0.3s ease;
+  outline: none;
+}
+
+.text-input:focus {
+  border-color: #409eff;
+  box-shadow: 0 0 0 2px rgba(64,158,255,0.1);
+}
+
+textarea.text-input {
+  resize: vertical;
+  min-height: 80px;
+}
+.select-input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #e1e1e1;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #333;
+  background-color: #fff;
+  transition: border-color 0.3s ease;
+}
+
+.select-input:focus {
+  border-color: #007bff;
+  outline: none;
+}
+
+/* 单选按钮组样式 */
+.radio-group {
+  display: flex;
+  gap: 20px;
+}
+
+.radio-label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.radio-label input[type="radio"] {
+  margin-right: 8px;
+}
+
+.radio-text {
+  color: #666;
+}
+
+/* 按钮样式美化 */
 .action-buttons {
   display: flex;
-  gap: 10px;
+  gap: 16px;
+  margin-top: 32px;
+}
+
+.quick-match-button,
+.create-room-button {
+  flex: 1;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.quick-match-button {
+  background-color: #f0f2f5;
+  color: #333;
+}
+
+.create-room-button {
+  background-color: #007bff;
+  color: white;
+}
+
+.quick-match-button:hover {
+  background-color: #e4e6e9;
+}
+
+.create-room-button:hover {
+  background-color: #0056b3;
 }
 
 .quick-match-button,
