@@ -281,9 +281,6 @@
 
               <!-- 按钮组 -->
               <div class="action-buttons">
-                <button class="quick-match-button" @click="quickMatch">
-                  快速匹配
-                </button>
                 <button class="create-room-button" @click="createRoom">
                   创建房间
                 </button>
@@ -292,6 +289,54 @@
           </section>
         </transition>
       </main>
+
+      <!-- 浮动快速匹配按钮 -->
+      <div
+        class="quick-match-button-container"
+        @mousedown="startDrag"
+        @touchstart="startDrag"
+        :style="{ top: buttonPosition.y + 'px', left: buttonPosition.x + 'px' }"
+      >
+        <button class="quick-match-button" @click.stop="toggleQuickMatchPanel" title="快速匹配">
+          <img src="@/assets/quickMatch.svg" alt="快速匹配" />
+        </button>
+      </div>
+
+      <!-- 快速匹配选项窗口 -->
+      <transition name="fade">
+        <div v-if="showQuickMatchPanel" class="quick-match-panel" @click.stop>
+          <h3>快速匹配</h3>
+          <div class="form-group">
+            <label for="matchPeopleCount">选择人数</label>
+            <select id="matchPeopleCount" v-model="matchPeopleCount" class="select-input">
+              <option v-for="count in peopleOptions" :key="count" :value="count">
+                {{ count }} 人
+              </option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>是否有AI</label>
+            <div class="radio-group">
+              <label class="radio-label">
+                <input type="radio" value="有AI" v-model="matchAI" />
+                <span class="radio-text">有AI</span>
+              </label>
+              <label class="radio-label">
+                <input type="radio" value="无AI" v-model="matchAI" />
+                <span class="radio-text">无AI</span>
+              </label>
+            </div>
+          </div>
+          <div class="action-buttons">
+            <button class="confirm-match-button" @click="performQuickMatch">
+              确认匹配
+            </button>
+            <button class="cancel-match-button" @click="toggleQuickMatchPanel">
+              取消
+            </button>
+          </div>
+        </div>
+      </transition>
     </div>
 </template>
   
@@ -345,7 +390,18 @@ export default {
         type: "无AI",
         currentPeople: 1,
         maxPeople: 2
-      }
+      },
+
+      buttonPosition: {
+        x: 20, // 初始X位置（右下角）
+        y: 20, // 初始Y位置
+      },
+      isDragging: false,
+      dragOffset: { x: 0, y: 0 },
+      showQuickMatchPanel: false, // 显示快速匹配窗口
+      matchPeopleCount: 6, // 快速匹配人数
+      matchAI: "有AI", // 快速匹配是否有AI
+
     };
   },
   computed: {
@@ -358,6 +414,34 @@ export default {
     //  });
     //},
   },
+  mounted() {
+    // 设置按钮初始位置为右下角
+    this.$nextTick(() => {
+      const roomList = this.$refs.roomList;
+      if (roomList) {
+        const rect = roomList.getBoundingClientRect();
+        this.buttonPosition.x = rect.width - 70; // 根据容器宽度设置X位置
+        this.buttonPosition.y = rect.height - 70; // 根据容器高度设置Y位置
+      }
+    });
+
+    // 添加全局的鼠标事件监听器
+    window.addEventListener("mousemove", this.onDragging);
+    window.addEventListener("mouseup", this.stopDrag);
+    window.addEventListener("touchmove", this.onDragging);
+    window.addEventListener("touchend", this.stopDrag);
+  },
+  beforeUnmount() {
+    // 移除事件监听器
+    window.removeEventListener("mousemove", this.onDragging);
+    window.removeEventListener("mouseup", this.stopDrag);
+    window.removeEventListener("touchmove", this.onDragging);
+    window.removeEventListener("touchend", this.stopDrag);
+  },
+
+
+
+
   methods: {
     //async showProfile(roomId) {
     //  this.selectedRoom = this.selectedRoom === roomId ? null : roomId;
@@ -398,7 +482,59 @@ export default {
     //  }
     //},
     // 输入框点击事件，展开左侧 search.svg 图标
+    // 开始拖动
+    startDrag(event) {
+      this.isDragging = true;
+      const touch = event.type === "touchstart" ? event.touches[0] : event;
+      this.dragOffset.x = touch.clientX - this.buttonPosition.x;
+      this.dragOffset.y = touch.clientY - this.buttonPosition.y;
+    },
+    // 拖动中
+    onDragging(event) {
+      if (!this.isDragging) return;
+      const touch = event.type === "touchmove" ? event.touches[0] : event;
+      let newX = touch.clientX - this.dragOffset.x;
+      let newY = touch.clientY - this.dragOffset.y;
 
+      // 限制在容器内
+      const roomList = this.$refs.roomList;
+      if (roomList) {
+        const rect = roomList.getBoundingClientRect();
+        const buttonSize = 50; // 按钮的大小（px）
+        newX = Math.max(0, Math.min(newX, rect.width - buttonSize));
+        newY = Math.max(0, Math.min(newY, rect.height - buttonSize));
+      }
+
+      this.buttonPosition.x = newX;
+      this.buttonPosition.y = newY;
+    },
+    // 停止拖动
+    stopDrag() {
+      this.isDragging = false;
+    },
+
+    // 切换快速匹配窗口的显示状态
+    toggleQuickMatchPanel() {
+      this.showQuickMatchPanel = !this.showQuickMatchPanel;
+    },
+
+    // 执行快速匹配
+    performQuickMatch() {
+      // 过滤符合条件的房间
+      const matchedRooms = this.filteredRooms.filter(room => {
+        const matchesPeople = room.maxPeople === this.matchPeopleCount;
+        const matchesAI = room.type === this.matchAI;
+        return matchesPeople && matchesAI && room.currentPeople < room.maxPeople;
+      });
+
+      if (matchedRooms.length > 0) {
+        // 加入第一个匹配的房间
+        this.joinRoom(matchedRooms[0].id);
+        this.toggleQuickMatchPanel();
+      } else {
+        alert("符合条件的房间不存在！");
+      }
+    },
 
     onFocus() {
       this.showSearchIcon = true;
@@ -1480,7 +1616,6 @@ textarea.text-input {
   margin-top: 32px;
 }
 
-.quick-match-button,
 .create-room-button {
   flex: 1;
   padding: 12px 24px;
@@ -1492,25 +1627,18 @@ textarea.text-input {
   transition: all 0.3s ease;
 }
 
-.quick-match-button {
-  background-color: #f0f2f5;
-  color: #333;
-}
 
 .create-room-button {
   background-color: #007bff;
   color: white;
 }
 
-.quick-match-button:hover {
-  background-color: #e4e6e9;
-}
+
 
 .create-room-button:hover {
   background-color: #0056b3;
 }
 
-.quick-match-button,
 .create-room-button {
   flex: 1;
   padding: 10px 0;
@@ -1526,5 +1654,122 @@ textarea.text-input {
 .create-room-button:hover {
   background-color: var(--button-hover);
 }
+
+/* 浮动快速匹配按钮的容器 */
+.quick-match-button-container {
+  position: absolute;
+  cursor: grab;
+  z-index: 10;
+}
+
+.quick-match-button-container:active {
+  cursor: grabbing;
+}
+
+/* 浮动快速匹配按钮 */
+.quick-match-button {
+  width: 50px;
+  height: 50px;
+  background-color: transparent;
+  border: none;
+  border-radius: 50%;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.3s ease, transform 0.3s ease;
+}
+
+.quick-match-button img {
+  width: 24px;
+  height: 24px;
+}
+
+.quick-match-button:hover {
+  background-color: transparent;
+  transform: scale(1.1);
+}
+
+/* 快速匹配选项窗口 */
+.quick-match-panel {
+  position: absolute;
+  bottom: 70px; /* 位于按钮上方 */
+  right: 0;
+  width: 250px;
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 16px;
+  z-index: 20;
+  animation: slideIn 0.3s ease forwards;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.quick-match-panel h3 {
+  margin-top: 0;
+  color: #2c3e50;
+  font-size: 1.2em;
+  text-align: center;
+}
+
+.quick-match-panel .form-group {
+  margin-bottom: 16px;
+}
+
+.quick-match-panel .form-group label {
+  display: block;
+  font-size: 0.9em;
+  margin-bottom: 8px;
+  color: #777;
+}
+
+.quick-match-panel .select-input,
+.quick-match-panel .radio-group {
+  width: 100%;
+}
+
+.quick-match-panel .select-input {
+  padding: 8px;
+  font-size: 1em;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+}
+
+.quick-match-panel .radio-group label {
+  display: inline-block;
+  margin-right: 10px;
+}
+
+.quick-match-panel .action-buttons {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.quick-match-panel .action-buttons button {
+  width: 45%;
+  padding: 8px;
+  background-color: #409eff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.quick-match-panel .action-buttons button:hover {
+  background-color: #3a8ee6;
+}
+
   </style>
   
