@@ -46,6 +46,13 @@ class GameConsumer(AsyncWebsocketConsumer):
 
                 await self.accept()
 
+                await self.send(text_data=json.dumps({
+                    "type": "game_info",
+                    "game": room_data
+                }))
+
+                await self.broadcast_game_update(room_id, "player_joined", room_data)
+
                 # TODO: 用户全部连接后，开始游戏
 
         except DenyConnection as e:
@@ -57,14 +64,39 @@ class GameConsumer(AsyncWebsocketConsumer):
             await self.close()
 
     async def disconnect(self, close_code):
+        room_id = self.scope['url_route']['kwargs']['room_id']
+        user_id = str(self.scope['user'].id)
+
+        await self.channel_layer.group_discard(f"room_{room_id}", self.channel_name)
+
+        # 获取房间缓存
+        room_data = await self.get_room_data_from_cache(room_id)
+        room_data['players'][user_id]['online'] = False
+        await self.update_room_in_cache(room_id, room_data)
+        await self.broadcast_game_update(room_id, "player_left", room_data)
+        # TODO: 将离开玩家的昵称广播给其他玩家？
+
+    async def receive(self, text_data=None, bytes_data=None):
+        """
+        接收客户端发送的消息。应该根据游戏目前所处阶段处理信息。
+        """
         pass
-        # TODO
 
     # TODO: 根据用户角色发送消息？
     async def game_message(self, event):
         # 从 event 中获取广播数据
         event_type = event.get("event")
         game_data = event.get("game")
+
+        # TODO: 去掉敏感信息
+        keys_to_remove = ["roles_for_humans_first", "game_specified_prompt", "victims_info", "poisoned_victims_info"]
+        for key in keys_to_remove:
+            game_data.pop(key, None)
+
+        keys_to_remove_in_players = ["role", "role_skills"]
+        for player in game_data['players']:
+            for key in keys_to_remove_in_players:
+                game_data['players'][player].pop(key, None)
 
         # 将广播的消息发送到客户端
         await self.send(text_data=json.dumps({
@@ -83,6 +115,34 @@ class GameConsumer(AsyncWebsocketConsumer):
                     "type": "game_message",
                     "event": event_type,
                     "game": game_data
+                }
+            )
+        except Exception as e:
+            print(f"广播消息时出错：{e}")
+
+    async def not_connected(self, event):
+        event_type = event.get("event")
+        message = event.get("message")
+        offline_players = event.get("offline_players")
+
+        await self.send(text_data=json.dumps({
+            "type": event_type,
+            "message": message,
+            "offline_players": offline_players
+        }))
+
+    @classmethod
+    async def handle_not_connected(cls, room_id, event_type, message, offline_players):
+        try:
+            channel_layer = get_channel_layer()
+
+            await channel_layer.group_send(
+                f"room_{room_id}",
+                {
+                    "type": "not_connected",
+                    "event": event_type,
+                    "message": message,
+                    "offline_players": offline_players
                 }
             )
         except Exception as e:

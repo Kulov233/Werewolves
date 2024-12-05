@@ -1,4 +1,7 @@
 # game/tasks.py
+import json
+import random
+
 from celery import shared_task
 from celery.result import AsyncResult
 from django.core.cache import caches
@@ -57,12 +60,78 @@ def send_room_readiness_message(result):
         # 所有玩家已连接，开始游戏
         game_data['status'] = "debug_start"
         game_cache.set(f"room:{room_id}", game_data)
-        async_to_sync(GameConsumer.broadcast_game_update)(room_id, "游戏开始", game_data)
+        async_to_sync(GameConsumer.broadcast_game_update)(room_id, "game_started", game_data)
         # TODO: 跳转到游戏逻辑
         print("游戏开始")
     else:
-        async_to_sync(GameConsumer.broadcast_game_update)(room_id, result['status'], result['message'])
-        # TODO: 处理channel和cache中的残留？
+        # TODO: 返回未连接玩家列表
+        async_to_sync(GameConsumer.handle_not_connected)(room_id, result['status'], result['message'], result['offline_players'])
+        # TODO: 前端应该在此时返回大厅。处理channel和cache中的残留？
+
+def initialize(room_id):
+    try:
+        game_cache = caches['game_cache']
+        game_data = game_cache.get(f"room:{room_id}")
+
+        # 读取游戏配置
+        with open('game_config.json', 'r') as file:
+            configs = json.load(file)
+            if str(game_data['max_players']) in configs:
+                game_config = configs[str(game_data['max_players'])]
+            else:
+                raise ValueError("没有找到对应玩家数量的游戏配置。")
+        # TODO: 确定ai数量
+        game_specified_prompt = "当前游戏中有"
+        last_role = ""
+        role_cnt = 0
+        for role in game_config["roles"]:
+            if role == last_role:
+                role_cnt += 1
+            else:
+                if role_cnt > 0:
+                    game_specified_prompt += f"{role_cnt}个{last_role}，"
+                    game_data["roles"][last_role] = role_cnt
+                role_cnt = 1
+                last_role = role
+        game_specified_prompt += f"{role_cnt}个{last_role}。"
+        game_data["roles"][last_role] = role_cnt
+        game_data["game_specified_prompt"] = game_specified_prompt
+
+        game_data["victory_conditions"] = game_config["victory_conditions"]
+        game_data["witch_config"] = game_config.get('witch_items', {'cure_count': 1, 'poison_count': 1})
+
+        # TODO: 所有角色名都是字符串
+        try:
+            game_data["roles_for_humans_first"] = game_config["roles_for_humans_first"]
+        except:
+            game_data["roles_for_humans_first"] = None
+
+        game_cache.set(f"room:{room_id}", game_data)
+
+    except Exception as e:
+        # TODO: 前端应该在此时返回大厅。处理channel和cache中的残留？
+        return {"room_id": room_id, "status": "error", "message": "初始化游戏失败。", "error": str(e)}
+
+def assign_roles_to_players(room_id):
+    try:
+        game_cache = caches['game_cache']
+        game_data = game_cache.get(f"room:{room_id}")
+
+        # human_players = [player for player in game_data["players"].values()]
+
+        roles_assigned = []
+        remaining_roles = [role for role, count in game_data["roles"].items()]
+
+        if game_data["roles_for_humans_first"]:
+            roles_for_humans_first = game_data["roles_for_humans_first"].copy()
+
+            random.shuffle(roles_for_humans_first)
+
+            for role_class in roles_for_humans_first:
+                pass
+
+    except Exception as e:
+        return {"room_id": room_id, "status": "error", "message": "分配角色失败。", "error": str(e)}
 
 @shared_task
 def combined_game_check(room_id):

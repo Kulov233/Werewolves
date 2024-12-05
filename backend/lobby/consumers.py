@@ -142,7 +142,8 @@ class LobbyConsumer(AsyncWebsocketConsumer):
             "description": data.get("description", "房主没有填写简介~"),
             "owner": self.scope["user"].id,
             "players": [self.scope["user"].id],
-            "max_players": data.get("max_players", 6), # TODO: 限制最大玩家数量
+            "ai_players": [], # TODO: AI 玩家配置
+            "max_players": data.get("max_players", 6),
             "game_mode": data.get("game_mode", "default"),
             "status": "waiting", # in-game
             "created_at": datetime.now().isoformat(),
@@ -218,7 +219,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                     "message": "游戏正在进行中，无法加入房间。"
                 }))
                 return
-            if len(room_data["players"]) >= room_data["max_players"]:
+            if len(room_data["players"]) + len(room_data["ai_players"]) >= room_data["max_players"]:
                 await self.send(text_data=json.dumps({
                     "type": "error",
                     "message": "房间已满。"
@@ -254,7 +255,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
         room_data = await self.get_room_data_from_cache(room_id)
         if room_data:
             if room_data["owner"] == self.scope["user"].id:
-                if len(room_data["players"]) < room_data["max_players"]:
+                if len(room_data["players"]) + len(room_data["ai_players"]) < room_data["max_players"]:
                     await self.send(text_data=json.dumps({
                         "type": "error",
                         "message": "房间人数不足。"
@@ -284,16 +285,29 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                         "description": room_data["description"],
                         "max_players": room_data["max_players"],
                         "status": "waiting", # waiting, night_<num>, day_<num>, finished
-                        "players":
-                            {
+                        "night_count": 1,
+                        "roles": {},
+                        "roles_for_humans_first": [], # 敏感
+                        "witch_config": {},
+                        "players": {
                                 str(player): { # 这里的 user_id 是字符串！
+                                'index': idx + 1,
                                 'name': await get_user_name(player),
                                 'alive': True,
                                 'online': False,
-                                'role': None,
+                                'role': None, # 敏感
+                                'role_skills': None, # 敏感
                                 }
-                                for player in room_data["players"]
-                            }
+                                for idx, player in enumerate(room_data["players"])
+                        },
+                        "ai_players": {
+                            # TODO: AI 玩家配置
+                        },
+                        "victory_conditions": {},
+                        "game_specified_prompt": "", # 敏感
+                        "victims_info": [], # 敏感
+                        "poisoned_victims_info": [], # 敏感
+                        "voted_victims_info": []
                         # ...
                     }
                     await self.set_room_data_in_game_cache(room_id, room_data_in_game)
