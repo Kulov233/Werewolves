@@ -1,5 +1,5 @@
 # lobby/consumers.py
-
+import asyncio
 import json
 import uuid
 
@@ -12,6 +12,65 @@ from datetime import datetime, timedelta
 
 from game.tasks import trigger_game_start_check
 
+from functools import wraps
+
+def with_room_lock(timeout=5):
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(consumer, data, *args, **kwargs):
+            cache = caches["lobby_cache"]
+            room_id = data.get("room_id")
+
+            if not room_id:
+                return await func(consumer, data, *args, **kwargs)
+
+            lock_id = f"lock:room:{room_id}"
+            retry_count = 3
+            retry_delay = 0.5  # 500ms
+
+            for _ in range(retry_count):
+                if cache.add(lock_id, 1, timeout):
+                    try:
+                        return await func(consumer, data, *args, **kwargs)
+                    finally:
+                        cache.delete(lock_id)
+
+                await asyncio.sleep(retry_delay)
+
+            # 多次重试失败后才返回错误
+            await consumer.send(text_data=json.dumps({
+                "type": "error",
+                "message": "操作失败，请稍后重试"
+            }))
+        return wrapper
+    return decorator
+
+def with_room_list_lock(timeout=5):
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(consumer, *args, **kwargs):
+            cache = caches["lobby_cache"]
+            lock_id = "lock:room_list"
+
+            retry_count = 3
+            retry_delay = 0.5  # 500ms
+
+            for _ in range(retry_count):
+                if cache.add(lock_id, 1, timeout):
+                    try:
+                        return await func(consumer, *args, **kwargs)
+                    finally:
+                        cache.delete(lock_id)
+
+                await asyncio.sleep(retry_delay)
+
+            # 多次重试失败后才返回错误
+            await consumer.send(text_data=json.dumps({
+                "type": "error",
+                "message": "服务器内部发生错误，请稍后重试。"
+            }))
+        return wrapper
+    return decorator
 
 class LobbyConsumer(AsyncWebsocketConsumer):
     def __init__(self, *args, **kwargs):
@@ -22,6 +81,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
 
     # 连接时触发
     # noinspection PyUnresolvedReferences
+    @with_room_list_lock(timeout=5)
     async def connect(self):
         try:
             if self.scope["user"].is_anonymous:
@@ -42,6 +102,9 @@ class LobbyConsumer(AsyncWebsocketConsumer):
 
                 # 将用户的连接信息添加到 channel_layer 中
                 # await self.add_connection(user_id)
+
+                # 清理信息
+                await self.clear_user_room_in_cache(self.scope["user"].id)
 
                 # 发送房间列表
                 rooms = await self.get_room_list_from_cache()
@@ -93,6 +156,12 @@ class LobbyConsumer(AsyncWebsocketConsumer):
             # 加入房间
             elif action == "join_room":
                 await self.handle_join_room(data)
+            # 添加 AI 玩家
+            elif action == "add_ai_player":
+                await self.handle_add_ai_player(data)
+            # 移除 AI 玩家
+            elif action == "remove_ai_player":
+                await self.handle_remove_ai_player(data)
             # 离开房间
             elif action == "leave_room":
                 await self.handle_leave_room(data)
@@ -117,6 +186,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
     """
 
     # noinspection PyUnresolvedReferences
+    @with_room_list_lock(timeout=5)
     async def handle_create_room(self, data):
         """
         创建房间
@@ -142,9 +212,9 @@ class LobbyConsumer(AsyncWebsocketConsumer):
             "description": data.get("description", "房主没有填写简介~"),
             "owner": self.scope["user"].id,
             "players": [self.scope["user"].id],
-            "ai_players": [], # TODO: AI 玩家配置
+            "ai_players": {}, # TODO: AI 玩家配置
             "max_players": data.get("max_players", 6),
-            "game_mode": data.get("game_mode", "default"),
+            # "game_mode": data.get("game_mode", "default"),
             "status": "waiting", # in-game
             "created_at": datetime.now().isoformat(),
             "expires_at": ""
@@ -168,6 +238,8 @@ class LobbyConsumer(AsyncWebsocketConsumer):
         await self.broadcast_room_update("room_removed", {"id": room_id})
 
     # noinspection PyUnresolvedReferences
+    @with_room_lock(timeout=5)
+    @with_room_list_lock(timeout=5)
     async def handle_remove_room(self, data):
         """
         删除房间
@@ -198,6 +270,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
             }))
 
     # noinspection PyUnresolvedReferences
+    @with_room_lock(timeout=5)
     async def handle_join_room(self, data):
         """
         加入房间
@@ -234,22 +307,97 @@ class LobbyConsumer(AsyncWebsocketConsumer):
             }))
 
     # noinspection PyUnresolvedReferences
-    async def handle_leave_room(self, data):
+    @with_room_lock(timeout=5)
+    async def handle_add_ai_player(self, data):
         """
-        离开房间
-        :param data: 客户端发送的text_data，里面应该什么都没有（使用get_user_room_from_cache）
-        :return: 不会返回值，但是会向客户端发送消息，遇到错误时只会向当前客户端发送消息
+        player_info: {
+            name: ""
+        }
         """
-        room_id = await self.get_user_room_from_cache(self.scope["user"].id)
-        if room_id:
-            await self.remove_player_from_room(room_id, self.scope["user"].id)
+        room_id = data.get("room_id")
+        room_data = await self.get_room_data_from_cache(room_id)
+        if room_data:
+            if room_data["owner"] == self.scope["user"].id:
+                if len(room_data["players"]) + len(room_data["ai_players"]) >= room_data["max_players"]:
+                    await self.send(text_data=json.dumps({
+                        "type": "error",
+                        "message": "房间已满。"
+                    }))
+                    return
+                else:
+                    original_player_info = data.get("player_info")
+                    if original_player_info:
+                        player_info = {
+                            "name": original_player_info.get("name", "AI 玩家")
+                        }
+                        await self.add_ai_player_to_room(room_id, player_info)
+                    else:
+                        await self.send(text_data=json.dumps({
+                            "type": "error",
+                            "message": "请提供 AI 玩家信息。"
+                        }))
+
+
+            else:
+                await self.send(text_data=json.dumps({
+                    "type": "error",
+                    "message": "只有房主可以添加 AI 玩家。"
+                }))
         else:
             await self.send(text_data=json.dumps({
                 "type": "error",
-                "message": "您不在任何房间中。"
+                "message": "房间不存在。"
             }))
 
     # noinspection PyUnresolvedReferences
+    @with_room_lock(timeout=5)
+    async def handle_remove_ai_player(self, data):
+        """
+        id: ""
+        """
+        room_id = data.get("room_id")
+        room_data = await self.get_room_data_from_cache(room_id)
+        if room_data:
+            if room_data["owner"] == self.scope["user"].id:
+                await self.remove_ai_player_from_room(room_id, data.get("player_id"))
+            else:
+                await self.send(text_data=json.dumps({
+                    "type": "error",
+                    "message": "只有房主可以移除 AI 玩家。"
+                }))
+        else:
+            await self.send(text_data=json.dumps({
+                "type": "error",
+                "message": "房间不存在。"
+            }))
+
+    # noinspection PyUnresolvedReferences
+    @with_room_lock(timeout=5)
+    async def handle_leave_room(self, data):
+        """
+        离开房间
+        :param data: 客户端发送的text_data，里面应该有且仅有room_id
+        :return: 不会返回值，但是会向客户端发送消息，遇到错误时只会向当前客户端发送消息
+        """
+        room_id = data.get("room_id")
+        room_data = await self.get_room_data_from_cache(room_id)
+
+        if room_data:
+            if self.scope["user"].id in room_data["players"]:
+                await self.remove_player_from_room(room_id, self.scope["user"].id)
+            else:
+                await self.send(text_data=json.dumps({
+                    "type": "error",
+                    "message": "您不在该房间中。"
+                }))
+        else:
+            await self.send(text_data=json.dumps({
+                "type": "error",
+                "message": "房间不存在。"
+            }))
+
+    # noinspection PyUnresolvedReferences
+    @with_room_lock(timeout=5)
     async def handle_start_game(self, data):
         room_id = await self.get_user_room_from_cache(self.scope["user"].id)
         room_data = await self.get_room_data_from_cache(room_id)
@@ -340,6 +488,24 @@ class LobbyConsumer(AsyncWebsocketConsumer):
             await self.update_room_in_cache(room_id, room_data)
             await self.set_user_room_in_cache(user_id, room_id)
             await self.broadcast_room_update("player_joined", room_data)
+
+    # noinspection PyUnresolvedReferences
+    async def add_ai_player_to_room(self, room_id, player_info):
+        room_data = await self.get_room_data_from_cache(room_id)
+        if room_data:
+            player_id = str(uuid.uuid4())
+            room_data["ai_players"][player_id] = player_info
+            await self.update_room_in_cache(room_id, room_data)
+            await self.broadcast_room_update("ai_player_joined", room_data)
+
+    # noinspection PyUnresolvedReferences
+    async def remove_ai_player_from_room(self, room_id, player_id):
+        room_data = await self.get_room_data_from_cache(room_id)
+        if room_data:
+            if player_id in room_data["ai_players"]:
+                room_data["ai_players"].pop(player_id)
+            await self.update_room_in_cache(room_id, room_data)
+            await self.broadcast_room_update("ai_player_left", room_data)
 
     # noinspection PyUnresolvedReferences
     async def remove_player_from_room(self, room_id, user_id):

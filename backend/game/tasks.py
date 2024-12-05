@@ -117,7 +117,7 @@ def assign_roles_to_players(room_id):
         game_cache = caches['game_cache']
         game_data = game_cache.get(f"room:{room_id}")
 
-        # human_players = [player for player in game_data["players"].values()]
+        human_players = [player for player, _ in game_data["players"].items()]
 
         roles_assigned = []
         remaining_roles = [role for role, count in game_data["roles"].items()]
