@@ -59,6 +59,7 @@
                 v-model="ver_code"
                 placeholder="请输入验证码"
                 prefix-icon="ant-design:lock-outlined"
+                @input="onVerCodeInput"
               />
               <canvas
                 id="canvas"
@@ -138,12 +139,15 @@ const toggleTheme = () => {
 const router = useRouter();
 let yanma = ref("");
 // 绑定验证码
-const ver_code = ref("");
+let ver_code = ref("");
 //验证码图形生成
 var show_num = [];
 onMounted(() => {
   draw();
 });
+function onVerCodeInput(event) {
+  ver_code.value = event.target.value;
+}
 
 function draw() {
   // jQuery 对 canvas 对象无法获取，原生 JS 可以解决
@@ -217,6 +221,7 @@ function draw() {
   }
 
   yanma.value = show_num.join("");
+  alert(yanma.value)
   return show_num;
 }
 
