@@ -193,7 +193,7 @@
 
               <div class="room-info">
                 <div class="info-item">
-                  <img src="@/assets/sun.svg" alt="Users" class="info-icon" />
+                  <img src="@/assets/people.svg" alt="Users" class="info-icon" />
                   <span class="player-count">
                     {{ room.currentPeople }}/{{ room.maxPeople }}
                   </span>
@@ -369,7 +369,7 @@ export default {
       userProfile: {
           userId: "user1",
           name: "云想衣裳花想容",
-          avatar: "@/assets/profile-icon.png",
+          avatar: require("@/assets/profile-icon.png"),
           isOnline: true,
           isFriend: false,
           stats: [
@@ -929,7 +929,7 @@ export default {
   background-color: #ffffff;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  z-index: 1000;
+  z-index: 2;
   overflow: hidden;
 }
 
@@ -1144,6 +1144,7 @@ export default {
   transform: translateY(-4px);
   box-shadow: 0 8px 12px rgba(0, 0, 0, 0.08);
   border-color: #e1e8f0;
+  z-index: 15;
 }
 
 /* 卡片头部样式 */
@@ -1198,20 +1199,20 @@ export default {
 .profile-card {
   position: absolute;
   top: calc(100% + 8px);
-  right: -8px;
+  left: -8px;
   width: 240px; /* 减小宽度 */
   background: #fff;
   border-radius: 8px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
   padding: 16px;
-  z-index: 1000;
+  z-index: 10;
 }
 
 .profile-card::before {
   content: '';
   position: absolute;
   top: -8px;
-  right: 20px;
+  left: 20px;
   width: 16px;
   height: 16px;
   background: #fff;
@@ -1227,8 +1228,8 @@ export default {
 }
 
 .large-avatar {
-  width: 48;
-  height: 48;
+  width: 80px !important;
+  height: 80px !important;
   border-radius: 50%;
   object-fit: cover;
   border: 3px solid #fff;
