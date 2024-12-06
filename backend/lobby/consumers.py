@@ -189,7 +189,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
     """
 
     # noinspection PyUnresolvedReferences
-    @with_room_list_lock
+    @with_room_list_lock(timeout=5)
     async def handle_get_rooms(self, data):
         rooms = await self.get_room_list_from_cache()
         await self.send(text_data=json.dumps({
