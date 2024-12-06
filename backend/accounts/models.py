@@ -3,6 +3,9 @@ from django.core.exceptions import ValidationError
 from django.db import models
 import os
 
+from django.db.models import JSONField
+
+
 # 将用户上传的头像重命名为用户的 ID
 def user_directory_path(instance, filename):
     # 获取文件的扩展名
@@ -22,4 +25,15 @@ class UserProfile(models.Model):
     bio = models.TextField("自我介绍", max_length=500, blank=True, default="这个人很懒，还没有自我介绍~")  # 自我介绍字段
     # TODO: 可能的前端bug：头像可能为null
     avatar = models.ImageField("头像", upload_to=user_directory_path, null=True)  # 头像字段
+    """
+    {
+        "date": "2024-12-6",
+        "won": true
+    }
+    """
+    recent_games = JSONField("最近三场游戏记录", default=list)  # 最近三场游戏记录
+    wins = models.IntegerField("胜场", default=0)  # 胜场
+    loses = models.IntegerField("败场", default=0)  # 败场
 
+    def __str__(self):
+        return self.user.username

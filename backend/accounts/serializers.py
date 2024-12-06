@@ -100,7 +100,7 @@ class UsernameEmailLoginSerializer(serializers.Serializer):
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
-        fields = ['bio', 'avatar']
+        fields = ['bio', 'avatar', 'recent_games', 'wins', 'loses']
 
 class UserSerializer(serializers.ModelSerializer):
     profile = UserProfileSerializer(source='userprofile', read_only=True)
@@ -108,6 +108,14 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'profile']
+
+# 公开信息序列化器
+class PublicInfoSerializer(serializers.ModelSerializer):
+    profile = UserProfileSerializer(source='userprofile', read_only=True)
+
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'profile']
 
 # 上传头像序列化器
 class AvatarUploadSerializer(serializers.ModelSerializer):

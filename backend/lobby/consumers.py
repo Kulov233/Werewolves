@@ -150,6 +150,9 @@ class LobbyConsumer(AsyncWebsocketConsumer):
             # 创建房间
             if action == "create_room":
                 await self.handle_create_room(data)
+            # 获取房间列表
+            elif action == "get_rooms":
+                await self.handle_get_rooms(data)
             # 移除房间
             elif action == "remove_room":
                 await self.handle_remove_room(data)
@@ -184,6 +187,15 @@ class LobbyConsumer(AsyncWebsocketConsumer):
     """
     下面是自定义的房间相关方法，考虑将它们模块化？
     """
+
+    # noinspection PyUnresolvedReferences
+    @with_room_list_lock
+    async def handle_get_rooms(self, data):
+        rooms = await self.get_room_list_from_cache()
+        await self.send(text_data=json.dumps({
+            "type": "room_list",
+            "rooms": rooms
+        }))
 
     # noinspection PyUnresolvedReferences
     @with_room_list_lock(timeout=5)

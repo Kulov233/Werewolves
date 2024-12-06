@@ -47,12 +47,28 @@ class LoginView(APIView):
         except LoginError as e:
             return Response({e.param: e.message}, status=status.HTTP_401_UNAUTHORIZED)
 
-# 获取用户信息
+# 获取用户个人信息
 class UserInfoView(APIView):
     @staticmethod
     def get(request):
         user = request.user
         serializer = UserSerializer(user)
+        return Response(serializer.data)
+
+# 获取某个用户的公开信息
+class PublicInfoView(APIView):
+    permission_classes = [AllowAny]  # 允许所有用户访问（包括未认证用户）
+
+    @staticmethod
+    def get(request, user_id):
+        try:
+            user = get_object_or_404(User, id=user_id)
+        except Http404:
+            return Response(
+                {"message": "用户不存在。"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        serializer = PublicInfoSerializer(user)
         return Response(serializer.data)
 
 # 上传头像
