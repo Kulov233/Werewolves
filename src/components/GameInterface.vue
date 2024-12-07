@@ -156,7 +156,6 @@
             </template>
           </div>
         </div>
-        <button class="exit-button" @click="exitGame">退出游戏</button>
     </div>
 
       <!-- 玩家详细信息弹出框 -->
@@ -928,30 +927,6 @@ p {
 }
 
 
-.exit-button {
-  background-color: #d9534f; /* 背景颜色 */
-  color: black; /* 字体颜色 */
-  border: 2px solid #090909; /* 边框和边框颜色 */
-  border-radius: 8px; /* 圆角半径，值越大越圆 */
-  padding: 1px 11px; /* 内边距 */
-  font-family: Arial, sans-serif; /* 字体样式 */
-  font-size: 11px; /* 字体大小 */
-  font-weight: bold; /* 字体加粗 */
-  cursor: pointer; /* 鼠标悬停样式 */
-  transition: background-color 0.3s, color 0.3s; /* 添加过渡效果 */
-  /*position: absolute;
-  top: 50px; /* 距离顶部 50 像素 */
-  /*left: 30px; /* 距离左侧 30 像素 */
-}
-
-.exit-button:hover {
-  background-color: white; /* 悬停时背景颜色 */
-  color: #d9534f; /* 悬停时字体颜色 */
-  border-color: #d9534f; /* 悬停时边框颜色 */
-}
-
-
-
 /* 玩家详细信息框样式 */
 .player-details-box {
   position: absolute;
@@ -1157,7 +1132,7 @@ p {
   position: absolute;
   top: 100px;
   right: 20px;
-  left: 70%;  /* 将其水平居中 */
+  left: 80%;  /* 将其水平居中 */
   background-color: transparent;
   border: none;
   cursor: pointer;

@@ -1,42 +1,90 @@
 <template>
-    <div id="app">
-        <!--<router-view />-->
-      <!-- 使用 GameInterface 组件 -->
-      <!--<GameInterface />-->
-      <nav>
-      
-      <router-link to="/profile">UserProfile</router-link>
-      <router-link to="/login">Login</router-link>
-      <router-link to="/register">Register</router-link>
-      <router-link to="/Home">主页</router-link>
-      <router-link to="/RoomCard">房间卡片组件</router-link>
-      <router-link to="/GameInterface">对战房间</router-link>
-      <router-link to="/search">search</router-link>
-      <router-link to="/Room">Room</router-link>
+  <div id="app">
+    <nav class="navigation">
+      <router-link 
+        v-for="route in navigationRoutes" 
+        :key="route.path"
+        :to="route.path"
+        class="nav-link"
+        active-class="active">
+        {{ route.label }}
+      </router-link>
     </nav>
-    <!-- 显示当前路由对应的页面内容 -->
-    <router-view></router-view>
-    </div>
-  </template>
+    
+    <router-view v-slot="{ Component }">
+      <transition name="fade" mode="out-in">
+        <component :is="Component" />
+      </transition>
+    </router-view>
+  </div>
+</template>
+
+<script>
+
+export default {
+  name: "App",
   
-  <script>
-  // 引入 GameInterface 组件
-  //import GameInterface from "./components/GameInterface.vue";
+  setup() {
   
-  export default {
-    name: "App",
-    components: {
-      //GameInterface // 注册 GameInterface 组件
-    }
-  };
-  </script>
-  
-  <style>
-  /* 可选的样式 */
-  #app {
-    font-family: Avenir, Helvetica, Arial, sans-serif;
-    text-align: center;
-    color: #2c3e50;
-    margin-top: 20px;
+    const navigationRoutes = [
+      { path: '/login', label: '登录' },
+      { path: '/registre', label: '注册' },
+      { path: '/search', label: '大厅' },
+      { path: '/Room', label: '房间内部' },
+      { path: '/GameInterface', label: '对战房间' },
+      
+    ];
+
+    return {
+      navigationRoutes
+    };
   }
-  </style>
+};
+</script>
+
+<style>
+#app {
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: #2c3e50;
+  min-height: 100vh;
+}
+
+.navigation {
+  padding: 20px;
+  background-color: #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+}
+
+.nav-link {
+  color: #606266;
+  text-decoration: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+}
+
+.nav-link:hover {
+  color: #409EFF;
+  background-color: #ecf5ff;
+}
+
+.nav-link.active {
+  color: #409EFF;
+  font-weight: 500;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+</style>

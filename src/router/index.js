@@ -1,27 +1,82 @@
-import { createRouter, createWebHistory } from 'vue-router'
-import GameInterface from '../components/GameInterface.vue'
-import UserProfile from '../components/Profile.vue' // 新页面组件
-import Login from '@/components/Login.vue'
-import Register from '@/components/Register.vue'
-import Home from '@/components/Home.vue'
-import RoomCard from '@/components/RoomCard.vue'
-import search from '@/components/search.vue'
-import Room from '@/components/Room.vue'
-const routes = [
-  { path: '/', name: 'GameInterface', component: GameInterface },
-  { path: '/profile', name: 'UserProfile', component: UserProfile }, // 新页面路由
-  { path: '/login', name: 'Login', component: Login },
-  { path: '/register', name: 'Register', component: Register },
-  { path: '/Home', name: 'Home', component: Home },
-  { path: '/RoomCard', name: 'RoomCard', component: RoomCard },
-  { path: '/GameInterface', name: 'GameInterface', component: GameInterface },
-  { path: '/search', name: 'search', component: search },
-  { path: '/Room', name: 'Room', component: Room },
-]
+import { createRouter, createWebHistory } from 'vue-router';
 
+// 路由组件导入
+const GameInterface = () => import('../components/GameInterface.vue');
+const UserProfile = () => import('../components/Profile.vue');
+const Login = () => import('@/components/Login.vue');
+const Register = () => import('@/components/Register.vue');
+const RoomCard = () => import('@/components/RoomCard.vue');
+const Search = () => import('@/components/search.vue');
+const Room = () => import('@/components/Room.vue');
+
+// 路由配置
+const routes = [
+  {
+    path: '/',
+    name: 'Home',
+    component: Login,
+    meta: { requiresAuth: false }
+  },
+  {
+    path: '/profile',
+    name: 'UserProfile',
+    component: UserProfile,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/login',
+    name: 'Login',
+    component: Login,
+    meta: { requiresAuth: false }
+  },
+  {
+    path: '/register',
+    name: 'Register',
+    component: Register,
+    meta: { requiresAuth: false }
+  },
+  {
+    path: '/room-card',
+    name: 'RoomCard',
+    component: RoomCard,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/GameInterface',
+    name: 'GameInterface',
+    component: GameInterface,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/search',
+    name: 'Search',
+    component: Search,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/room/:id?',
+    name: 'room',
+    component: Room,
+    props: true, // 允许通过 props 传递参数
+    meta: { requiresAuth: true }
+  }
+];
+
+// 创建路由实例
 const router = createRouter({
   history: createWebHistory(process.env.BASE_URL),
   routes
-})
+});
 
-export default router
+// 路由守卫
+router.beforeEach((to, from, next) => {
+  const isAuthenticated = localStorage.getItem('access_token');
+  
+  if (to.meta.requiresAuth && !isAuthenticated) {
+    next({ name: 'Login' });
+  } else {
+    next();
+  }
+});
+
+export default router;

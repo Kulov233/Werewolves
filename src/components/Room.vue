@@ -72,7 +72,7 @@
                 <transition name="profile">
                     <div v-if="selectedPlayerId === 'host'" class="profile-card" @click.stop>
                         <div class="profile-header">
-                        <img src="@/assets/profile-icon.png"
+                        <img :src="hostProfile.avatar"
                             alt="房主头像" 
                             class="large-avatar"/>
                         <div class="profile-info">
@@ -269,7 +269,7 @@
                 <div class="room-info-overview">
                 <h3>房间信息</h3>
                 <div class="room-info-item">
-                    <img src="@/assets/profile-icon.png" alt="房主" class="info-icon"/>
+                    <img :src="hostProfile.avatar" alt="房主" class="info-icon"/>
                     <span>房主：{{ hostProfile.name }}</span>
                 </div>
                 <div class="room-info-item">
@@ -330,7 +330,252 @@
 </template>
   
 <script>
+import { onMounted, ref , onUnmounted} from 'vue';
+import { useStore } from 'vuex';
+import { useRouter } from 'vue-router';
+import axios from 'axios';
+
+const router = useRouter();
+// 创建axios实例
+const api = axios.create({
+  baseURL: 'http://localhost:8000'
+});
+
+// 添加请求拦截器
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// 添加响应拦截器
+api.interceptors.response.use(
+  (response) => {
+    return response;
+  },
+  async (error) => {
+    const originalRequest = error.config;
+
+    // 如果是401错误且不是刷新token的请求
+    if (error.response.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      try {
+        // 使用refresh token获取新的access token
+        const refreshToken = localStorage.getItem('refresh_token');
+        const response = await axios.post('http://localhost:8000/api/token/refresh/', {
+          refresh: refreshToken
+        });
+
+        // 更新access token
+        const newAccessToken = response.data.access;
+        localStorage.setItem('access_token', newAccessToken);
+
+        // 更新原始请求的Authorization header
+        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        
+        // 重试原始请求
+        return api(originalRequest);
+      } catch (refreshError) {
+        // refresh token也过期了，需要重新登录
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        // 重定向到登录页面
+        router.push('/login');  // 跳转到登录页面
+        
+        // 可以添加一些用户提示信息，提醒用户重新登录
+        alert('您的会话已过期，请重新登录。');
+        return Promise.reject(refreshError);
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 export default {
+  setup() {
+    const store = useStore();
+    const router = useRouter();
+    const roomData = ref(store.state.currentRoom);
+    const userProfile = ref(store.state.userProfile);
+    const ws = store.state.webSocket;
+
+    const currentRoom = ref({
+      name: "",
+      currentPeople: 0,
+      maxPeople: 6,
+      type: "无AI",
+      aiPlayers: [],
+      players: []
+    });
+
+    // 房主信息
+    const hostProfile = ref({
+      name: "",
+      avatar: "",
+      isOnline: true,
+      stats: []
+    });
+
+    // 成员列表
+    const members = ref([]);
+    const selectedPlayerId = ref(null);
+
+    // 初始化房间信息
+    const initializeRoom = async () => {
+      if (!roomData.value) {
+        router.push('/lobby');
+        return;
+      }
+
+      // 设置房间基本信息
+      currentRoom.value = {
+        name: roomData.value.title,
+        currentPeople: roomData.value.players.length + Object.keys(roomData.value.ai_players || {}).length,
+        maxPeople: roomData.value.max_players,
+        type: Object.keys(roomData.value.ai_players || {}).length > 0 ? "有AI" : "无AI",
+        players: roomData.value.players,
+        aiPlayers: roomData.value.ai_players || []
+      };
+
+      // 获取并设置房主信息
+      const ownerProfile = await fetchSelectedProfile(roomData.value.owner);
+      if (ownerProfile) {
+        hostProfile.value = {
+          name: ownerProfile.name,
+          avatar: ownerProfile.avatar,
+          isOnline: ownerProfile.isOnline,
+          stats: ownerProfile.stats
+        };
+      }
+
+      // 获取并设置所有玩家信息
+      const playerProfiles = await Promise.all(
+        currentRoom.value.players.map(async (playerId) => {
+          const profile = await fetchSelectedProfile(playerId);
+          return {
+            id: playerId,
+            name: profile.name,
+            avatar: profile.avatar,
+            isAI: false,
+            userId: playerId,
+            isOnline: profile.isOnline,
+            isFriend: profile.isFriend,
+            stats: profile.stats,
+            recentGames: profile.recentGames
+          };
+        })
+      );
+
+      // 添加AI玩家信息
+      const aiPlayerProfiles = Object.entries(currentRoom.value.aiPlayers).map(([id, name]) => ({
+        id,
+        name,
+        avatar: require("@/assets/ai.svg"),
+        isAI: true,
+        userId: id,
+        isOnline: true,
+        stats: []
+      }));
+
+      // 合并所有玩家信息
+      members.value = [...playerProfiles, ...aiPlayerProfiles];
+    };
+
+    // 获取选中的人信息
+    const fetchSelectedProfile = async (userId) => {
+      try {
+        const avatarResponse = await api.get(`/api/accounts/avatar/${userId}/`);
+        const userResponse = await api.get(`/api/accounts/public_info/${userId}/`);
+        
+        if (userResponse.status === 200) {
+          const userData = userResponse.data;
+          return {
+            userId: userData.id,
+            name: userData.username,
+            avatar: avatarResponse.status === 200 
+              ? avatarResponse.data.avatar_url
+              : require('@/assets/profile-icon.png'),
+            isOnline: true, // 这里可以从websocket获取在线状态
+            isFriend: false, // 这里可以从好友列表判断
+            stats: [
+              { label: '游戏场数', value: userData.profile.wins + userData.profile.loses },
+              { label: '胜率', value: calculateWinRate(userData.profile.games) },
+              { label: '评分', value: userData.profile.rating || 0 }
+            ],
+            recentGames: (userData.profile.recent_games || []).map((game, index) => ({
+              id: index.toString(),
+              result: game.won ? 'win' : 'lose',
+              date: new Date(game.date).toLocaleDateString()
+            }))
+          };
+        }
+      } catch (error) {
+        console.error('获取用户信息失败:', error);
+        return null;
+      }
+    };
+
+    // 辅助函数：计算胜率
+    const calculateWinRate = (games) => {
+      if (!games || games.length === 0) return '0%';
+      const wins = games.filter(game => game.won).length;
+      return `${Math.round((wins / games.length) * 100)}%`;
+    };
+
+    // WebSocket监听
+    const setupWebsocketListeners = () => {
+      if (!ws) return;
+
+      ws.onType('player_join', (data) => {
+        currentRoom.value.currentPeople++;
+        members.value.push({
+          id: data.player_id,
+          name: data.player_name,
+          avatar: data.avatar,
+          isAI: false,
+          userId: data.player_id,
+          isOnline: true,
+          stats: data.stats || []
+        });
+      });
+
+      ws.onType('player_leave', (data) => {
+        currentRoom.value.currentPeople--;
+        members.value = members.value.filter(m => m.id !== data.player_id);
+      });
+    };
+
+    onMounted(() => {
+      initializeRoom();
+      setupWebsocketListeners();
+    });
+
+    onUnmounted(() => {
+      if (ws && roomData.value) {
+        ws.sendMessage({
+          action: 'leave_room',
+          room_id: roomData.value.id
+        });
+      }
+    });
+
+    return {
+      currentRoom,
+      hostProfile,
+      members,
+      selectedPlayerId,
+      userProfile,
+      // ... 其他需要的数据和方法
+    };
+  },
   data() {
     return {
 
@@ -356,7 +601,7 @@ export default {
       },
       
       // 当前房间信息
-      currentRoom: {
+      currentRoom_test: {
         name: "示例房间",
         currentPeople: 3,
         maxPeople: 6,
@@ -364,7 +609,7 @@ export default {
       },
       
       // 房主信息
-      hostProfile: {
+      hostProfile_test: {
         name: "云想衣裳花想容",
         avatar: require("@/assets/profile-icon.png"),
         isOnline: true,
@@ -375,7 +620,7 @@ export default {
         ]
       },
 
-      userProfile: {
+      userProfile_test: {
         name: "云想衣裳花想容",
         avatar: require("@/assets/profile-icon.png"), // 使用require导入图片
         isOnline: true,
@@ -394,7 +639,7 @@ export default {
       },
 
       // 成员列表
-      members: [
+      members_test: [
         { 
           id: 1, 
           name: '玩家1', 
@@ -452,7 +697,7 @@ export default {
       ],
 
       // 选中的玩家ID (用于显示资料卡)
-      selectedPlayerId: null,
+      selectedPlayerId_test: null,
       
       // 是否是房主
       isHost: true,

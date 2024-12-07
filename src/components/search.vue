@@ -22,7 +22,7 @@
         <div v-if="showMenuSidebar" class="sidebar menu-sidebar" @click.stop>
           <div class="sidebar-content">
             <!-- 个人信息头部 -->
-            <div class="profile-header">
+            <div class="profile-header-menu">
               <div class="profile-avatar" @click="toggleAvatarEdit" @mouseenter="showChangeAvatar" @mouseleave="hideChangeAvatar">
                 <img :src="userProfile.avatar" alt="用户头像" />
                 <!-- 头像编辑遮罩 -->
@@ -425,23 +425,23 @@
                 </span>
                 <!-- 添加房主头像 -->
                 <div class="owner-avatar" @click.stop="showProfile(room.id)">
-                  <img src="@/assets/profile-icon.png" alt="房主头像" />
+                  <img :src="room.ownerAvatar" alt="房主头像" />
                   <!-- 个人资料卡弹窗 -->
                   <transition name="profile">
                     <div v-if="selectedRoom === room.id" class="profile-card" @click.stop>
                       <div class="profile-header">
-                         <img src="@/assets/profile-icon.png"
+                         <img :src="selectedProfile.avatar"
                             alt="房主头像" 
                             class="large-avatar"/>
                         <div class="profile-info">
-                          <h4>{{ userProfile.name || '房主昵称' }}</h4>
-                          <span class="profile-status" :class="{'online': userProfile.isOnline}">
-                            {{ userProfile.isOnline ? '在线' : '离线' }}
+                          <h4>{{ selectedProfile.name || '房主昵称' }}</h4>
+                          <span class="profile-status" :class="{'online': selectedProfile.isOnline}">
+                            {{ selectedProfile.isOnline ? '在线' : '离线' }}
                           </span>
                         </div>
                       </div>
                       <div class="profile-stats">
-                        <div v-for="(stat, index) in userProfile.stats" 
+                        <div v-for="(stat, index) in selectedProfile.stats" 
                             :key="index" 
                             class="stat-item">
                           <span class="stat-value">{{ stat.value }}</span>
@@ -450,12 +450,12 @@
                       </div>
                       <div class="profile-actions">
                         <button class="action-btn add-friend-btn" 
-                                @click="sendFriendRequest(userProfile.userId)"
-                                :disabled="userProfile.isFriend">
+                                @click="sendFriendRequest(selectedProfile.userId)"
+                                :disabled="selectedProfile.isFriend">
                           <img src="@/assets/addFriend.svg" alt="加好友" class="action-icon"/>
-                          {{ userProfile.isFriend ? '已是好友' : '加好友' }}
+                          {{ selectedProfile.isFriend ? '已是好友' : '加好友' }}
                         </button>
-                        <button class="action-btn report-btn" @click="reportUser(userProfile.userId)">
+                        <button class="action-btn report-btn" @click="reportUser(selectedProfile.userId)">
                           <img src="@/assets/report.svg" alt="举报" class="action-icon"/>
                           举报
                         </button>
@@ -463,7 +463,7 @@
                       <div class="recent-games">
                         <h5>最近对战</h5>
                         <div class="game-list">
-                          <div v-for="game in userProfile.recentGames" 
+                          <div v-for="game in selectedProfile.recentGames" 
                               :key="game.id" 
                               class="game-item">
                             <span class="game-result" :class="game.result">
@@ -551,7 +551,7 @@
               <!-- 选择人数 -->
               <div class="form-group">
                 <label for="peopleCount">选择人数</label>
-                <select id="peopleCount" v-model="selectedPeopleCount" class="select-input">
+                <select id="peopleCount" v-model="newRoom.maxPlayers" class="select-input">
                   <option v-for="count in peopleOptions" :key="count" :value="count">
                     {{ count }} 人
                   </option>
@@ -563,11 +563,11 @@
                 <label>房间类型</label>
                 <div class="radio-group">
                   <label class="radio-label">
-                    <input type="radio" value="有AI" v-model="roomType" />
+                    <input type="radio" value="有AI" v-model="newRoom.type" />
                     <span class="radio-text">有AI</span>
                   </label>
                   <label class="radio-label">
-                    <input type="radio" value="无AI" v-model="roomType" />
+                    <input type="radio" value="无AI" v-model="newRoom.type" />
                     <span class="radio-text">无AI</span>
                   </label>
                 </div>
@@ -637,94 +637,162 @@
 <script>
 import { useWebSocket } from '@/composables/useWebSocket';
 import { onMounted, onUnmounted } from 'vue';
+import { useRouter } from 'vue-router';
+import { useStore } from 'vuex';
 import { ref } from 'vue';
+import axios from 'axios';
+
+const router = useRouter();
+// 创建axios实例
+const api = axios.create({
+  baseURL: 'http://localhost:8000'
+});
+
+// 添加请求拦截器
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// 添加响应拦截器
+api.interceptors.response.use(
+  (response) => {
+    return response;
+  },
+  async (error) => {
+    const originalRequest = error.config;
+
+    // 如果是401错误且不是刷新token的请求
+    if (error.response.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      try {
+        // 使用refresh token获取新的access token
+        const refreshToken = localStorage.getItem('refresh_token');
+        const response = await axios.post('http://localhost:8000/api/token/refresh/', {
+          refresh: refreshToken
+        });
+
+        // 更新access token
+        const newAccessToken = response.data.access;
+        localStorage.setItem('access_token', newAccessToken);
+
+        // 更新原始请求的Authorization header
+        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        
+        // 重试原始请求
+        return api(originalRequest);
+      } catch (refreshError) {
+        // refresh token也过期了，需要重新登录
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        // 重定向到登录页面
+        router.push('/login');  // 跳转到登录页面
+        
+        // 可以添加一些用户提示信息，提醒用户重新登录
+        alert('您的会话已过期，请重新登录。');
+        return Promise.reject(refreshError);
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 export default {
   
   data() {
     return {
       friendRequests: [
-      {
-        id: 1,
-        name: '张三',
-        avatar: require('@/assets/profile-icon.png'),
-        time: '10分钟前'
-      },
-      {
-        id: 2,
-        name: '李四',
-        avatar: require('@/assets/profile-icon.png'),
-        time: '1小时前'
-      }
-    ],
-    showFriendRequests: false,
-    showAddFriend: false,
-    friendSearchQuery: '',
-    onlineFriends: [
-      {
-        id: 1,
-        name: '王五',
-        avatar: require('@/assets/profile-icon.png'),
-        status: '游戏中'
-      },
-      {
-        id: 2,
-        name: '赵六',
-        avatar: require('@/assets/profile-icon.png'),
-        status: '在线'
-      }
-    ],
-    offlineFriends: [
-      {
-        id: 3,
-        name: '小七',
-        avatar: require('@/assets/profile-icon.png'),
-        lastSeen: '2小时前在线'
-      }
-    ],
+        {
+          id: 1,
+          name: '张三',
+          avatar: require('@/assets/profile-icon.png'),
+          time: '10分钟前'
+        },
+        {
+          id: 2,
+          name: '李四',
+          avatar: require('@/assets/profile-icon.png'),
+          time: '1小时前'
+        }
+      ],
+      showFriendRequests: false,
+      showAddFriend: false,
+      friendSearchQuery: '',
+      onlineFriends: [
+        {
+          id: 1,
+          name: '王五',
+          avatar: require('@/assets/profile-icon.png'),
+          status: '游戏中'
+        },
+        {
+          id: 2,
+          name: '赵六',
+          avatar: require('@/assets/profile-icon.png'),
+          status: '在线'
+        }
+      ],
+      offlineFriends: [
+        {
+          id: 3,
+          name: '小七',
+          avatar: require('@/assets/profile-icon.png'),
+          lastSeen: '2小时前在线'
+        }
+      ],
 
-    // 历史记录相关
-    totalGames: 128,
-    winRate: 76,
-    avgRating: 4.8,
-    timeFilter: 'all',
-    resultFilter: 'all',
-    gameHistory: [
-      {
-        id: 1,
-        result: 'win',
-        time: '2024-12-07 14:30',
-        roleIcon: require('@/assets/wolf.svg'),
-        role: '狼人',
-        rating: 4.9,
-        duration: '25分钟',
-        goodTeam: [
-          { id: 1, name: '玩家1', avatar: require('@/assets/profile-icon.png') },
-          { id: 2, name: '玩家2', avatar: require('@/assets/profile-icon.png') }
-        ],
-        badTeam: [
-          { id: 3, name: '玩家3', avatar: require('@/assets/profile-icon.png') },
-          { id: 4, name: '玩家4', avatar: require('@/assets/profile-icon.png') }
-        ]
-      },
-      {
-        id: 2,
-        result: 'lose',
-        time: '2024-12-07 13:15',
-        roleIcon: require('@/assets/villager.svg'),
-        role: '平民',
-        rating: 4.7,
-        duration: '30分钟',
-        goodTeam: [
-          { id: 5, name: '玩家5', avatar: require('@/assets/profile-icon.png') },
-          { id: 6, name: '玩家6', avatar: require('@/assets/profile-icon.png') }
-        ],
-        badTeam: [
-          { id: 7, name: '玩家7', avatar: require('@/assets/profile-icon.png') },
-          { id: 8, name: '玩家8', avatar: require('@/assets/profile-icon.png') }
-        ]
-      }
-    ],
+      // 历史记录相关
+      totalGames: 128,
+      winRate: 76,
+      avgRating: 4.8,
+      timeFilter: 'all',
+      resultFilter: 'all',
+      gameHistory: [
+        {
+          id: 1,
+          result: 'win',
+          time: '2024-11-31 14:30',
+          roleIcon: require('@/assets/wolf.svg'),
+          role: '狼人',
+          rating: 4.9,
+          duration: '25分钟',
+          goodTeam: [
+            { id: 1, name: '玩家1', avatar: require('@/assets/profile-icon.png') },
+            { id: 2, name: '玩家2', avatar: require('@/assets/profile-icon.png') }
+          ],
+          badTeam: [
+            { id: 3, name: '玩家3', avatar: require('@/assets/profile-icon.png') },
+            { id: 4, name: '玩家4', avatar: require('@/assets/profile-icon.png') }
+          ]
+        },
+        {
+          id: 2,
+          result: 'lose',
+          time: '2024-11-07 13:15',
+          roleIcon: require('@/assets/villager.svg'),
+          role: '平民',
+          rating: 4.7,
+          duration: '30分钟',
+          goodTeam: [
+            { id: 5, name: '玩家5', avatar: require('@/assets/profile-icon.png') },
+            { id: 6, name: '玩家6', avatar: require('@/assets/profile-icon.png') }
+          ],
+          badTeam: [
+            { id: 7, name: '玩家7', avatar: require('@/assets/profile-icon.png') },
+            { id: 8, name: '玩家8', avatar: require('@/assets/profile-icon.png') }
+          ]
+        }
+      ],
+
       showNoResultsMessage: false,
       filteredRooms: [],
       searchQuery: "", // 搜索输入
@@ -732,9 +800,6 @@ export default {
       showHistory: false,      // 控制历史搜索的显示
       history: ['房间1', '房间2', '房间3'], // 历史记录
 
-      roomType: "无AI", // 房间类型（默认无AI）
-
-      selectedPeopleCount: 6, // 默认选中6人
       peopleOptions: [4, 6, 8, 10, 12, 16], // 可选人数列表
       
       showMenuSidebar: false, // 控制侧边栏的显示与否
@@ -743,9 +808,8 @@ export default {
 
       showCreateRoomPanel: false, // 控制创建房间面板的显示
       selectedRoom: null, // 用于控制显示哪个房间的个人资料卡
-      
 
-      userProfile: {
+      userProfile_test: {
           userId: "user1",
           name: "云想衣裳花想容",
           signature: "点击编辑个性签名",
@@ -770,12 +834,7 @@ export default {
       isEditingAvatar: false,
 
       //userProfile: null,
-      newRoom: {
-        title: `云想衣裳花想容的房间`,  // 这里需要替换实际的用户名
-        description: "无",
-        maxPlayers: 0,
-        type: "无AI",
-      },
+
 
       buttonPosition: {
         x: 20, // 初始X位置（右下角）
@@ -790,37 +849,312 @@ export default {
     };
   },
   setup() {
+    const store = useStore();
+    const router = useRouter();
+    
+    let room_created = ref({})
+    const userProfile = ref({
+      userId: "",
+      name: "",
+      signature: "",
+      avatar: "",
+      isOnline: true,
+      isFriend: true,
+      stats: [
+        { label: '游戏场数', value: 0 },
+        { label: '胜率', value: '0%' },
+        { label: '评分', value: 0 }
+      ]
+    });
     const Rooms = ref([]);
+    const selectedProfile = ref({
+      userId: '',
+      name: '',
+      signature: '',
+      avatar: require('@/assets/profile-icon.png'),
+      isOnline: false,
+      isFriend: false,
+      stats: [],
+      recentGames: []
+    });
+    const newRoom = ref({
+      title: '',
+      description: "无",
+      maxPlayers: 6,
+      type: "无AI",
+    });
+
+    // 函数用于初始化或重新设置房间信息
+    const initializeRoom = () => {
+      newRoom.value.title = `${userProfile.value.name}的房间`; // 设置房间标题
+      newRoom.value.description = "无";
+      newRoom.value.maxPlayers = 6;
+      newRoom.value.type = "无AI";
+    };
+
     const accessToken = localStorage.getItem('access_token');
     const { connect, disconnect, sendMessage, onType, isConnected } = useWebSocket('ws://localhost:8000/ws/lobby/', accessToken);
 
     onMounted(() => {
       connect();
       fetchRoomData();
+      fetchUserInfo();
     });
 
     onUnmounted(() => {
       disconnect();
       sendMessage();
     });
+    const joinRoom = async (roomId) => {
+      // 找到对应的房间数据
+      const room = Rooms.value.find(r => r.id === roomId);
+      if (!room) return;
+      
+      try {
+        // 存储房间数据和用户信息到 Vuex
+        await store.dispatch('saveRoomData', room);
+        await store.dispatch('saveUserProfile', userProfile.value);
+        await store.dispatch('saveWebSocket', {
+          connect,
+          disconnect,
+          sendMessage,
+          onType,
+          isConnected
+        });
 
+        // 发送加入房间的 websocket 消息
+        sendMessage({
+          action: 'join_room',
+          room_id: roomId
+        });
+
+        // 路由跳转
+        router.push({
+          name: 'room',
+          params: { id: roomId }
+        });
+      } catch (error) {
+        console.error('加入房间失败:', error);
+        alert('加入房间失败，请重试');
+      }
+    };
     const fetchRoomData = () => {
       sendMessage({
         action: 'get_rooms'
       });
 
-      onType('room_list', (data) => {
-        Rooms.value = data.rooms;
+      onType('room_list', async (data) => {
+        // 获取并处理每个房间的数据
+        const processedRooms = await Promise.all(data.rooms.map(async (room) => {
+          try {
+            // 获取房主头像
+            const avatarResponse = await api.get(`/api/accounts/avatar/${room.owner}/`);
+            
+            // 返回处理后的房间数据，包含所有原始数据并添加头像
+            return {
+              ...room, // 保持原有的所有数据
+              ownerAvatar: avatarResponse.status === 200 
+                ? avatarResponse.data.avatar_url
+                : require('@/assets/profile-icon.png')
+            };
+          } catch (error) {
+            console.error(`获取房间 ${room.id} 的房主头像失败:`, error);
+            // 出错时使用默认头像，但保留其他数据
+            return {
+              ...room,
+              ownerAvatar: require('@/assets/profile-icon.png')
+            };
+          }
+        }));
+
+        // 更新 Rooms 状态
+        Rooms.value = processedRooms;
       });
     };
 
+    // 创建房间的方法
+    const createRoom = async () => {
+      try {
+        // 发送消息创建房间
+        sendMessage({
+          action: 'create_room',
+          title: newRoom.value.title,
+          description: newRoom.value.description,
+          max_players: newRoom.value.maxPlayers,
+          type: newRoom.value.type,
+        });
+        
+        onType('room_created', async (data) => {
+          room_created.value = data.room;
+          
+          // 存储房间数据和用户信息到 Vuex
+          await store.dispatch('saveRoomData', room_created.value);
+          await store.dispatch('saveUserProfile', userProfile.value);
+          await store.dispatch('saveWebSocket', {
+            connect,
+            disconnect,
+            sendMessage,
+            onType,
+            isConnected
+          });
+          
+          // 使用 router 进行导航
+          router.push({
+            name: 'room',
+            params: { id: room_created.value.id }
+          });
+        });
 
+        initializeRoom(); // 重置表单
+        fetchRoomData(); // 刷新房间列表
+        
+      } catch (error) {
+        console.error('Error creating room:', error);
+      }
+    };
+
+    // 获取用户信息
+    const fetchUserInfo = async () => {
+      try {
+        const response = await api.get('/api/accounts/info/');
+        const data = response.data;
+        
+        userProfile.value = {
+          userId: data.id,
+          name: data.username,
+          signature: data.profile.bio || "点击编辑个性签名",
+          avatar: `http://localhost:8000${data.profile.avatar}`,
+          isOnline: true,
+          isFriend: true,
+          stats: [
+            { label: '游戏场数', value: data.profile.games.length },
+            { label: '胜率', value: calculateWinRate(data.profile.games) },
+            { label: '评分', value: calculateRating(data.profile.games) }
+          ]
+        };
+      } catch (error) {
+        console.error('获取用户信息失败:', error);
+        // 处理错误，可能需要重定向到登录页面
+      }
+    };
+
+    // 更新头像
+    const updateAvatar = async (file) => {
+      try {
+        const formData = new FormData();
+        formData.append('avatar', file);
+
+        const response = await api.post('/api/accounts/avatar/upload/', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        });
+
+        if (response.status === 200) {
+          // 更新头像URL
+          userProfile.value.avatar = `http://localhost:8000${response.data.avatar}`;
+          return true;
+        }
+        return false;
+      } catch (error) {
+        console.error('上传头像失败:', error);
+        return false;
+      }
+    };
+
+    // 更新个性签名
+    const updateSignature = async (newSignature) => {
+      try {
+        const response = await api.put('/api/accounts/bio/update/', {
+          bio: newSignature
+        });
+
+        if (response.status === 200) {
+          userProfile.value.signature = response.data.bio;
+          return true;
+        }
+        return false;
+      } catch (error) {
+        console.error('更新个性签名失败:', error);
+        return false;
+      }
+    };
+
+    
+    // 获取用户头像
+    const fetchSelectedAvatar = async (userId) => {
+      try {
+        const response = await api.get(`/api/accounts/avatar/${userId}/`);
+        if (response.status === 200) {
+          return response.data.avatar_url;
+        } else {
+          return require('@/assets/profile-icon.png'); // 默认头像
+        }
+      } catch (error) {
+        console.error('获取头像失败:', error);
+        return require('@/assets/profile-icon.png'); // 出错时返回默认头像
+      }
+    };
+
+    // 获取选中的人信息
+    const fetchSelectedProfile = async (userId) => {
+      try {
+        const response = await api.get(`/api/accounts/public_info/${userId}/`);
+        const data = response.data;
+        return {
+          userId: data.id,
+          name: data.username,
+          signature: data.profile.bio,
+          avatar: `http://localhost:8000${data.profile.avatar}`,
+          isOnline: true,
+          isFriend: false,
+          stats: [
+            { label: '游戏场数', value: data.profile.wins + data.profile.loses },
+            { label: '胜率', value: `${calculateWinRate(data.profile.games)}` },
+            { label: '评分', value: data.profile.rating || 0 }
+          ],
+          recentGames: (data.profile.recent_games || []).map((game, index) => ({
+            id: index.toString(),
+            result: game.won ? 'win' : 'lose',
+            date: new Date(game.date).toLocaleDateString()
+          }))
+        };
+      } catch (error) {
+        console.error('获取用户信息失败:', error);
+        return null;
+      }
+    };
+
+    // 辅助函数：计算胜率
+    const calculateWinRate = (games) => {
+      if (!games || games.length === 0) return '0%';
+      const wins = games.filter(game => game.result === 'win').length;
+      return `${Math.round((wins / games.length) * 100)}%`;
+    };
+
+    // 辅助函数：计算平均评分
+    const calculateRating = (games) => {
+      if (!games || games.length === 0) return 0;
+      const totalRating = games.reduce((sum, game) => sum + (game.rating || 0), 0);
+      return (totalRating / games.length).toFixed(1);
+    };
 
     return {
+      newRoom,
       isConnected,
       sendMessage,
       Rooms,
+      selectedProfile,
       fetchRoomData,
+      userProfile,
+      fetchUserInfo,
+      updateAvatar,
+      fetchSelectedProfile,
+      updateSignature,
+      fetchSelectedAvatar,
+      initializeRoom,
+      joinRoom,
+      createRoom,
       // 其他属性和方法
     };
     // 其他组件属性和方法
@@ -884,6 +1218,7 @@ export default {
     window.addEventListener("mouseup", this.stopDrag);
     window.addEventListener("touchmove", this.onDragging);
     window.addEventListener("touchend", this.stopDrag);
+
   },
   beforeUnmount() {
     // 移除事件监听器
@@ -892,7 +1227,7 @@ export default {
     window.removeEventListener("touchmove", this.onDragging);
     window.removeEventListener("touchend", this.stopDrag);
   },
-
+  
 
 
 
@@ -940,7 +1275,6 @@ export default {
     // 这里可以实现一个包含删除好友、屏蔽等操作的下拉菜单
   },
 
-  // WebSocket相关方法
   setupWebSocket() {
     // 设置WebSocket连接
     this.ws = new WebSocket('ws://your-websocket-server');
@@ -1048,36 +1382,38 @@ export default {
     async handleAvatarChange(event) {
       const file = event.target.files[0];
       if (!file) return;
-      
-      // 验证文件类型
+
       if (!file.type.startsWith('image/')) {
         alert('请选择图片文件！');
         return;
       }
 
-      // 验证文件大小（例如限制为2MB）
-      if (file.size > 2 * 1024 * 1024) {
-        alert('图片大小不能超过2MB！');
+      if (file.size > 5 * 1024 * 1024) {
+        alert('图片大小不能超过5MB！');
         return;
       }
 
-      try {
-        // 这里应该调用后端API上传图片
-        // const formData = new FormData();
-        // formData.append('avatar', file);
-        // const response = await uploadAvatar(formData);
-        
-        // 临时使用本地预览
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          this.userProfile.avatar = e.target.result;
-        };
-        reader.readAsDataURL(file);
-      } catch (error) {
-        console.error('上传头像失败:', error);
+      const success = await this.updateAvatar(file);
+      if (success) {
+        alert('头像上传成功！');
+      } else {
         alert('上传头像失败，请重试');
-      } finally {
-        this.isEditingAvatar = false;
+      }
+    },
+
+    async saveSignature() {
+      if (!this.userProfile.tempSignature.trim()) {
+        alert('个性签名不能为空！');
+        return;
+      }
+
+      const success = await this.updateSignature(this.userProfile.tempSignature.trim());
+      if (success) {
+        this.userProfile.signature = this.userProfile.tempSignature;
+        this.userProfile.isEditingSignature = false;
+        alert('个性签名更新成功！');
+      } else {
+        alert('更新个性签名失败，请重试');
       }
     },
 
@@ -1089,11 +1425,23 @@ export default {
       });
     },
 
-    saveSignature() {
-      if (this.userProfile.tempSignature.trim()) {
-        this.userProfile.signature = this.userProfile.tempSignature.trim();
+
+
+    // 更新房主头像展示方法
+    async showProfile(roomId) {
+      this.selectedRoom = this.selectedRoom === roomId ? null : roomId;
+      
+      if (this.selectedRoom) {
+        // 获取当前房间信息
+        const room = this.Rooms.find(r => r.id === roomId);
+        if (!room) return;
+
+        // 获取房主信息
+        const selectedProfile = await this.fetchSelectedProfile(room.owner);
+        if (selectedProfile) {
+          this.selectedProfile = selectedProfile;
+        }
       }
-      this.userProfile.isEditingSignature = false;
     },
 
     // 开始拖动
@@ -1130,6 +1478,7 @@ export default {
     // 切换快速匹配窗口的显示状态
     toggleQuickMatchPanel() {
       this.showQuickMatchPanel = !this.showQuickMatchPanel;
+      
     },
 
     // 执行快速匹配
@@ -1196,12 +1545,6 @@ export default {
       this.history = [];
     },
 
-
-
-    handleInput() {
-      // 监听输入事件，方便以后扩展
-    },
-
     toggleSidebar(type) {
       if (type === 'menu') {
         this.showMenuSidebar = !this.showMenuSidebar;
@@ -1248,32 +1591,7 @@ export default {
       alert("好友记录功能！");
     },
     quickMatch() {
-      alert(`快速匹配：${this.roomType}`);
-    },
-    async createRoom() {
-      try {
-        this.sendMessage({
-            action: 'create_room',
-            title: this.newRoom.title,
-            description: this.newRoom.description,
-            max_players: this.selectedPeopleCount,
-            type:this.roomType,
-          });
-
-        this.toggleCreateRoom(); // 关闭创建面板
-        
-        // 重置表单
-        this.newRoom.title = `云想衣裳花想容的房间`;
-        this.newRoom.description = "无";
-        this.selectedPeopleCount = 6;
-        this.roomType = "无AI";
-      } catch (error) {
-        console.error('Error creating room:', error);
-      }
-    },
-    joinRoom(roomId) {
-    alert(`加入房间 ID: ${roomId}`);
-    
+      alert(`快速匹配：${this.newRoom.type}`);
     },
 
     toggleCreateRoom() {
@@ -1286,13 +1604,10 @@ export default {
       } else {
         this.$refs.roomList.classList.remove('shrink');
       }
+      this.initializeRoom();
     },
 
     
-
-    showProfile(roomId) {
-      this.selectedRoom = this.selectedRoom === roomId ? null : roomId;
-    }
     
   },
 };
@@ -1375,7 +1690,10 @@ export default {
 }
 
 /* 个人信息头部样式 */
-.profile-header {
+.profile-header-menu {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   padding: 24px;
   background: linear-gradient(135deg, #4c6ef5, #3b5bdb);
   color: white;
@@ -2606,7 +2924,7 @@ export default {
   top: calc(100% + 8px);
   left: -8px;
   width: 240px; /* 减小宽度 */
-  background: #fff;
+  background: #fff ;
   border-radius: 8px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
   padding: 16px;
@@ -2630,6 +2948,7 @@ export default {
   align-items: center;
   gap: 12px;
   margin-bottom: 16px;
+  background: #fff ;
 }
 
 .large-avatar {
