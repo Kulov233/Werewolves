@@ -102,6 +102,8 @@ class BioUpdateView(APIView):
 
 # 获取某个ID的用户头像
 class UserAvatarView(APIView):
+    permission_classes = [AllowAny]  # 允许所有用户访问（包括未认证用户）
+
     @staticmethod
     def get(request, user_id):
         # 获取用户头像
