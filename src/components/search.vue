@@ -21,9 +21,111 @@
       <transition name="slide-left">
         <div v-if="showMenuSidebar" class="sidebar menu-sidebar" @click.stop>
           <div class="sidebar-content">
-            <h3>菜单内容</h3>
-            <p>这里是一些内容。</p>
-            <button @click="toggleSidebar('menu')">关闭</button>
+            <!-- 个人信息头部 -->
+            <div class="profile-header">
+              <div class="profile-avatar" @click="toggleAvatarEdit" @mouseenter="showChangeAvatar" @mouseleave="hideChangeAvatar">
+                <img :src="userProfile.avatar" alt="用户头像" />
+                <!-- 头像编辑遮罩 -->
+                <div class="avatar-overlay" v-show="isHoveringAvatar">
+                  <input type="file" 
+                        @change="handleAvatarChange" 
+                        accept="image/*"
+                        class="avatar-input"
+                        ref="avatarInput">
+                  <div class="avatar-edit-text">更换头像</div>
+                </div>
+                <div class="online-status" :class="{ 'is-online': userProfile.isOnline }"></div>
+              </div>
+              <div class="profile-basic">
+                <h3 class="profile-name">{{ userProfile.name }}</h3>
+                <!-- 个性签名编辑区 -->
+                <div class="signature-container" @click="startEditSignature" v-if="!userProfile.isEditingSignature">
+                  <span class="signature-text">{{ userProfile.signature }}</span>
+                  <img src="@/assets/edit.svg" alt="Edit" class="edit-icon"/>
+                </div>
+                <input v-else
+                      ref="signatureInput"
+                      v-model="userProfile.tempSignature"
+                      @blur="saveSignature"
+                      @keyup.enter="saveSignature"
+                      class="signature-input"
+                      placeholder="输入个性签名"
+                      maxlength="30">
+              </div>
+            </div>
+
+            <!-- 个人统计数据 -->
+            <div class="profile-stats">
+              <div v-for="stat in userProfile.stats" :key="stat.label" class="stat-card">
+                <span class="stat-value">{{ stat.value }}</span>
+                <span class="stat-label">{{ stat.label }}</span>
+              </div>
+            </div>
+
+            <!-- 功能区块 -->
+            <div class="menu-sections">
+              <!-- 游戏中心 -->
+              <div class="menu-section">
+                <h4 class="section-title">
+                  <img src="@/assets/wolf.svg" alt="Game" class="section-icon" />
+                  游戏中心
+                </h4>
+                <div class="section-content">
+                  <button class="menu-button" @click="goToHistory">
+                    <img src="@/assets/history.svg" alt="History" />
+                    游戏记录
+                  </button>
+                  <button class="menu-button" @click="goToAchievements">
+                    <img src="@/assets/wolf.svg" alt="Achievements" />
+                    我的成就
+                  </button>
+                </div>
+              </div>
+
+              <!-- 好友系统 -->
+              <div class="menu-section">
+                <h4 class="section-title">
+                  <img src="@/assets/wolf.svg" alt="Friends" class="section-icon" />
+                  社交中心
+                </h4>
+                <div class="section-content">
+                  <button class="menu-button" @click="goToFriends">
+                    <img src="@/assets/wolf.svg" alt="Friend List" />
+                    好友列表
+                  </button>
+                  <button class="menu-button" @click="goToInvites">
+                    <img src="@/assets/wolf.svg" alt="Invites" />
+                    邀请管理
+                  </button>
+                </div>
+              </div>
+
+              <!-- 设置中心 -->
+              <div class="menu-section">
+                <h4 class="section-title">
+                  <img src="@/assets/wolf.svg" alt="Settings" class="section-icon" />
+                  设置中心
+                </h4>
+                <div class="section-content">
+                  <button class="menu-button" @click="goToProfile">
+                    <img src="@/assets/wolf.svg" alt="Profile" />
+                    资料设置
+                  </button>
+                  <button class="menu-button" @click="goToPreferences">
+                    <img src="@/assets/wolf.svg" alt="Preferences" />
+                    偏好设置
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 底部操作区 -->
+            <div class="menu-footer">
+              <button class="logout-button" @click="handleLogout">
+                <img src="@/assets/logout.svg" alt="Logout" />
+                退出登录
+              </button>
+            </div>
           </div>
         </div>
       </transition>
@@ -31,10 +133,108 @@
       <!-- 右侧滑出菜单 Friends -->
       <transition name="slide-right">
         <div v-if="showFriendsSidebar" class="sidebar friends-sidebar" @click.stop>
-          <div class="sidebar-content">
-            <h3>朋友列表</h3>
-            <p>这里显示朋友的信息。</p>
-            <button @click="toggleSidebar('friends')">关闭</button>
+          <div class="sidebar-header">
+            <h3>好友列表</h3>
+            <div class="header-actions">
+              <button class="icon-btn" @click="toggleFriendRequests" title="好友请求">
+                <img src="@/assets/wolf.svg" alt="Requests"/>
+                <span class="badge" v-if="friendRequests.length > 0">{{friendRequests.length}}</span>
+              </button>
+              <button class="icon-btn" @click="toggleAddFriend" title="添加好友">
+                <img src="@/assets/addFriend.svg" alt="Add Friend"/>
+              </button>
+              <button class="close-btn" @click="toggleSidebar('friends')">
+                <img src="@/assets/close-createRoom.svg" alt="Close"/>
+              </button>
+            </div>
+          </div>
+
+          <!-- 好友请求面板 -->
+          <div v-if="showFriendRequests" class="friend-requests-panel">
+            <div class="panel-header">
+              <h4>好友请求</h4>
+              <span class="request-count">{{friendRequests.length}}个待处理</span>
+            </div>
+            <div class="requests-list">
+              <div v-for="request in friendRequests" 
+                  :key="request.id" 
+                  class="request-item">
+                <img :src="request.avatar" alt="Avatar" class="request-avatar"/>
+                <div class="request-info">
+                  <span class="request-name">{{request.name}}</span>
+                  <span class="request-time">{{request.time}}</span>
+                </div>
+                <div class="request-actions">
+                  <button class="accept-btn" @click="handleFriendRequest(request.id, 'accept')">接受</button>
+                  <button class="reject-btn" @click="handleFriendRequest(request.id, 'reject')">拒绝</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 添加好友面板 -->
+          <div v-if="showAddFriend" class="add-friend-panel">
+            <div class="search-friend">
+              <input type="text" 
+                    v-model="friendSearchQuery"
+                    placeholder="输入用户ID或昵称"
+                    @keyup.enter="searchFriend"/>
+              <button @click="searchFriend">搜索</button>
+            </div>
+          </div>
+
+          <!-- 好友列表 -->
+          <div class="friends-list">
+            <!-- 在线好友 -->
+            <div class="friend-group">
+              <div class="group-header">
+                <span>在线好友</span>
+                <span class="count">{{onlineFriends.length}}</span>
+              </div>
+              <div class="friend-items">
+                <div v-for="friend in onlineFriends" 
+                    :key="friend.id" 
+                    class="friend-item">
+                  <img :src="friend.avatar" alt="Avatar" class="friend-avatar"/>
+                  <div class="friend-info">
+                    <span class="friend-name">{{friend.name}}</span>
+                    <span class="friend-status">{{friend.status}}</span>
+                  </div>
+                  <div class="friend-actions">
+                    <button class="action-btn" @click="inviteFriend(friend.id)">
+                      <img src="@/assets/invite.svg" alt="Invite"/>
+                    </button>
+                    <button class="action-btn" @click="showFriendMenu(friend)">
+                      <img src="@/assets/more.svg" alt="More"/>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 离线好友 -->
+            <div class="friend-group">
+              <div class="group-header">
+                <span>离线好友</span>
+                <span class="count">{{offlineFriends.length}}</span>
+              </div>
+              <div class="friend-items">
+                <div v-for="friend in offlineFriends" 
+                    :key="friend.id" 
+                    class="friend-item offline">
+                  <img :src="friend.avatar" alt="Avatar" class="friend-avatar"/>
+                  <div class="friend-info">
+                    <span class="friend-name">{{friend.name}}</span>
+                    <span class="friend-status">{{friend.lastSeen}}</span>
+                  </div>
+                  <div class="friend-actions">
+                    <button class="action-btn" @click="showFriendMenu(friend)">
+                      <img src="@/assets/more.svg" alt="More"/>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </transition>
@@ -42,10 +242,91 @@
       <!-- 右侧滑出菜单 History -->
       <transition name="slide-right">
         <div v-if="showHistorySidebar" class="sidebar history-sidebar" @click.stop>
-          <div class="sidebar-content">
-            <h3>历史记录</h3>
-            <p>这里显示历史记录信息。</p>
-            <button @click="toggleSidebar('history')">关闭</button>
+          <div class="sidebar-header">
+            <h3>游戏记录</h3>
+            <div class="header-actions">
+              <button class="close-btn" @click="toggleSidebar('history')">
+                <img src="@/assets/close-createRoom.svg" alt="Close"/>
+              </button>
+            </div>
+          </div>
+
+          <!-- 数据统计 -->
+          <div class="stats-cards">
+            <div class="stat-card">
+              <span class="stat-number">{{totalGames}}</span>
+              <span class="stat-label">总场次</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-number">{{winRate}}%</span>
+              <span class="stat-label">胜率</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-number">{{avgRating}}</span>
+              <span class="stat-label">平均评分</span>
+            </div>
+          </div>
+
+          <!-- 筛选器 -->
+          <div class="history-filters">
+            <select v-model="timeFilter" class="filter-select">
+              <option value="all">全部时间</option>
+              <option value="week">最近7天</option>
+              <option value="month">最近30天</option>
+            </select>
+            <select v-model="resultFilter" class="filter-select">
+              <option value="all">全部结果</option>
+              <option value="win">胜利</option>
+              <option value="lose">失败</option>
+            </select>
+          </div>
+
+          <!-- 历史记录列表 -->
+          <div class="game-history-list">
+            <div v-for="game in filteredGameHistory" 
+                :key="game.id" 
+                class="game-record">
+              <div class="game-header">
+                <span class="game-result" :class="game.result">
+                  {{game.result === 'win' ? '胜利' : '失败'}}
+                </span>
+                <span class="game-time">{{game.time}}</span>
+              </div>
+              <div class="game-details">
+                <div class="role-info">
+                  <img :src="game.roleIcon" alt="Role" class="role-icon"/>
+                  <span class="role-name">{{game.role}}</span>
+                </div>
+                <div class="game-stats">
+                  <div class="stat">
+                    <span class="label">评分</span>
+                    <span class="value">{{game.rating}}</span>
+                  </div>
+                  <div class="stat">
+                    <span class="label">场次时长</span>
+                    <span class="value">{{game.duration}}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="game-players">
+                <div class="team good-team">
+                  <div v-for="player in game.goodTeam" 
+                      :key="player.id" 
+                      class="player">
+                    <img :src="player.avatar" alt="Avatar" class="player-avatar"/>
+                    <span class="player-name">{{player.name}}</span>
+                  </div>
+                </div>
+                <div class="team bad-team">
+                  <div v-for="player in game.badTeam" 
+                      :key="player.id" 
+                      class="player">
+                    <img :src="player.avatar" alt="Avatar" class="player-avatar"/>
+                    <span class="player-name">{{player.name}}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </transition>
@@ -111,24 +392,36 @@
                 </div>
               </transition>
             </div>
+            <div class="header-actions">
+              <!-- 添加刷新按钮 -->
+              <button class="refresh-button" @click="fetchRoomData" title="刷新房间列表">
+                <img src="@/assets/refresh.svg" alt="Refresh" class="refresh-icon" />
+              </button>
 
-            <!-- 在搜索框右边添加一个创建房间按钮 -->
-            <button class="create-Room-button" @click="toggleCreateRoom" title="创建房间">
-              <img src="@/assets/createRoom.svg" alt="Create Room" />
-            </button>
+              <!-- 在搜索框右边添加一个创建房间按钮 -->
+              <button class="create-Room-button" @click="toggleCreateRoom" title="创建房间">
+                <img src="@/assets/createRoom.svg" alt="Create Room" />
+              </button>
+            </div>
           </div>
           <!-- 添加过渡动画容器 -->
           <transition-group 
             name="room-card" 
             tag="div" 
             class="room-cards">
-            <div v-for="room in filteredRooms" 
+
+            <!-- 当没有搜索结果时显示提示信息 -->
+            <div v-if="showNoResultsMessage" class="no-results">
+              <p>没有找到匹配的房间</p>
+            </div>
+
+            <div v-for="room in filteredRooms.length > 0 ? filteredRooms : Rooms" 
                 :key="room.id" 
                 class="room-card">
               <div class="room-card-header">
-                <h3>{{ room.name }}</h3>
-                <span class="room-type" :class="{ 'ai': room.type === '有AI' }">
-                  {{ room.type }}
+                <h3>{{ room.title }}</h3>
+                <span class="room-type" :class="{ 'ai': Object.keys(room.ai_players).length > 0 }">
+                  {{ Object.keys(room.ai_players).length > 0 ? '有AI' : '无AI' }}
                 </span>
                 <!-- 添加房主头像 -->
                 <div class="owner-avatar" @click.stop="showProfile(room.id)">
@@ -185,6 +478,7 @@
                 </div>
               </div>
 
+              
               <div class="room-description">
                 <span class="description">
                     {{ room.description }}
@@ -195,15 +489,15 @@
                 <div class="info-item">
                   <img src="@/assets/people.svg" alt="Users" class="info-icon" />
                   <span class="player-count">
-                    {{ room.currentPeople }}/{{ room.maxPeople }}
+                    {{ room.players.length + Object.keys(room.ai_players).length }}/{{ room.max_players }}
                   </span>
                 </div>
                 
                 <!-- 可以根据需要添加更多房间信息 -->
                 <div class="info-item">
                   <img src="@/assets/status.svg" alt="Status" class="info-icon" />
-                  <span :class="{'status-full': room.currentPeople === room.maxPeople}">
-                    {{ room.currentPeople === room.maxPeople ? '已满' : '可加入' }}
+                  <span :class="{'status-full': room.players.length + Object.keys(room.ai_players).length === room.max_players }">
+                    {{ room.players.length + Object.keys(room.ai_players).length === room.max_players ? '已满' : '可加入' }}
                   </span>
                 </div>
               </div>
@@ -211,8 +505,8 @@
               <button 
                 class="join-button" 
                 @click.stop="joinRoom(room.id)"
-                :disabled="room.currentPeople === room.maxPeople">
-                <span v-if="room.currentPeople === room.maxPeople">房间已满</span>
+                :disabled="room.players.length + Object.keys(room.ai_players).length === room.max_players">
+                <span v-if="room.players.length + Object.keys(room.ai_players).length === room.max_players">房间已满</span>
                 <span v-else>加入房间</span>
               </button>
             </div>
@@ -237,7 +531,7 @@
                 <input 
                   type="text" 
                   id="roomName" 
-                  v-model="newRoom.name" 
+                  v-model="newRoom.title" 
                   class="text-input"
                   placeholder="输入房间名称"
                 >
@@ -341,21 +635,106 @@
 </template>
   
 <script>
+import { useWebSocket } from '@/composables/useWebSocket';
+import { onMounted, onUnmounted } from 'vue';
+import { ref } from 'vue';
+
 export default {
+  
   data() {
     return {
+      friendRequests: [
+      {
+        id: 1,
+        name: '张三',
+        avatar: require('@/assets/profile-icon.png'),
+        time: '10分钟前'
+      },
+      {
+        id: 2,
+        name: '李四',
+        avatar: require('@/assets/profile-icon.png'),
+        time: '1小时前'
+      }
+    ],
+    showFriendRequests: false,
+    showAddFriend: false,
+    friendSearchQuery: '',
+    onlineFriends: [
+      {
+        id: 1,
+        name: '王五',
+        avatar: require('@/assets/profile-icon.png'),
+        status: '游戏中'
+      },
+      {
+        id: 2,
+        name: '赵六',
+        avatar: require('@/assets/profile-icon.png'),
+        status: '在线'
+      }
+    ],
+    offlineFriends: [
+      {
+        id: 3,
+        name: '小七',
+        avatar: require('@/assets/profile-icon.png'),
+        lastSeen: '2小时前在线'
+      }
+    ],
+
+    // 历史记录相关
+    totalGames: 128,
+    winRate: 76,
+    avgRating: 4.8,
+    timeFilter: 'all',
+    resultFilter: 'all',
+    gameHistory: [
+      {
+        id: 1,
+        result: 'win',
+        time: '2024-12-07 14:30',
+        roleIcon: require('@/assets/wolf.svg'),
+        role: '狼人',
+        rating: 4.9,
+        duration: '25分钟',
+        goodTeam: [
+          { id: 1, name: '玩家1', avatar: require('@/assets/profile-icon.png') },
+          { id: 2, name: '玩家2', avatar: require('@/assets/profile-icon.png') }
+        ],
+        badTeam: [
+          { id: 3, name: '玩家3', avatar: require('@/assets/profile-icon.png') },
+          { id: 4, name: '玩家4', avatar: require('@/assets/profile-icon.png') }
+        ]
+      },
+      {
+        id: 2,
+        result: 'lose',
+        time: '2024-12-07 13:15',
+        roleIcon: require('@/assets/villager.svg'),
+        role: '平民',
+        rating: 4.7,
+        duration: '30分钟',
+        goodTeam: [
+          { id: 5, name: '玩家5', avatar: require('@/assets/profile-icon.png') },
+          { id: 6, name: '玩家6', avatar: require('@/assets/profile-icon.png') }
+        ],
+        badTeam: [
+          { id: 7, name: '玩家7', avatar: require('@/assets/profile-icon.png') },
+          { id: 8, name: '玩家8', avatar: require('@/assets/profile-icon.png') }
+        ]
+      }
+    ],
+      showNoResultsMessage: false,
+      filteredRooms: [],
       searchQuery: "", // 搜索输入
       showSearchIcon: false,   // 控制 search.svg 是否显示
       showHistory: false,      // 控制历史搜索的显示
       history: ['房间1', '房间2', '房间3'], // 历史记录
 
       roomType: "无AI", // 房间类型（默认无AI）
-      filteredRooms: [
-      { id: 1, name: "房间1", type: "有AI", description:"这是一个六人局房间且有AI", currentPeople: 2, maxPeople: 6 },
-      { id: 2, name: "房间2", type: "无AI", description:"无", currentPeople: 4, maxPeople: 10 },
-      { id: 3, name: "房间3", type: "有AI", description:"无", currentPeople: 1, maxPeople: 4 },
-    ],
-      selectedPeopleCount: 2, // 默认选中2人
+
+      selectedPeopleCount: 6, // 默认选中6人
       peopleOptions: [4, 6, 8, 10, 12, 16], // 可选人数列表
       
       showMenuSidebar: false, // 控制侧边栏的显示与否
@@ -369,6 +748,7 @@ export default {
       userProfile: {
           userId: "user1",
           name: "云想衣裳花想容",
+          signature: "点击编辑个性签名",
           avatar: require("@/assets/profile-icon.png"),
           isOnline: true,
           isFriend: false,
@@ -381,15 +761,20 @@ export default {
             { id: 'g1', result: 'win', date: '2024-12-04' },
             { id: 'g2', result: 'win', date: '2024-12-03' },
             { id: 'g3', result: 'lose', date: '2024-12-03' }
-          ]
+          ],
       },
+
+      isHoveringAvatar: false,
+      isEditingSignature: false,
+      tempSignature: "",
+      isEditingAvatar: false,
+
       //userProfile: null,
       newRoom: {
-        name: `云想衣裳花想容的房间`,  // 这里需要替换实际的用户名
+        title: `云想衣裳花想容的房间`,  // 这里需要替换实际的用户名
         description: "无",
+        maxPlayers: 0,
         type: "无AI",
-        currentPeople: 1,
-        maxPeople: 2
       },
 
       buttonPosition: {
@@ -404,18 +789,87 @@ export default {
 
     };
   },
-  computed: {
-    // 根据搜索和房间类型过滤房间列表
-    //filteredRooms() {
-    //  return this.rooms.filter((room) => {
-    //    const matchesSearch = room.name.includes(this.searchQuery);
-    //    const matchesType = this.roomType === "All" || room.type === this.roomType;
-    //    return matchesSearch && matchesType;
-    //  });
-    //},
+  setup() {
+    const Rooms = ref([]);
+    const accessToken = localStorage.getItem('access_token');
+    const { connect, disconnect, sendMessage, onType, isConnected } = useWebSocket('ws://localhost:8000/ws/lobby/', accessToken);
+
+    onMounted(() => {
+      connect();
+      fetchRoomData();
+    });
+
+    onUnmounted(() => {
+      disconnect();
+      sendMessage();
+    });
+
+    const fetchRoomData = () => {
+      sendMessage({
+        action: 'get_rooms'
+      });
+
+      onType('room_list', (data) => {
+        Rooms.value = data.rooms;
+      });
+    };
+
+
+
+    return {
+      isConnected,
+      sendMessage,
+      Rooms,
+      fetchRoomData,
+      // 其他属性和方法
+    };
+    // 其他组件属性和方法
   },
+  computed: {
+    displayedRooms() {
+      const query = this.searchQuery.toLowerCase().trim();
+      
+      // 如果没有搜索关键词，返回所有房间
+      if (!query) {
+        return this.Rooms;
+      }
+      
+      // 根据房间名称或ID进行过滤
+      return this.Rooms.filter(room => {
+        const titleMatch = room.title.toLowerCase().includes(query);
+        const idMatch = room.id.toString().includes(query);
+        return titleMatch || idMatch;
+      });
+    },
+      filteredGameHistory() {
+      let filtered = this.gameHistory;
+
+      // 按时间筛选
+      if (this.timeFilter !== 'all') {
+        const now = new Date();
+        const days = this.timeFilter === 'week' ? 7 : 30;
+        const timeLimit = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+        
+        filtered = filtered.filter(game => {
+          const gameTime = new Date(game.time);
+          return gameTime >= timeLimit;
+        });
+      }
+
+      // 按结果筛选
+      if (this.resultFilter !== 'all') {
+        filtered = filtered.filter(game => game.result === this.resultFilter);
+      }
+
+      return filtered;
+    }
+
+  },
+
   mounted() {
     // 设置按钮初始位置为右下角
+    
+
     this.$nextTick(() => {
       const roomList = this.$refs.roomList;
       if (roomList) {
@@ -443,45 +897,205 @@ export default {
 
 
   methods: {
-    //async showProfile(roomId) {
-    //  this.selectedRoom = this.selectedRoom === roomId ? null : roomId;
-    //  if (this.selectedRoom) {
-    //    // 获取用户资料
-    //    try {
-    //      const response = await this.getUserProfile(roomId);
-    //      this.userProfile = response.data;
-    //    } catch (error) {
-    //      console.error('Failed to fetch user profile:', error);
-    //    }
-    //  }
-    //},
-//
-    //// 获取用户资料接口
-    //async getUserProfile(roomId) {
-    //  // TODO: 实现接口调用
-    //  // return await api.get(`/api/user/profile/${roomId}`);
-    //},
-//
-    //// 发送好友请求
-    //async sendFriendRequest(userId) {
-    //  try {
-    //    // await api.post('/api/friend/request', { userId });
-    //    // 处理成功响应
-    //  } catch (error) {
-    //    console.error('Failed to send friend request:', error);
-    //  }
-    //},
-//
-    //// 举报用户
-    //async reportUser(userId) {
-    //  try {
-    //    // await api.post('/api/user/report', { userId });
-    //    // 处理成功响应
-    //  } catch (error) {
-    //    console.error('Failed to report user:', error);
-    //  }
-    //},
-    // 输入框点击事件，展开左侧 search.svg 图标
+     // 好友系统相关方法
+  toggleFriendRequests() {
+    this.showFriendRequests = !this.showFriendRequests;
+    this.showAddFriend = false;
+  },
+
+  toggleAddFriend() {
+    this.showAddFriend = !this.showAddFriend;
+    this.showFriendRequests = false;
+  },
+
+  handleFriendRequest(requestId, action) {
+    // 处理好友请求
+    if (action === 'accept') {
+      // 接受好友请求的逻辑
+      this.friendRequests = this.friendRequests.filter(req => req.id !== requestId);
+      // 这里应该调用后端API处理好友关系
+    } else {
+      // 拒绝好友请求的逻辑
+      this.friendRequests = this.friendRequests.filter(req => req.id !== requestId);
+    }
+  },
+
+  searchFriend() {
+    if (this.friendSearchQuery.trim()) {
+      // 搜索好友的逻辑
+      console.log('Searching for:', this.friendSearchQuery);
+      // 这里应该调用后端API搜索用户
+    }
+  },
+
+  inviteFriend(friendId) {
+    // 邀请好友加入游戏的逻辑
+    console.log('Inviting friend:', friendId);
+    // 这里应该调用后端API发送游戏邀请
+  },
+
+  showFriendMenu(friend) {
+    // 显示好友操作菜单的逻辑
+    console.log('Show menu for friend:', friend.name);
+    // 这里可以实现一个包含删除好友、屏蔽等操作的下拉菜单
+  },
+
+  // WebSocket相关方法
+  setupWebSocket() {
+    // 设置WebSocket连接
+    this.ws = new WebSocket('ws://your-websocket-server');
+    
+    this.ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      
+      switch (data.type) {
+        case 'friendRequest':
+          this.handleNewFriendRequest(data.request);
+          break;
+        case 'friendStatusChange':
+          this.updateFriendStatus(data.friend);
+          break;
+        case 'gameInvite':
+          this.handleGameInvite(data.invite);
+          break;
+      }
+    };
+  },
+
+  handleNewFriendRequest(request) {
+    this.friendRequests.unshift({
+      id: request.id,
+      name: request.name,
+      avatar: request.avatar,
+      time: '刚刚'
+    });
+  },
+
+  updateFriendStatus(friend) {
+    // 更新好友状态
+    const onlineFriend = this.onlineFriends.find(f => f.id === friend.id);
+    const offlineFriend = this.offlineFriends.find(f => f.id === friend.id);
+
+    if (friend.isOnline) {
+      if (offlineFriend) {
+        // 从离线列表移动到在线列表
+        this.offlineFriends = this.offlineFriends.filter(f => f.id !== friend.id);
+        this.onlineFriends.push({
+          ...offlineFriend,
+          status: '在线'
+        });
+      }
+    } else {
+      if (onlineFriend) {
+        // 从在线列表移动到离线列表
+        this.onlineFriends = this.onlineFriends.filter(f => f.id !== friend.id);
+        this.offlineFriends.push({
+          ...onlineFriend,
+          lastSeen: '刚刚离线'
+        });
+      }
+    }
+  },
+
+  handleGameInvite(invite) {
+    // 处理游戏邀请
+    this.$notify({
+      title: '游戏邀请',
+      message: `${invite.fromName} 邀请你加入游戏`,
+      type: 'info',
+      duration: 0,
+      showClose: true,
+      customClass: 'game-invite-notification',
+      onClick: () => {
+        this.respondToGameInvite(invite.id, true);
+      }
+    });
+  },
+
+  respondToGameInvite(inviteId, accept) {
+    // 响应游戏邀请
+    if (accept) {
+      // 接受邀请的逻辑
+      this.ws.send(JSON.stringify({
+        type: 'acceptGameInvite',
+        inviteId: inviteId
+      }));
+    } else {
+      // 拒绝邀请的逻辑
+      this.ws.send(JSON.stringify({
+        type: 'rejectGameInvite',
+        inviteId: inviteId
+      }));
+    }
+  },
+
+    showChangeAvatar() {
+      this.isHoveringAvatar = true;
+    },
+    hideChangeAvatar() {
+      this.isHoveringAvatar = false;
+    },
+    
+    toggleAvatarEdit() {
+      this.isEditingAvatar = !this.isEditingAvatar;
+      if (this.isEditingAvatar) {
+        this.$nextTick(() => {
+          this.$refs.avatarInput.click();
+        });
+      }
+    },
+
+    async handleAvatarChange(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      
+      // 验证文件类型
+      if (!file.type.startsWith('image/')) {
+        alert('请选择图片文件！');
+        return;
+      }
+
+      // 验证文件大小（例如限制为2MB）
+      if (file.size > 2 * 1024 * 1024) {
+        alert('图片大小不能超过2MB！');
+        return;
+      }
+
+      try {
+        // 这里应该调用后端API上传图片
+        // const formData = new FormData();
+        // formData.append('avatar', file);
+        // const response = await uploadAvatar(formData);
+        
+        // 临时使用本地预览
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          this.userProfile.avatar = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      } catch (error) {
+        console.error('上传头像失败:', error);
+        alert('上传头像失败，请重试');
+      } finally {
+        this.isEditingAvatar = false;
+      }
+    },
+
+    startEditSignature() {
+      this.userProfile.isEditingSignature = true;
+      this.userProfile.tempSignature = this.userProfile.signature;
+      this.$nextTick(() => {
+        this.$refs.signatureInput.focus();
+      });
+    },
+
+    saveSignature() {
+      if (this.userProfile.tempSignature.trim()) {
+        this.userProfile.signature = this.userProfile.tempSignature.trim();
+      }
+      this.userProfile.isEditingSignature = false;
+    },
+
     // 开始拖动
     startDrag(event) {
       this.isDragging = true;
@@ -521,7 +1135,7 @@ export default {
     // 执行快速匹配
     performQuickMatch() {
       // 过滤符合条件的房间
-      const matchedRooms = this.filteredRooms.filter(room => {
+      const matchedRooms = this.Rooms.filter(room => {
         const matchesPeople = room.maxPeople === this.matchPeopleCount;
         const matchesAI = room.type === this.matchAI;
         return matchesPeople && matchesAI && room.currentPeople < room.maxPeople;
@@ -556,10 +1170,20 @@ export default {
         // 添加到历史记录
         if (!this.history.includes(this.searchQuery)) {
           this.history.unshift(this.searchQuery);
+          // 限制历史记录最多保存10条
+          if (this.history.length > 10) {
+            this.history.pop();
+          }
         }
-        alert(`搜索内容：${this.searchQuery}`);
+        this.filteredRooms = this.displayedRooms;
+        this.showNoResultsMessage = this.filteredRooms.length === 0;
+      } else {
+        this.filteredRooms = [];
+        this.showNoResultsMessage = false;
       }
+      this.showHistory = false;
     },
+    
     // 选择历史搜索项
     selectHistory(item) {
       this.searchQuery = item;
@@ -620,37 +1244,36 @@ export default {
       this.showHistory = false; 
     },
 
-    inviteFriend() {
-      alert("好友邀请功能！");
-    },
     friendRecord() {
       alert("好友记录功能！");
     },
     quickMatch() {
       alert(`快速匹配：${this.roomType}`);
     },
-    createRoom() {
-      const roomId = this.filteredRooms.length + 1;
-      const newRoom = {
-        id: roomId,
-        name: this.newRoom.name,
-        type: this.roomType,
-        description: this.newRoom.description,
-        currentPeople: 1,
-        maxPeople: this.selectedPeopleCount
-      };
-      
-      this.filteredRooms.push(newRoom);
-      this.toggleCreateRoom(); // 关闭创建面板
-      
-      // 重置表单
-      this.newRoom.name = `云想衣裳花想容的房间`;
-      this.newRoom.description = "无";
-      this.roomType = "无AI";
-      this.selectedPeopleCount = 2;
+    async createRoom() {
+      try {
+        this.sendMessage({
+            action: 'create_room',
+            title: this.newRoom.title,
+            description: this.newRoom.description,
+            max_players: this.selectedPeopleCount,
+            type:this.roomType,
+          });
+
+        this.toggleCreateRoom(); // 关闭创建面板
+        
+        // 重置表单
+        this.newRoom.title = `云想衣裳花想容的房间`;
+        this.newRoom.description = "无";
+        this.selectedPeopleCount = 6;
+        this.roomType = "无AI";
+      } catch (error) {
+        console.error('Error creating room:', error);
+      }
     },
     joinRoom(roomId) {
     alert(`加入房间 ID: ${roomId}`);
+    
     },
 
     toggleCreateRoom() {
@@ -740,11 +1363,752 @@ export default {
   padding: 20px;
 }
 .menu-sidebar {
-  left: 0; 
+  background-color: #ffffff;
+  width: 320px;
 }
 
-.friends-sidebar, .history-sidebar {
+.sidebar-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 0;
+}
+
+/* 个人信息头部样式 */
+.profile-header {
+  padding: 24px;
+  background: linear-gradient(135deg, #4c6ef5, #3b5bdb);
+  color: white;
+  border-radius: 0 0 20px 20px;
+  position: relative;
+  margin-bottom: 20px;
+}
+
+.profile-avatar {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  cursor: pointer;
+  margin-bottom: 12px;
+}
+
+.avatar-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.profile-avatar:hover .avatar-overlay {
+  opacity: 1;
+}
+
+.avatar-input {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.avatar-edit-text {
+  color: white;
+  font-size: 14px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.profile-avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  object-fit: cover;
+}
+
+.signature-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: background-color 0.3s;
+}
+
+.signature-container:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+
+
+.signature-text {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.edit-icon {
+  width: 14px;
+  height: 14px;
+  opacity: 0.7;
+}
+
+.signature-container .edit-icon {
+  display: none;
+}
+
+.signature-container:hover .edit-icon {
+  display: block;
+}
+
+.signature-input {
+  width: 100%;
+  padding: 4px 8px;
+  border: none;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #333;
+  font-size: 14px;
+  outline: none;
+}
+
+.signature-input::placeholder {
+  color: #999;
+}
+
+
+
+.profile-basic {
+  margin-top: 12px;
+}
+
+.profile-name {
+  font-size: 1.5em;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+}
+
+.profile-status {
+  font-size: 0.9em;
+  opacity: 0.9;
+}
+
+/* 统计卡片样式 */
+.profile-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  padding: 0 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 12px;
+  text-align: center;
+  transition: transform 0.2s;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+}
+
+.stat-value {
+  display: block;
+  font-size: 1.2em;
+  font-weight: 600;
+  color: #4c6ef5;
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-size: 0.8em;
+  color: #868e96;
+}
+
+/* 功能区块样式 */
+.menu-sections {
+  flex: 1;
+  padding: 0 16px;
+  overflow-y: auto;
+}
+
+.menu-section {
+  margin-bottom: 24px;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  font-size: 1em;
+  color: #495057;
+  margin-bottom: 12px;
+  padding: 0 8px;
+}
+
+.section-icon {
+  width: 20px;
+  height: 20px;
+  margin-right: 8px;
+}
+
+.section-content {
+  display: grid;
+  gap: 8px;
+}
+
+.menu-button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: #495057;
+  font-size: 0.9em;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+  text-align: left;
+}
+
+.menu-button:hover {
+  background: #f8f9fa;
+  color: #4c6ef5;
+}
+
+.menu-button img {
+  width: 20px;
+  height: 20px;
+  opacity: 0.7;
+}
+
+.menu-button:hover img {
+  opacity: 1;
+}
+
+/* 底部操作区样式 */
+.menu-footer {
+  padding: 16px;
+  border-top: 1px solid #e9ecef;
+  margin-top: auto;
+}
+
+.logout-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px;
+  background: #fee;
+  border: none;
+  border-radius: 8px;
+  color: #e03131;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.logout-button:hover {
+  background: #fdd;
+}
+
+.logout-button img {
+  width: 20px;
+  height: 20px;
+}
+
+.friends-sidebar,
+.history-sidebar {
+  width: 360px;
+  background: #ffffff;
   right: 0;
+}
+
+/* 侧边栏头部 */
+.sidebar-header {
+  padding: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #eee;
+}
+
+.sidebar-header h3 {
+  margin: 0;
+  font-size: 1.2em;
+  color: #333;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.icon-btn {
+  position: relative;
+  padding: 8px;
+  background: transparent !important;;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.icon-btn:hover {
+  background: #f5f5f5;
+}
+
+.icon-btn img {
+  width: 20px;
+  height: 20px;
+}
+
+.badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background: #f56c6c;
+  color: white;
+  border-radius: 9px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-btn {
+  padding: 8px;
+  background: transparent !important;
+  border: none;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: all 0.3s;
+}
+
+.close-btn:hover {
+  opacity: 1;
+}
+
+.close-btn img {
+  width: 16px;
+  height: 16px;
+}
+
+/* 好友请求面板 */
+.friend-requests-panel {
+  background: #f8f9fa;
+  border-bottom: 1px solid #eee;
+}
+
+.panel-header {
+  padding: 12px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.panel-header h4 {
+  margin: 0;
+  font-size: 0.9em;
+  color: #666;
+}
+
+.request-count {
+  font-size: 0.8em;
+  color: #999;
+}
+
+.requests-list {
+  padding: 0 20px 12px;
+}
+
+.request-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: white;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.request-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.request-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.request-name {
+  font-size: 0.9em;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.request-time {
+  font-size: 0.8em;
+  color: #999;
+}
+
+.request-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.accept-btn,
+.reject-btn {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.8em;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.accept-btn {
+  background: #67c23a;
+  color: white;
+}
+
+.accept-btn:hover {
+  background: #5daf34;
+}
+
+.reject-btn {
+  background: #f56c6c;
+  color: white;
+}
+
+.reject-btn:hover {
+  background: #e74c3c;
+}
+
+/* 添加好友面板 */
+.add-friend-panel {
+  padding: 20px;
+  border-bottom: 1px solid #eee;
+}
+
+.search-friend {
+  display: flex;
+  gap: 8px;
+}
+
+.search-friend input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+.search-friend button {
+  padding: 8px 16px;
+  background: #409eff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.search-friend button:hover {
+  background: #3a8ee6;
+}
+
+/* 好友列表 */
+.friends-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.friend-group {
+  padding: 12px 0;
+}
+
+.group-header {
+  padding: 8px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #666;
+  font-size: 0.9em;
+}
+
+.count {
+  font-size: 0.9em;
+  color: #999;
+}
+
+.friend-items {
+  padding: 0 20px;
+}
+
+.friend-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 8px;
+  transition: all 0.3s;
+  cursor: pointer;
+}
+
+.friend-item:hover {
+  background: #f5f7fa;
+}
+
+.friend-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.friend-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.friend-name {
+  font-size: 0.9em;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.friend-status {
+  font-size: 0.8em;
+  color: #67c23a;
+}
+
+.friend-item.offline .friend-status {
+  color: #999;
+}
+
+.friend-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.friend-item:hover .friend-actions {
+  opacity: 1;
+}
+
+.action-btn {
+  padding: 6px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.action-btn:hover {
+  background: #eee;
+}
+
+.action-btn img {
+  width: 16px;
+  height: 16px;
+  opacity: 0.7;
+}
+
+/* 历史记录侧边栏 */
+.stats-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  padding: 20px;
+  background: #f8f9fa;
+}
+
+.stat-card {
+  padding: 16px;
+  background: white;
+  border-radius: 8px;
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.stat-number {
+  display: block;
+  font-size: 1.5em;
+  font-weight: 600;
+  color: #409eff;
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-size: 0.8em;
+  color: #666;
+}
+
+.history-filters {
+  padding: 12px 20px;
+  display: flex;
+  gap: 12px;
+  border-bottom: 1px solid #eee;
+}
+
+.filter-select {
+  padding: 6px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.9em;
+  color: #666;
+  background: white;
+}
+
+.game-history-list {
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.game-record {
+  background: white;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.game-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.game-result {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.9em;
+  font-weight: 500;
+}
+
+.game-result.win {
+  background: #f0f9eb;
+  color: #67c23a;
+}
+
+.game-result.lose {
+  background: #fef0f0;
+  color: #f56c6c;
+}
+
+.game-time {
+  font-size: 0.8em;
+  color: #999;
+}
+
+.game-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-top: 1px solid #eee;
+  border-bottom: 1px solid #eee;
+}
+
+.role-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.role-icon {
+  width: 32px;
+  height: 32px;
+}
+
+.role-name {
+  font-size: 0.9em;
+  color: #333;
+}
+
+.game-stats {
+  display: flex;
+  gap: 16px;
+}
+
+.stat {
+  text-align: center;
+}
+
+.stat .label {
+  display: block;
+  font-size: 0.8em;
+  color: #999;
+  margin-bottom: 4px;
+}
+
+.stat .value {
+  font-size: 0.9em;
+  color: #333;
+  font-weight: 500;
+}
+
+.game-players {
+  padding-top: 12px;
+}
+
+.team {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.player {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: #f5f7fa;
+  border-radius: 12px;
+}
+
+.player-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+}
+
+.player-name {
+  font-size: 0.8em;
+  color: #666;
+}
+
+.good-team .player {
+  background: #f0f9eb;
+}
+
+.bad-team .player {
+  background: #fef0f0;
 }
 
 /* 左侧滑动动画 */
@@ -1064,6 +2428,32 @@ export default {
   padding: 0 10px;
   height: 50px;
 }
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.refresh-button {
+  background-color: transparent !important;
+  border: none;
+  cursor: pointer;
+  padding: 10px;
+  transition: transform 0.3s ease;
+}
+
+.refresh-button:hover {
+  transform: scale(1.1);
+  filter: brightness(0) saturate(100%) invert(41%) sepia(93%) saturate(390%) hue-rotate(188deg) brightness(98%) contrast(89%);
+}
+
+.refresh-icon {
+  width: 24px;
+  height: 24px;
+  filter: var(--img-filter);
+  transition: filter 0.3s ease;
+}
 .create-Room-button {
   background-color: transparent !important;;
   border: none;
@@ -1095,6 +2485,21 @@ export default {
 .slide-create-enter-from,
 .slide-create-leave-to {
   transform: translateX(100%);
+}
+
+.no-results {
+  width: 100%;
+  padding: 40px;
+  text-align: center;
+  color: #666;
+  background: #f8f9fa;
+  border-radius: 8px;
+  margin: 20px 0;
+}
+
+.no-results p {
+  margin: 0;
+  font-size: 1.1em;
 }
 
 .room-list-header h2 {

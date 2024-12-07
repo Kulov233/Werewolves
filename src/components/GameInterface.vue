@@ -133,6 +133,29 @@
             <span class="label">存活队友：</span>
             <span class="value">{{ livingTeammates }}人</span>
         </div>
+        <!-- 角色能力图标部分 -->
+        <div class="role-abilities">
+
+          <div class="abilities-container">
+            <!-- 动态显示技能图标 -->
+            <template v-for="ability in roleAbilities" :key="ability.id">
+              <div class="ability-item" :class="{ 'disabled': ability.count === 0 }">
+                <img 
+                  :src="require(`@/assets/${ability.icon}`)" 
+                  :alt="ability.name"
+                  class="ability-icon"
+                  :title="ability.description"
+                />
+                <div class="ability-info">
+                  <span class="ability-name">{{ ability.name }}</span>
+                  <span class="ability-count" v-if="ability.hasCount">
+                    剩余：{{ ability.count }}
+                  </span>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
         <button class="exit-button" @click="exitGame">退出游戏</button>
     </div>
 
@@ -165,7 +188,70 @@
   export default {
     data() {
       return {
-        
+        // 角色能力配置
+        roleAbilitiesConfig: {
+          // 狼人技能配置
+          狼人: [
+            {
+              id: 'kill',
+              name: '杀人',
+              icon: 'kill.svg',
+              description: '每晚可以杀死一名玩家',
+              hasCount: false, // 无限次数的技能
+            }
+          ],
+          // 女巫技能配置
+          女巫: [
+            {
+              id: 'heal',
+              name: '解药',
+              icon: 'medicine.svg',
+              description: '可以救活一名被杀的玩家',
+              hasCount: true,
+              count: 1
+            },
+            {
+              id: 'poison',
+              name: '毒药',
+              icon: 'medicine.svg',
+              description: '可以毒死一名玩家',
+              hasCount: true,
+              count: 1
+            }
+          ],
+          // 预言家技能配置
+          预言家: [
+            {
+              id: 'check',
+              name: '查验',
+              icon: 'kill.svg',
+              description: '每晚可以查验一名玩家的身份',
+              hasCount: false
+            }
+          ],
+          // 猎人技能配置
+          猎人: [
+            {
+              id: 'shoot',
+              name: '开枪',
+              icon: 'kill.svg',
+              description: '死亡时可以开枪带走一名玩家',
+              hasCount: true,
+              count: 1
+            }
+          ],
+          // 守卫技能配置
+          守卫: [
+            {
+              id: 'protect',
+              name: '守护',
+              icon: 'kill.svg',
+              description: '每晚可以守护一名玩家',
+              hasCount: false
+            }
+          ]
+          // ... 可以继续添加其他角色的技能配置
+        },
         players: [
           { 
             id: 1, 
@@ -222,7 +308,7 @@
         userMessage: "",
 
 
-        role: "狼人",
+        role: "女巫",
         objective: "淘汰全部人类",
         victoryCondition: "再淘汰1名人类",
         livingTeammates: 0,
@@ -258,11 +344,28 @@
           return this.messages;
         }
         return this.messages.filter(msg => msg.recipients !== 'dead');
-      }
+      },
+
+      // 根据当前角色获取对应的技能列表
+      roleAbilities() {
+        // 根据角色名获取对应的技能配置
+        return this.roleAbilitiesConfig[this.role.toLowerCase()] || [];
+      },
     },
 
     methods: {
-
+      
+      // 使用技能的方法
+      useAbility(ability) {
+        if (ability.hasCount && ability.count > 0) {
+          ability.count--;
+          // 这里添加使用技能的具体逻辑
+          console.log(`使用技能: ${ability.name}`);
+        } else if (!ability.hasCount) {
+          // 无限次数技能的使用逻辑
+          console.log(`使用技能: ${ability.name}`);
+        }
+      },
       initializeMessages() {
         this.messages = [
           { senderid: 1, sendername: "Wang", recipients: "all", avatar: require('@/assets/head.png'), text: "天亮请睁眼。昨晚，4号玩家被杀了。" },
@@ -756,6 +859,75 @@ p {
     font-size: 1.1em;
 }
 
+.role-abilities {
+  margin-top: -15px;
+  padding: 10px;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+}
+
+.abilities-header {
+  margin-bottom: 10px;
+}
+
+.abilities-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  justify-content: center;
+}
+
+.ability-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  width: 80px;
+}
+
+.ability-item:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.ability-item.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ability-icon {
+  width: 80px;
+  height: 80px;
+  margin-bottom: 5px;
+  transition: transform 0.3s ease;
+}
+
+.ability-item:hover .ability-icon {
+  transform: scale(1.1);
+}
+
+.ability-info {
+  text-align: center;
+}
+
+.ability-name {
+  font-size: 12px;
+  color: #333;
+  margin-bottom: 2px;
+  display: block;
+}
+
+.ability-count {
+  font-size: 11px;
+  color: #666;
+  display: block;
+}
+
+
 .exit-button {
   background-color: #d9534f; /* 背景颜色 */
   color: black; /* 字体颜色 */
@@ -983,7 +1155,7 @@ p {
 /* 大的日夜切换图标样式 */
 .sun-moon-icon {
   position: absolute;
-  top: 20%;  /* 距离顶部 100px，可以根据需要调整 */
+  top: 100px;
   right: 20px;
   left: 70%;  /* 将其水平居中 */
   background-color: transparent;
