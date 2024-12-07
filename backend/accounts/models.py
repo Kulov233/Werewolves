@@ -31,9 +31,18 @@ class UserProfile(models.Model):
         "won": true
     }
     """
-    recent_games = JSONField("最近三场游戏记录", default=list)  # 最近三场游戏记录
-    wins = models.IntegerField("胜场", default=0)  # 胜场
-    loses = models.IntegerField("败场", default=0)  # 败场
+    recent_games = JSONField("最近三场游戏记录", default=list)  # 最近三场游戏记录，公开
+    """
+    {
+        "role": "Villager",
+        "date": "2024-12-6",
+        "duration": 2, [分钟]
+        "won": true
+    }
+    """
+    games = JSONField("游戏记录", default=list)  # 游戏记录，私密
+    wins = models.IntegerField("胜场", default=0)  # 胜场，公开
+    loses = models.IntegerField("败场", default=0)  # 败场，公开
 
     def __str__(self):
         return self.user.username

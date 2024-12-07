@@ -96,12 +96,19 @@ class UsernameEmailLoginSerializer(serializers.Serializer):
         data["user"] = user
         return data
 
-# 用户资料序列化器
+# 用户个人资料序列化器
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
-        fields = ['bio', 'avatar', 'recent_games', 'wins', 'loses']
+        fields = ['bio', 'avatar', 'games']
 
+# 用户公开信息序列化器
+class PublicUserProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserProfile
+        fields = ['bio', 'avatar', 'wins', 'loses', 'recent_games']
+
+# 用户个人信息序列化器
 class UserSerializer(serializers.ModelSerializer):
     profile = UserProfileSerializer(source='userprofile', read_only=True)
 
@@ -111,7 +118,7 @@ class UserSerializer(serializers.ModelSerializer):
 
 # 公开信息序列化器
 class PublicInfoSerializer(serializers.ModelSerializer):
-    profile = UserProfileSerializer(source='userprofile', read_only=True)
+    profile = PublicUserProfileSerializer(source='userprofile', read_only=True)
 
     class Meta:
         model = User
