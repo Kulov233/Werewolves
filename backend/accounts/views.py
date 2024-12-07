@@ -116,7 +116,10 @@ class UserAvatarView(APIView):
             )
         if user_profile.avatar:
             # 重定向到头像 URL
-            return redirect(user_profile.avatar.url)
+            return Response(
+                {"avatar_url": request.build_absolute_uri(user_profile.avatar.url)},
+                status=status.HTTP_200_OK,
+            )
         else:
             # 用户没有头像，返回 404 错误
             return Response(
