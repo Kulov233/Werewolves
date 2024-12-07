@@ -94,7 +94,10 @@ class BioUpdateView(APIView):
 
         if serializer.is_valid():
             serializer.save()
-            return Response({"message": "自我介绍修改成功。"}, status=status.HTTP_200_OK)
+            return Response({
+                "message": "自我介绍修改成功。",
+                "bio": serializer.data["bio"]
+            }, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 # 获取某个ID的用户头像
