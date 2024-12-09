@@ -39,26 +39,26 @@ const routes = [
     path: '/room-card',
     name: 'RoomCard',
     component: RoomCard,
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: false }
   },
   {
     path: '/GameInterface',
     name: 'GameInterface',
     component: GameInterface,
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: false }
   },
   {
     path: '/search',
     name: 'Search',
     component: Search,
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: false }
   },
   {
     path: '/room/:id?',
     name: 'room',
     component: Room,
     props: true, // 允许通过 props 传递参数
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: false }
   }
 ];
 

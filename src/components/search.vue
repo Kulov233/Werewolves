@@ -845,7 +845,7 @@ export default {
       showQuickMatchPanel: false, // 显示快速匹配窗口
       matchPeopleCount: 6, // 快速匹配人数
       matchAI: "有AI", // 快速匹配是否有AI
-
+      
     };
   },
   setup() {
@@ -866,7 +866,59 @@ export default {
         { label: '评分', value: 0 }
       ]
     });
-    const Rooms = ref([]);
+    //const Rooms = ref([]);
+    const Rooms = ref([
+      {
+        id: 1,
+        title: '新手村',
+        description: '欢迎来到狼人杀,让我们一起愉快地玩耍吧!',
+        owner: 'player1',
+        ownerAvatar: require('@/assets/profile-icon.png'),
+        players: ['player1', 'player2'],
+        ai_players: {},
+        max_players: 12,
+      },
+      {
+        id: 2,
+        title: '高玩房',
+        description: '实力相当的高手对决,无限火力',
+        owner: 'player3', 
+        ownerAvatar: require('@/assets/profile-icon.png'),
+        players: ['player3', 'player4', 'player5'],
+        ai_players: { 'AI_1': '简单', 'AI_2': '普通' },
+        max_players: 8,
+      },
+      {
+        id: 3, 
+        title: '欢乐休闲',
+        description: '休闲玩家开黑,禁止语音',
+        owner: 'player6',
+        ownerAvatar: require('@/assets/profile-icon.png'),
+        players: ['player6', 'player7', 'player8', 'player9'],
+        ai_players: { 'AI_3': '简单' },
+        max_players: 12,
+      },
+      {
+        id: 4,
+        title: '9人标准局',
+        description: '标准9人局,争取胜利',
+        owner: 'player10',
+        ownerAvatar: require('@/assets/profile-icon.png'),
+        players: ['player10', 'player11', 'player12'],
+        ai_players: {},
+        max_players: 9, 
+      },
+      {
+        id: 5,
+        title: '大乱斗',
+        description: '16人混战,你能活到最后吗',
+        owner: 'player13', 
+        ownerAvatar: require('@/assets/profile-icon.png'),
+        players: ['player13', 'player14', 'player15'],
+        ai_players: { 'AI_4': '困难', 'AI_5': '地狱' },
+        max_players: 16,
+      },
+    ]);
     const selectedProfile = ref({
       userId: '',
       name: '',
