@@ -60,7 +60,7 @@ def send_room_readiness_message(result):
         # 所有玩家已连接，开始游戏
         game_data['status'] = "debug_start"
         game_cache.set(f"room:{room_id}", game_data)
-        async_to_sync(GameConsumer.broadcast_game_update)(room_id, "game_started", game_data)
+        async_to_sync(GameConsumer.broadcast_game_update)(room_id, "game_start", game_data)
         # TODO: 跳转到游戏逻辑
         print("游戏开始")
     else:
@@ -161,6 +161,11 @@ def assign_roles_to_players(room_id):
 
             game_cache.set(f"room:{room_id}", game_data)
             # TODO: 完成分配角色后，发送消息
+
+            for user_id in human_players:
+                async_to_sync(GameConsumer.send_role_to_player)(user_id, game_data["players"][user_id])
+
+        return {"room_id": room_id, "status": "success", "message": "分配角色成功", "roles_assigned": roles_assigned}
 
 
     except Exception as e:

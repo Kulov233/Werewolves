@@ -36,8 +36,15 @@ class GameConsumer(AsyncWebsocketConsumer):
                 # if room_data['status'] != 'waiting':
                 #     raise DenyConnection("游戏已经开始。")
 
+                # 公开频道
                 await self.channel_layer.group_add(
                     f"room_{room_id}",
+                    self.channel_name
+                )
+
+                # 私有频道，用于消息通知
+                await self.channel_layer.group_add(
+                    f"user_{user_id}",
                     self.channel_name
                 )
 
@@ -68,6 +75,7 @@ class GameConsumer(AsyncWebsocketConsumer):
         user_id = str(self.scope['user'].id)
 
         await self.channel_layer.group_discard(f"room_{room_id}", self.channel_name)
+        await self.channel_layer.group_discard(f"user_{user_id}", self.channel_name)
 
         # 获取房间缓存
         room_data = await self.get_room_data_from_cache(room_id)
@@ -98,6 +106,10 @@ class GameConsumer(AsyncWebsocketConsumer):
             for key in keys_to_remove_in_players:
                 game_data['players'][player].pop(key, None)
 
+        for ai_player in game_data['ai_players']:
+            for key in keys_to_remove_in_players:
+                game_data['ai_players'][ai_player].pop(key, None)
+
         # 将广播的消息发送到客户端
         await self.send(text_data=json.dumps({
             "type": event_type,
@@ -119,6 +131,35 @@ class GameConsumer(AsyncWebsocketConsumer):
             )
         except Exception as e:
             print(f"广播消息时出错：{e}")
+
+    async def role_info(self, event):
+        role_info = event.get("role_info")
+
+        """
+        {
+            "role_info": {
+                "role": "Witch",
+                "skills": { # 若非女巫则为null
+                    "cure_count": 1,
+                    "poison_count": 1
+                }
+            }
+        }
+        """
+
+        await self.send(text_data=json.dumps({
+            "type": "role_info",
+            "role_info": role_info
+        }))
+
+    async def send_role_to_player(self, user_id, role_info):
+        await self.channel_layer.send(
+            f"user_{user_id}",
+            {
+                "type": "role_info",
+                "role_info": role_info
+            }
+        )
 
     async def not_connected(self, event):
         event_type = event.get("event")

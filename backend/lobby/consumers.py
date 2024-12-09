@@ -165,6 +165,9 @@ class LobbyConsumer(AsyncWebsocketConsumer):
             # 移除 AI 玩家
             elif action == "remove_ai_player":
                 await self.handle_remove_ai_player(data)
+            # 编辑房间
+            elif action == "edit_room":
+                await self.handle_edit_room(data)
             # 离开房间
             elif action == "leave_room":
                 await self.handle_leave_room(data)
@@ -220,10 +223,11 @@ class LobbyConsumer(AsyncWebsocketConsumer):
         room_data = {
             # TODO: 确定房间数据的格式
             "id": room_id,
-            "title": data.get("title", "未命名的房间"),
-            "description": data.get("description", "房主没有填写简介~"),
+            "title": data.get("title", None),
+            "description": data.get("description", None),
             "owner": self.scope["user"].id,
             "players": [self.scope["user"].id],
+            "allow_ai_players": data.get("allow_ai_players", None),
             "ai_players": {}, # TODO: AI 玩家配置
             "max_players": data.get("max_players", 6),
             # "game_mode": data.get("game_mode", "default"),
@@ -232,11 +236,45 @@ class LobbyConsumer(AsyncWebsocketConsumer):
             "expires_at": ""
         }
 
+        allowed_max_players = [4, 6 ,8, 10, 12, 16]
+
         # TODO: 校验房间数据
         if not room_data["title"]:
+            await self.send(text_data=json.dumps({
+                "type": "warning",
+                "message": "房间标题为空，已设置为默认标题。"
+            }))
             room_data["title"] = "未命名的房间"
         if not room_data["description"]:
+            await self.send(text_data=json.dumps({
+                "type": "warning",
+                "message": "房间简介为空，已设置为默认简介。"
+            }))
             room_data["description"] = "房主没有填写简介~"
+        if not isinstance(room_data["allow_ai_players"], bool):
+            await self.send(text_data=json.dumps({
+                "type": "warning",
+                "message": "房间是否允许 AI 玩家设置错误，已设置为默认值（允许）。"
+            }))
+            room_data["allow_ai_players"] = True
+        if not isinstance(room_data["max_players"], int):
+            try:
+                await self.send(text_data=json.dumps({
+                    "type": "warning",
+                    "message": "最大玩家数不是一个整数，已尝试转换。"
+                }))
+                room_data["max_players"] = int(room_data["max_players"])
+            except ValueError:
+                await self.send(text_data=json.dumps({
+                    "type": "error",
+                    "message": "最大玩家数必须是一个整数。"
+                }))
+                return
+        if room_data["max_players"] not in allowed_max_players:
+            await self.send(text_data=json.dumps({
+                "type": "warning",
+                "message": "不支持的最大玩家数，已设置为默认值（6人）。"}))
+            room_data["max_players"] = 6
 
         await self.update_room_in_cache(room_id, room_data)
         await self.add_room_id_to_cache(room_id)  # 添加房间 ID 到列表
@@ -337,6 +375,13 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                     }))
                     return
                 else:
+                    if not room_data["allow_ai_players"]:
+                        await self.send(text_data=json.dumps({
+                            "type": "error",
+                            "message": "房间不允许 AI 玩家。"
+                        }))
+                        return
+                    # TODO: 与前端对接
                     original_player_info = data.get("player_info")
                     if original_player_info:
                         player_info = {
@@ -382,6 +427,72 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                 "type": "error",
                 "message": "房间不存在。"
             }))
+
+    # noinspection PyUnresolvedReferences
+    @with_room_lock(timeout=5)
+    async def handle_edit_room(self, data):
+        room_id = data.get("room_id")
+        room_data = await self.get_room_data_from_cache(room_id)
+        if room_data:
+            if room_data["owner"] == self.scope["user"].id:
+                allow_ai_players = data.get("allow_ai_players", None)
+                if not isinstance(allow_ai_players, bool):
+                    await self.send(text_data=json.dumps({
+                        "type": "warning",
+                        "message": "房间是否允许 AI 玩家设置错误，已设置为默认值（允许）。"
+                    }))
+                    room_data["allow_ai_players"] = True
+                else:
+                    room_data["allow_ai_players"] = allow_ai_players
+
+                if not allow_ai_players:
+                    # 移除 AI 玩家
+                    room_data["ai_players"] = {}
+
+                max_players = data.get("max_players")
+
+                allowed_max_players = [4, 6, 8, 10, 12, 16]
+
+                if not isinstance(max_players, int):
+                    try:
+                        await self.send(text_data=json.dumps({
+                            "type": "warning",
+                            "message": "最大玩家数不是一个整数，已尝试转换。"
+                        }))
+                        room_data["max_players"] = int(room_data["max_players"])
+                    except ValueError:
+                        await self.send(text_data=json.dumps({
+                            "type": "error",
+                            "message": "最大玩家数必须是一个整数。"
+                        }))
+                        return
+                if room_data["max_players"] not in allowed_max_players:
+                    await self.send(text_data=json.dumps({
+                        "type": "warning",
+                        "message": "不支持的最大玩家数，尝试设置为默认值（6人）。"}))
+                    room_data["max_players"] = 6
+
+                if len(room_data["players"]) + len(room_data["ai_players"]) > max_players:
+                    await self.send(text_data=json.dumps({
+                        "type": "error",
+                        "message": "房间人数已经超过了最大人数。"
+                    }))
+                    return
+
+                room_data["allow_ai_players"] = allow_ai_players
+                room_data["max_players"] = max_players
+
+                await self.update_room_in_cache(room_id, room_data)
+                await self.broadcast_room_update("room_updated", room_data)
+            else:
+                await self.send(text_data=json.dumps({
+                    "type": "error",
+                    "message": "只有房主可以编辑房间。"
+                }))
+        else:
+            await self.send(text_data=json.dumps({
+                "type": "error",
+                "message": "房间不存在。"}))
 
     # noinspection PyUnresolvedReferences
     @with_room_lock(timeout=5)
@@ -465,8 +576,8 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                                 'index': idx + 1 + len(room_data["players"]),
                                 'name': player_info["name"],
                                 'alive': True,
-                                'role': None,
-                                'role_skills': None
+                                'role': None, # 敏感
+                                'role_skills': None # 敏感
                             }
                             for idx, (player_id, player_info) in enumerate(room_data["ai_players"].items())
                         },
