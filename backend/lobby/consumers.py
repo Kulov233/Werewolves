@@ -14,6 +14,7 @@ from game.tasks import trigger_game_start_check
 
 from functools import wraps
 
+
 def with_room_lock(timeout=5):
     def decorator(func):
         @wraps(func)
@@ -42,8 +43,11 @@ def with_room_lock(timeout=5):
                 "type": "error",
                 "message": "操作失败，请稍后重试"
             }))
+
         return wrapper
+
     return decorator
+
 
 def with_room_list_lock(timeout=5):
     def decorator(func):
@@ -69,15 +73,18 @@ def with_room_list_lock(timeout=5):
                 "type": "error",
                 "message": "服务器内部发生错误，请稍后重试。"
             }))
+
         return wrapper
+
     return decorator
+
 
 class LobbyConsumer(AsyncWebsocketConsumer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.lobby_cache = caches["lobby_cache"]
         self.game_cache = caches["game_cache"]
-        self.room_timeout = 3600 # 房间超时时间[s]
+        self.room_timeout = 3600  # 房间超时时间[s]
 
     # 连接时触发
     # noinspection PyUnresolvedReferences
@@ -228,15 +235,15 @@ class LobbyConsumer(AsyncWebsocketConsumer):
             "owner": self.scope["user"].id,
             "players": [self.scope["user"].id],
             "allow_ai_players": data.get("allow_ai_players", None),
-            "ai_players": {}, # TODO: AI 玩家配置
+            "ai_players": {},  # TODO: AI 玩家配置
             "max_players": data.get("max_players", 6),
             # "game_mode": data.get("game_mode", "default"),
-            "status": "waiting", # in-game
+            "status": "waiting",  # in-game
             "created_at": datetime.now().isoformat(),
             "expires_at": ""
         }
 
-        allowed_max_players = [4, 6 ,8, 10, 12, 16]
+        allowed_max_players = [4, 6, 8, 10, 12, 16]
 
         # TODO: 校验房间数据
         if not room_data["title"]:
@@ -522,7 +529,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
     # noinspection PyUnresolvedReferences
     @with_room_lock(timeout=5)
     async def handle_start_game(self, data):
-        room_id = await self.get_user_room_from_cache(self.scope["user"].id)
+        room_id = data.get("room_id")
         room_data = await self.get_room_data_from_cache(room_id)
         if room_data:
             if room_data["owner"] == self.scope["user"].id:
@@ -555,39 +562,68 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                         "title": room_data["title"],
                         "description": room_data["description"],
                         "max_players": room_data["max_players"],
-                        "status": "waiting", # waiting, night_<num>, day_<num>, finished
+                        "status": "waiting",  # waiting, night_<num>, day_<num>, finished
                         "night_count": 1,
                         "roles": {},
-                        "roles_for_humans_first": [], # 敏感
+                        "roles_for_humans_first": [],  # 敏感
                         "witch_config": {},
                         "players": {
-                                str(player): { # 这里的 user_id 是字符串！
-                                'index': str(idx + 1), # 玩家编号，也是字符串，从 1 开始
+                            str(player): {  # 这里的 user_id 是字符串！
+                                'index': str(idx + 1),  # 玩家编号，也是字符串，从 1 开始
                                 'name': await get_user_name(player),
                                 'alive': True,
                                 'online': False,
-                                'role': None, # 敏感
-                                'role_skills': None, # 技能信息（女巫），敏感
-                                }
-                                for idx, player in enumerate(room_data["players"])
+                                'role': None,  # 敏感
+                                'role_skills': None,  # 技能信息（女巫），敏感
+                            }
+                            for idx, player in enumerate(room_data["players"])
                         },
                         "ai_players": {
                             player_id: {
-                                'index': str(idx + 1 + len(room_data["players"])), # 接上真人玩家编号
+                                'index': str(idx + 1 + len(room_data["players"])),  # 接上真人玩家编号
                                 'name': player_info["name"],
                                 'alive': True,
-                                'role': None, # 敏感
-                                'role_skills': None # 敏感
+                                'role': None,  # 敏感
+                                'role_skills': None  # 敏感
                             }
                             for idx, (player_id, player_info) in enumerate(room_data["ai_players"].items())
                         },
                         "victory_conditions": {},
-                        "game_specified_prompt": "", # 敏感
-                        "victims_info": [], # 敏感
-                        "poisoned_victims_info": [], # 敏感
-                        "voted_victims_info": []
+                        "game_specified_prompt": "",  # 敏感
+                        "victims_info": [],  # 敏感
+                        "poisoned_victims_info": [],  # 敏感
+                        "voted_victims_info": [],
+                        "current_phase": "Initialize",
+                        "phase_timer": {
+                            "Initialize": 1,
+                            "Werewolf": 120,
+                            "Prophet": 60,
+                            "Witch": 60,
+                            "Speak": 60,
+                            "Vote": 60
+                        },
                         # ...
                     }
+                    speaking_phases = [f"Speak_{i}" for i in range(1, room_data["max_players"] + 1)]
+                    room_data_in_game["phase_transitions"] = {
+                        "Initialize": "Werewolf",
+                        "Werewolf": "Prophet",
+                        "Prophet": "Witch",
+                        "Witch": "Day",
+                        "Day": speaking_phases[0],
+                    }
+                    for i in range(room_data["max_players"] - 1):
+                        phase_transitions[speaking_phases[i]] = speaking_phases[i + 1]
+                    phase_transitions[speaking_phases[-1]] = "Vote"
+                    phase_transitions["Vote"] = "End"
+                    phase_transitions["End"] = "Werewolf"
+                    """
+                    Initialize -> Werewolf -> Prophet -> Witch -> Speak_1 ->
+                     Speak_2 -> ... -> Speak_n -> Vote 
+                     -> End -> Werewolf
+                     如果编号 n - len(room_data["players"]) > 0，则 Speak_n 为 AI 玩家发言
+                    """
+
                     await self.set_room_data_in_game_cache(room_id, room_data_in_game)
                     # TODO: 在大厅中删除房间？
                     await self.remove_room(room_id)
@@ -605,7 +641,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
         else:
             await self.send(text_data=json.dumps({
                 "type": "error",
-                "message": "您不在任何房间中。"
+                "message": "房间不存在。"
             }))
 
     # noinspection PyUnresolvedReferences
@@ -733,7 +769,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def update_room_in_cache(self, room_id, room_data):
         room_data["expires_at"] = (datetime.now() + timedelta(seconds=self.room_timeout)).isoformat()
-        self.lobby_cache.set(f"room:{room_id}", room_data, timeout=self.room_timeout) # TODO: 考虑timeout
+        self.lobby_cache.set(f"room:{room_id}", room_data, timeout=self.room_timeout)  # TODO: 考虑timeout
 
     # 删除房间
     @database_sync_to_async

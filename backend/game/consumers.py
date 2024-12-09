@@ -71,15 +71,18 @@ class GameConsumer(AsyncWebsocketConsumer):
             }))
             await self.close()
 
+    # noinspection PyUnresolvedReferences
     async def disconnect(self, close_code):
         room_id = self.scope['url_route']['kwargs']['room_id']
         user_id = str(self.scope['user'].id)
 
         await self.channel_layer.group_discard(f"room_{room_id}", self.channel_name)
-        await self.channel_layer.group_discard(f"user_{user_id}", self.channel_name)
+        await self.channel_layer.group_discard(f"room_{room_id}_user_{user_id}", self.channel_name)
 
         # 获取房间缓存
         room_data = await self.get_room_data_from_cache(room_id)
+        if room_data is None:
+            return
         room_data['players'][user_id]['online'] = False
         await self.update_room_in_cache(room_id, room_data)
         await self.broadcast_game_update(room_id, "player_left", room_data)
@@ -159,7 +162,7 @@ class GameConsumer(AsyncWebsocketConsumer):
         try:
             channel_layer = get_channel_layer()
 
-            await channel_layer.send(
+            await channel_layer.group_send(
                 f"room_{room_id}_user_{user_id}",
                 {
                     "type": "role_info",
@@ -194,7 +197,7 @@ class GameConsumer(AsyncWebsocketConsumer):
         try:
             channel_layer = get_channel_layer()
 
-            await channel_layer.send(
+            await channel_layer.group_send(
                 f"room_{room_id}_werewolves",
                 {
                     "type": "wolf_sync",
@@ -228,7 +231,7 @@ class GameConsumer(AsyncWebsocketConsumer):
         try:
             channel_layer = get_channel_layer()
 
-            await channel_layer.send(
+            await channel_layer.group_send(
                 f"room_{room_id}_werewolves",
                 {
                     "type": "kill_result",
@@ -261,7 +264,7 @@ class GameConsumer(AsyncWebsocketConsumer):
         try:
             channel_layer = get_channel_layer()
 
-            await channel_layer.send(
+            await channel_layer.group_send(
                 f"room_{room_id}_user_{user_id}",
                 {
                     "type": "check_result",
@@ -298,7 +301,7 @@ class GameConsumer(AsyncWebsocketConsumer):
         try:
             channel_layer = get_channel_layer()
 
-            await channel_layer.send(
+            await channel_layer.group_send(
                 f"room_{room_id}_user_{user_id}",
                 {
                     "type": "witch_info",
@@ -333,7 +336,7 @@ class GameConsumer(AsyncWebsocketConsumer):
         try:
             channel_layer = get_channel_layer()
 
-            await channel_layer.send(
+            await channel_layer.group_send(
                 f"room_{room_id}_user_{user_id}",
                 {
                     "type": "witch_action_result",

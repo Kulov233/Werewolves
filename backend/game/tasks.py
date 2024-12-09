@@ -63,10 +63,13 @@ def send_room_readiness_message(result):
         async_to_sync(GameConsumer.broadcast_game_update)(room_id, "game_start", game_data)
         # TODO: 跳转到游戏逻辑
         print("游戏开始")
+        initialize(room_id)
+        assign_roles_to_players(room_id)
     else:
         # TODO: 返回未连接玩家列表
         async_to_sync(GameConsumer.handle_not_connected)(room_id, result['status'], result['message'], result['offline_players'])
         # TODO: 前端应该在此时返回大厅。处理channel和cache中的残留？
+
 
 def initialize(room_id):
     try:
@@ -74,7 +77,7 @@ def initialize(room_id):
         game_data = game_cache.get(f"room:{room_id}")
 
         # 读取游戏配置
-        with open('game_config.json', 'r') as file:
+        with open('backend/game/game_config.json', 'r') as file:
             configs = json.load(file)
             if str(game_data['max_players']) in configs:
                 game_config = configs[str(game_data['max_players'])]
@@ -117,7 +120,6 @@ def assign_roles_to_players(room_id):
         game_cache = caches['game_cache']
         game_data = game_cache.get(f"room:{room_id}")
 
-        roles_assigned = []
         human_players = [player for player, _ in game_data["players"].items()] # 以UserID表示
         ai_players = [player for player, _ in game_data["ai_players"].items()] # 以uuid表示
         remaining_roles = [role for role, count in game_data["roles"].items() for _ in range(count)]
@@ -138,42 +140,52 @@ def assign_roles_to_players(room_id):
                     remaining_roles.remove(role_class)
                 else:
                     if ai_players:
-                        player = ai_players.pop(0)
+                        ai_player = ai_players.pop(0)
                         if role_class == "Witch":
                             cure_count = game_data["witch_config"]["cure_count"]
                             poison_count = game_data["witch_config"]["poison_count"]
-                            game_data["ai_players"][player] = {"role": role_class, "role_skills": {"cure_count": cure_count, "poison_count": poison_count}}
+                            game_data["ai_players"][ai_player]["role"] = role_class
+                            game_data["ai_players"][ai_player]["role_skills"] = {"cure_count": cure_count, "poison_count": poison_count}
                         else:
-                            game_data["ai_players"][player] = {"role": role_class}
+                            game_data["ai_players"][ai_player]["role"] = role_class
                         remaining_roles.remove(role_class)
-            random.shuffle(remaining_roles)
+        random.shuffle(remaining_roles)
 
-            remaining_players = human_players + ai_players
+        for player in human_players:
+            role_class = remaining_roles.pop(0)
+            if role_class == "Witch":
+                cure_count = game_data["witch_config"]["cure_count"]
+                poison_count = game_data["witch_config"]["poison_count"]
+                game_data["players"][player]["role"] = role_class
+                game_data["players"][player]["role_skills"] = {"cure_count": cure_count, "poison_count": poison_count}
+            else:
+                game_data["players"][player]["role"] = role_class
 
-            for role_class, player in zip(remaining_roles, remaining_players):
-                if role_class == "Witch":
-                    cure_count = game_data["witch_config"]["cure_count"]
-                    poison_count = game_data["witch_config"]["poison_count"]
-                    game_data["players"][player] = {"role": role_class, "role_skills": {"cure_count": cure_count, "poison_count": poison_count}}
-                else:
-                    game_data["players"][player] = {"role": role_class}
-                roles_assigned.append(player)
+        for ai_player in ai_players:
+            role_class = remaining_roles.pop(0)
+            if role_class == "Witch":
+                cure_count = game_data["witch_config"]["cure_count"]
+                poison_count = game_data["witch_config"]["poison_count"]
+                game_data["ai_players"][ai_player]["role"] = role_class
+                game_data["ai_players"][ai_player]["role_skills"] = {"cure_count": cure_count, "poison_count": poison_count}
+            else:
+                game_data["ai_players"][ai_player]["role"] = role_class
 
-            game_cache.set(f"room:{room_id}", game_data)
-            # TODO: 完成分配角色后，发送消息
+        game_cache.set(f"room:{room_id}", game_data)
+        # TODO: 完成分配角色后，发送消息
 
-            for user_id in human_players:
-                role_info = {
-                    "role": game_data["players"][user_id]["role"],
-                    "role_skills": game_data["players"][user_id]["role_skills"]
-                }
-                async_to_sync(GameConsumer.send_role_to_player)(room_id, user_id, role_info)
+        for user_id, _ in game_data["players"].items():
+            role_info = {
+                "role": game_data["players"][user_id]["role"],
+                "role_skills": game_data["players"][user_id]["role_skills"]
+            }
+            async_to_sync(GameConsumer.send_role_to_player)(room_id, user_id, role_info)
 
-        return {"room_id": room_id, "status": "success", "message": "分配角色成功", "roles_assigned": roles_assigned}
+        return {"room_id": room_id, "status": "success", "message": f"房间{room_id}分配角色成功。"}
 
 
     except Exception as e:
-        return {"room_id": room_id, "status": "error", "message": "分配角色失败。", "error": str(e)}
+        return {"room_id": room_id, "status": "error", "message": f"房间{room_id}分配角色失败。", "error": str(e)}
 
 @shared_task
 def combined_game_check(room_id):
