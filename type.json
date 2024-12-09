@@ -1,0 +1,227 @@
+
+分配角色<-
+{
+  "type": "set_role",
+  "role": "Werewolf"
+}
+
+天黑了<-
+{
+  "type": "night_phase",
+  "game": {},
+}
+
+狼人阶段开始<-
+{
+  "type": "kill_phase",
+  "game": {},
+}
+
+刀人投票->
+{
+  "type": "kill_vote",
+  "target": 7,  // 玩家序号
+}
+{
+  "type": "kill_vote",
+  "target": null,
+}
+
+其他狼人的投票<-
+{
+  "type": "wolf_sync",
+  "message": {
+    1: 4,
+    3: null,  // null为弃权或者未投票
+    7: 4,
+    8: 1,
+  }
+}
+
+刀人结果<-
+{
+  "type": "kill_result",
+  "result": 7,  // 玩家序号
+}
+{
+  "type": "kill_result",
+  "result": null,  // 没有投出刀人结果平票
+}
+
+狼人阶段开始<-
+{
+  "type": "kill_phase_end",
+  "game": {},
+}
+
+预言家查人<-
+{
+  "type": "check_phase",
+  "game": {},
+}
+
+查人动作->
+{
+  "type": "check",
+  "target": 7  // 玩家序号
+}
+{
+  "type": "check",
+  "target": null  // 超时或者选择不查
+}
+
+查人结果<-
+{
+  "type": "check_result",
+  "target": 7,
+  "role": "Witch",
+}
+
+预言家结束<-
+{
+  "type": "check_phase_end",
+  "game": {},
+}
+
+女巫阶段<-
+{
+  "type": "witch_phase",
+  "game": {},
+}
+
+女巫信息<-
+{
+  "type": "witch_info",
+  "cure_count": 1,
+  "poison_count": 0,
+  "cure_target": [6, 8], // 今晚死掉的玩家序号列表
+}
+
+女巫操作->
+{
+  "type": "witch_action",
+  "cure": 6,  // null
+  "poison": 7  // null
+}
+
+女巫操作回复<-
+{
+  "type": "witch_action_result",
+  "cure": 6,
+  "poison": null,  // 失败了或者操作非法
+}
+
+女巫阶段结束<-
+{
+  "type": "witch_phase_end",
+  "game": {},
+}
+
+天亮了<-
+{
+  "type": "day_phase",
+  "game": {},
+}
+
+晚上死掉的人<-
+{
+  "type": "night_death_info",
+  "victims": [2, 4, 6],
+}
+
+发言阶段开始<-
+{
+  "type": "talk_phase",
+  "game": {},
+}
+
+(所有人的)聊天消息更新<-
+{
+  "type": "talk_update",
+  "source": 5,
+  ""
+}
+
+聊天到你<-
+{
+  "type": "talk_start",
+  "player": 6,  // 发给当前说话的玩家
+}
+
+聊天说话->
+{
+  "type": "talk_content",
+  "content": "我是奶龙！我才是奶龙！",
+}
+
+主动结束发言->  // 点击结束按钮，或者这边计时器到时间
+{
+  "type": "talk_end",
+  "player": 6,
+}
+
+结束发言<-  // 计时器到时间或者收到主动结束, 这两个名字就应该是一样的
+{
+  "type": "talk_end",
+  "player": 6,  // 发给当前说话的玩家
+}
+
+聊天阶段结束<-
+{
+  "type": "talk_phase_end",
+  "game": {},
+}
+
+投票阶段开始<-
+{
+  "type": "vote_phase",
+  "game": {},
+}
+
+投票->
+{
+  "type": "vote",
+  "target": 5,  // null 弃权/超时
+}
+
+投票结果<-
+{
+  "type": "vote_result",
+  "result": 6, // null 平票
+}
+
+投票阶段结束<-
+{
+  "type": "vote_phase_end",
+  "game": {},
+}
+
+白天死掉的人<-
+{
+  "type": "day_death_info",
+  "victims": [3, 6],  // []
+}
+
+游戏是否结束<-
+{
+  "type": "game_end",
+  "end": false // true
+  "victory": {
+    "Werewolf": false,
+    "Villager": true,
+    "Prophet": true,
+    "Witch": true,
+    "Idiot": false
+  },  // 没结束为null
+  "victory_side": "Good",
+  "reveal_role": {
+    1: "Witch",
+    2: "Werewolf",
+    ...
+  }
+}
+
+
+
+
+

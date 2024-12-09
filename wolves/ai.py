@@ -230,7 +230,7 @@ class AIPlayer():
             "type": "function",
             "function": {
                 "name": "cure",
-                "description": f"选择对一位玩家使用解药，输入为玩家序号，范围为{special_info["victims"]}。"
+                "description": f"选择对一位玩家使用解药，输入为玩家序号，范围为{special_info['victims']}。"
                                f"注意，你自己今晚被杀。请一定要使用解药。",
                 "parameters": {
                     "type": "object",
@@ -249,7 +249,7 @@ class AIPlayer():
             "type": "function",
             "function": {
                 "name": "poison",
-                "description": f"选择对一位玩家使用毒药，输入为玩家序号，范围为{special_info["targets"]}。如果选择不使用，则输入-1",
+                "description": f"选择对一位玩家使用毒药，输入为玩家序号，范围为{special_info['targets']}。如果选择不使用，则输入-1",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -269,14 +269,14 @@ class AIPlayer():
 
         tool_prompt = ""
         if special_info["cure"] > 0:
-            if self.index in special_info["victims"]:
+            if self.index in special_info['victims']:
                 result1 = self.index
             else:
-                tool_prompt += (f"你可以选择调用cure函数使用一瓶解药，目标是今晚死去的角色，范围为{special_info["victims"]}。"
+                tool_prompt += (f"你可以选择调用cure函数使用一瓶解药，目标是今晚死去的角色，范围为{special_info['victims']}。"
                                 f"如果选择不使用，则调用函数输入-1。")
                 tools.append(cure_tool)
         if special_info["poison"] > 0:
-            tool_prompt += f"你可以选择调用poison函数使用一瓶毒药，目标是今晚还活着的角色，范围为{special_info["targets"]}。"
+            tool_prompt += f"你可以选择调用poison函数使用一瓶毒药，目标是今晚还活着的角色，范围为{special_info['targets']}。"
             tools.append(poison_tool)
         if tools:
             prompt = self.prompt_generator.witch_prompt(self.messages, special_info, tool_prompt)
