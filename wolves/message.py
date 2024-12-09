@@ -46,7 +46,6 @@ def send_message(mes: Message, all_players: List['Player'],
         recipients = all_players
     elif isinstance(recipients, Player):
         recipients = [recipients]
-
     for recipient in recipients:
         if recipient.is_human:
             # 对于人类玩家

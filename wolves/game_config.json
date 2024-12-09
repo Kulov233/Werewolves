@@ -3,8 +3,7 @@
       "roles": ["Werewolf", "Villager", "Villager", "Villager"],
       "victory_conditions": {
         "good_win": "wolf_num == 0",
-        "wolf_win": "wolf_num >= good_num",
-        "idiot_win": ""
+        "wolf_win": "wolf_num >= good_num"
       },
       "witch_items": {
         "cure_count": 1,
@@ -15,8 +14,7 @@
       "roles": ["Werewolf", "Werewolf", "Prophet", "Witch", "Villager", "Villager"],
       "victory_conditions": {
         "good_win": "wolf_num == 0",
-        "wolf_win": "wolf_num >= good_num",
-        "idiot_win": ""
+        "wolf_win": "wolf_num >= good_num"
       },
       "witch_items": {
         "cure_count": 1,
@@ -38,7 +36,7 @@
       "roles_for_humans_first": ["Witch", "Idiot"]
     },
     "12": {
-      "roles": ["Werewolf", "Werewolf", "Werewolf", "Prophet", "Witch", "Villager", "Villager", "Villager", "Villager", "Villager", "Villager", "Villager"],
+      "roles": ["Werewolf", "Werewolf", "Werewolf", "Werewolf", "Prophet", "Witch", "Idiot", "Villager", "Villager", "Villager", "Villager", "Villager"],
       "victory_conditions": {
         "good_win": "wolf_num == 0",
         "wolf_win": "wolf_num >= good_num or not gods_alive or not villagers_alive"
