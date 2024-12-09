@@ -13,4 +13,5 @@ Django的数据库配置在backend/app/settings.py:105-114，redis的配置在ba
 uvicorn app.asgi:application --host 127.0.0.1 --port 8000 --reload
 celery -A app worker --loglevel=info
 ```  
+对局内消息规范请见：[消息规范](https://kcn1xdbl9m26.feishu.cn/wiki/EBuhw0fzfi3wHskS8jncf3o4nze?from=from_copylink)  
 接口文档请见：[接口设计与文档](https://apifox.com/apidoc/shared-78bc5d54-d6f2-4d57-a7de-6950273258d8)

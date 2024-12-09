@@ -562,7 +562,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                         "witch_config": {},
                         "players": {
                                 str(player): { # 这里的 user_id 是字符串！
-                                'index': idx + 1,
+                                'index': str(idx + 1), # 玩家编号，也是字符串，从 1 开始
                                 'name': await get_user_name(player),
                                 'alive': True,
                                 'online': False,
@@ -573,7 +573,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                         },
                         "ai_players": {
                             player_id: {
-                                'index': idx + 1 + len(room_data["players"]),
+                                'index': str(idx + 1 + len(room_data["players"])), # 接上真人玩家编号
                                 'name': player_info["name"],
                                 'alive': True,
                                 'role': None, # 敏感

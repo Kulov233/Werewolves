@@ -1,5 +1,6 @@
 # game/consumers.py
 import json
+from typing import Optional
 
 from channels.db import database_sync_to_async
 from channels.exceptions import DenyConnection
@@ -42,9 +43,9 @@ class GameConsumer(AsyncWebsocketConsumer):
                     self.channel_name
                 )
 
-                # 私有频道，用于消息通知
+                # 用户私聊频道，用于发送角色
                 await self.channel_layer.group_add(
-                    f"user_{user_id}",
+                    f"room_{room_id}_user_{user_id}",
                     self.channel_name
                 )
 
@@ -137,9 +138,10 @@ class GameConsumer(AsyncWebsocketConsumer):
 
         """
         {
+            "type": "role_info",
             "role_info": {
                 "role": "Witch",
-                "skills": { # 若非女巫则为null
+                "role_skills": { // 若非女巫则为null
                     "cure_count": 1,
                     "poison_count": 1
                 }
@@ -152,14 +154,431 @@ class GameConsumer(AsyncWebsocketConsumer):
             "role_info": role_info
         }))
 
-    async def send_role_to_player(self, user_id, role_info):
-        await self.channel_layer.send(
-            f"user_{user_id}",
-            {
-                "type": "role_info",
-                "role_info": role_info
-            }
-        )
+    @classmethod
+    async def send_role_to_player(cls, room_id, user_id, role_info):
+        try:
+            channel_layer = get_channel_layer()
+
+            await channel_layer.send(
+                f"room_{room_id}_user_{user_id}",
+                {
+                    "type": "role_info",
+                    "role_info": role_info
+                }
+            )
+        except Exception as e:
+            print(f"发送角色信息时出错：{e}")
+
+    async def wolf_sync(self, event):
+        targets = event.get("targets")
+
+        """
+        {
+          "type": "wolf_sync",
+          "targets": {
+            "1": "4",
+            "3": null,  // null为弃权或者未投票
+            "7": "4",
+            "8": "1",
+          }
+        }
+        """
+
+        await self.send(text_data=json.dumps({
+            "type": "wolf_sync",
+            "targets": targets
+        }))
+
+    @classmethod
+    async def sync_werewolf_target(cls, room_id: str, targets: dict[str, Optional[str]]):
+        try:
+            channel_layer = get_channel_layer()
+
+            await channel_layer.send(
+                f"room_{room_id}_werewolves",
+                {
+                    "type": "wolf_sync",
+                    "targets": targets
+                }
+            )
+        except Exception as e:
+            print(f"同步狼人选择时出错：{e}")
+
+    async def kill_result(self, event):
+        result = event.get("result")
+
+        """
+        {
+          "type": "kill_result",
+          "result": "7",  // 玩家序号
+        }
+        {
+          "type": "kill_result",
+          "result": null,  // 没有投出刀人结果平票
+        }
+        """
+
+        await self.send(text_data=json.dumps({
+            "type": "kill_result",
+            "result": result
+        }))
+
+    @classmethod
+    async def send_kill_result(cls, room_id: str, result: Optional[str]):
+        try:
+            channel_layer = get_channel_layer()
+
+            await channel_layer.send(
+                f"room_{room_id}_werewolves",
+                {
+                    "type": "kill_result",
+                    "result": result
+                }
+            )
+        except Exception as e:
+            print(f"发送狼人猎杀结果时出错：{e}")
+
+    async def check_result(self, event):
+        target = event.get("target")
+        role = event.get("role")
+
+        """
+        {
+          "type": "check_result",
+          "target": "7",
+          "role": "Witch",
+        }
+        """
+
+        await self.send(text_data=json.dumps({
+            "type": "check_result",
+            "target": target,
+            "role": role
+        }))
+
+    @classmethod
+    async def send_check_result(cls, room_id: str, user_id: str, target: str, role: str):
+        try:
+            channel_layer = get_channel_layer()
+
+            await channel_layer.send(
+                f"room_{room_id}_user_{user_id}",
+                {
+                    "type": "check_result",
+                    "target": target,
+                    "role": role
+                }
+            )
+        except Exception as e:
+            print(f"发送预言家查验结果时出错：{e}")
+
+    async def witch_info(self, event):
+        cure_count = event.get("cure_count")
+        poison_count = event.get("poison_count")
+        cure_target = event.get("cure_target")
+
+        """
+        {
+          "type": "witch_info",
+          "cure_count": 1,
+          "poison_count": 0,
+          "cure_target": ["6", "8"], // 今晚死掉的玩家序号列表，玩家序号为字符串
+        }
+        """
+
+        await self.send(text_data=json.dumps({
+            "type": "witch_info",
+            "cure_count": cure_count,
+            "poison_count": poison_count,
+            "cure_target": cure_target
+        }))
+
+    @classmethod
+    async def send_witch_info(cls, room_id: str, user_id: str, cure_count: int, poison_count: int, cure_target: list[str]):
+        try:
+            channel_layer = get_channel_layer()
+
+            await channel_layer.send(
+                f"room_{room_id}_user_{user_id}",
+                {
+                    "type": "witch_info",
+                    "cure_count": cure_count,
+                    "poison_count": poison_count,
+                    "cure_target": cure_target
+                }
+            )
+        except Exception as e:
+            print(f"发送女巫信息时出错：{e}")
+
+    async def witch_action_result(self, event):
+        cure = event.get("cure")
+        poison = event.get("poison")
+
+        """
+        {
+          "type": "witch_action_result",
+          "cure": "6",
+          "poison": null,  // 失败了或者操作非法
+        }
+        """
+
+        await self.send(text_data=json.dumps({
+            "type": "witch_action_result",
+            "cure": cure,
+            "poison": poison,
+        }))
+
+    @classmethod
+    async def send_witch_action_result(cls, room_id: str, user_id: str, cure: Optional[str], poison: Optional[str]):
+        try:
+            channel_layer = get_channel_layer()
+
+            await channel_layer.send(
+                f"room_{room_id}_user_{user_id}",
+                {
+                    "type": "witch_action_result",
+                    "cure": cure,
+                    "poison": poison
+                }
+            )
+        except Exception as e:
+            print(f"发送女巫操作回复时出错：{e}")
+
+    async def night_death_info(self, event):
+        victims = event.get("victims")
+
+        """
+        {
+          "type": "night_death_info",
+          "victims": ["2", "4", "6"],
+        }
+        """
+
+        await self.send(text_data=json.dumps({
+            "type": "night_death_info",
+            "victims": victims
+        }))
+
+    @classmethod
+    async def broadcast_night_death_info(cls, room_id: str, victims: list[str]):
+        try:
+            channel_layer = get_channel_layer()
+
+            await channel_layer.group_send(
+                f"room_{room_id}",
+                {
+                    "type": "night_death_info",
+                    "victims": victims
+                }
+            )
+        except Exception as e:
+            print(f"广播夜晚死亡玩家时出错：{e}")
+
+    async def talk_update(self, event):
+        source = event.get("source")
+        message = event.get("message")
+
+        """
+        {
+          "type": "talk_update",
+          "source": "5",
+          "message": "我会喷火，你会吗？"
+        }
+        """
+
+        await self.send(text_data=json.dumps({
+            "type": "talk_update",
+            "source": source,
+            "message": message
+        }))
+
+    @classmethod
+    async def broadcast_talk_message(cls, room_id: str, source: str, message: str):
+        try:
+            channel_layer = get_channel_layer()
+
+            await channel_layer.group_send(
+                f"room_{room_id}",
+                {
+                    "type": "talk_update",
+                    "source": source,
+                    "message": message
+                }
+            )
+        except Exception as e:
+            print(f"广播玩家发言时出错：{e}")
+
+    async def talk_start(self, event):
+        player = event.get("player")
+
+        """
+        {
+          "type": "talk_start",
+          "player": "6",  // 发给当前说话的玩家
+        }
+        """
+
+        await self.send(text_data=json.dumps({
+            "type": "talk_start",
+            "player": player
+        }))
+
+    @classmethod
+    async def broadcast_talk_start(cls, room_id: str, player: str):
+        try:
+            channel_layer = get_channel_layer()
+
+            await channel_layer.group_send(
+                f"room_{room_id}",
+                {
+                    "type": "talk_start",
+                    "player": player
+                }
+            )
+        except Exception as e:
+            print(f"广播接下来发言的玩家时出错：{e}")
+
+    async def talk_end(self, event):
+        player = event.get("player")
+
+        """
+        {
+          "type": "talk_end",
+          "player": 6,
+        }
+        """
+
+        await self.send(text_data=json.dumps({
+            "type": "talk_start",
+            "player": player
+        }))
+
+    @classmethod
+    async def broadcast_talk_end(cls, room_id: str, player: str):
+        try:
+            channel_layer = get_channel_layer()
+
+            await channel_layer.group_send(
+                f"room_{room_id}",
+                {
+                    "type": "talk_end",
+                    "player": player
+                }
+            )
+        except Exception as e:
+            print(f"广播刚刚结束发言的玩家时出错：{e}")
+
+    async def vote_result(self, event):
+        result = event.get("result")
+
+        """
+        {
+          "type": "vote_result",
+          "result": "6", // null 平票
+        }
+        """
+
+        await self.send(text_data=json.dumps({
+            "type": "vote_result",
+            "result": result
+        }))
+
+    @classmethod
+    async def broadcast_vote_result(cls, room_id: str, result: Optional[str]):
+        try:
+            channel_layer = get_channel_layer()
+
+            await channel_layer.group_send(
+                f"room_{room_id}",
+                {
+                    "type": "vote_result",
+                    "result": result
+                }
+            )
+        except Exception as e:
+            print(f"广播投票结果时出错：{e}")
+
+    async def day_death_info(self, event):
+        victims = event.get("victims")
+
+        """
+        {
+          "type": "day_death_info",
+          "victims": ["3", "6"],
+        }
+        """
+
+        await self.send(text_data=json.dumps({
+            "type": "day_death_info",
+            "victims": victims
+        }))
+
+    @classmethod
+    async def broadcast_day_death_info(cls, room_id: str, victims: list[str]):
+        try:
+            channel_layer = get_channel_layer()
+
+            await channel_layer.group_send(
+                f"room_{room_id}",
+                {
+                    "type": "day_death_info",
+                    "victims": victims
+                }
+            )
+        except Exception as e:
+            print(f"广播白天死亡玩家时出错：{e}")
+
+    async def game_end(self, event):
+        end = event.get("end")
+        victory = event.get("victory")
+        victory_side = event.get("victory_side")
+        reveal_role = event.get("reveal_role")
+
+        """
+        {
+          "type": "game_end",
+          "end": false // true
+          "victory": {
+            "Werewolf": false,
+            "Villager": true,
+            "Prophet": true,
+            "Witch": true,
+            "Idiot": false
+          },  // 没结束为null
+          "victory_side": "Good",
+          "reveal_role": {
+            "1": "Witch",
+            "2": "Werewolf",
+            ...
+          }
+        }
+        """
+
+        await self.send(text_data=json.dumps({
+            "type": "game_end",
+            "end": end,
+            "victory": victory,
+            "victory_side": victory_side,
+            "reveal_role": reveal_role
+        }))
+
+    @classmethod
+    async def broadcast_game_end(cls, room_id: str, end: bool, victory: Optional[dict], victory_side: Optional[str], reveal_role: Optional[dict]):
+        try:
+            channel_layer = get_channel_layer()
+
+            await channel_layer.group_send(
+                f"room_{room_id}",
+                {
+                    "type": "game_end",
+                    "end": end,
+                    "victory": victory,
+                    "victory_side": victory_side,
+                    "reveal_role": reveal_role
+                }
+            )
+        except Exception as e:
+            print(f"广播白天死亡玩家时出错：{e}")
 
     async def not_connected(self, event):
         event_type = event.get("event")

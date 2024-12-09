@@ -163,7 +163,11 @@ def assign_roles_to_players(room_id):
             # TODO: 完成分配角色后，发送消息
 
             for user_id in human_players:
-                async_to_sync(GameConsumer.send_role_to_player)(user_id, game_data["players"][user_id])
+                role_info = {
+                    "role": game_data["players"][user_id]["role"],
+                    "role_skills": game_data["players"][user_id]["role_skills"]
+                }
+                async_to_sync(GameConsumer.send_role_to_player)(room_id, user_id, role_info)
 
         return {"room_id": room_id, "status": "success", "message": "分配角色成功", "roles_assigned": roles_assigned}
 
