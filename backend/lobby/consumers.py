@@ -526,7 +526,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                 "message": "房间不存在。"
             }))
 
-    # noinspection PyUnresolvedReferences
+    # noinspection PyUnresolvedReferences,PyTypeChecker
     @with_room_lock(timeout=5)
     async def handle_start_game(self, data):
         room_id = data.get("room_id")
@@ -562,7 +562,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                         "title": room_data["title"],
                         "description": room_data["description"],
                         "max_players": room_data["max_players"],
-                        "status": "waiting",  # waiting, night_<num>, day_<num>, finished
+                        # "status": "waiting",  # waiting, night_<num>, day_<num>, finished
                         "night_count": 1,
                         "roles": {},
                         "roles_for_humans_first": [],  # 敏感
@@ -593,14 +593,16 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                         "victims_info": [],  # 敏感
                         "poisoned_victims_info": [],  # 敏感
                         "voted_victims_info": [],
-                        "current_phase": "Initialize",
+                        "current_phase": "Waiting",
                         "phase_timer": {
                             "Initialize": 1,
-                            "Werewolf": 120,
-                            "Prophet": 60,
-                            "Witch": 60,
-                            "Speak": 60,
-                            "Vote": 60
+                            "Werewolf": 10,
+                            "Prophet": 10,
+                            "Witch": 10,
+                            "Day": 3,
+                            "Speak": 10,
+                            "Vote": 10,
+                            'End': 3,
                         },
                         # ...
                     }
@@ -613,22 +615,28 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                         "Day": speaking_phases[0],
                     }
                     for i in range(room_data["max_players"] - 1):
-                        phase_transitions[speaking_phases[i]] = speaking_phases[i + 1]
-                    phase_transitions[speaking_phases[-1]] = "Vote"
-                    phase_transitions["Vote"] = "End"
-                    phase_transitions["End"] = "Werewolf"
+                        room_data_in_game["phase_transitions"][speaking_phases[i]] = speaking_phases[i + 1]
+                    room_data_in_game["phase_transitions"][speaking_phases[-1]] = "Vote"
+                    room_data_in_game["phase_transitions"]["Vote"] = "End"
+                    room_data_in_game["phase_transitions"]["End"] = "Werewolf"
                     """
-                    Initialize -> Werewolf -> Prophet -> Witch -> Speak_1 ->
+                    Initialize -> Werewolf -> Prophet -> Witch -> Day -> Speak_1 ->
                      Speak_2 -> ... -> Speak_n -> Vote 
                      -> End -> Werewolf
                      如果编号 n - len(room_data["players"]) > 0，则 Speak_n 为 AI 玩家发言
                     """
 
+                    all_phases = list(room_data_in_game["phase_transitions"].keys()) + list(
+                        room_data_in_game["phase_transitions"].values())
+                    unique_phases = set(all_phases)
+                    unique_phases_list = list(unique_phases)
+                    room_data_in_game["phases"] = unique_phases_list
+
                     await self.set_room_data_in_game_cache(room_id, room_data_in_game)
                     # TODO: 在大厅中删除房间？
-                    await self.remove_room(room_id)
-                    for player in room_data["players"]:
-                        await self.clear_user_room_in_cache(player)
+                    # await self.remove_room(room_id)
+                    # for player in room_data["players"]:
+                    #     await self.clear_user_room_in_cache(player)
 
                     # 触发游戏开始检查
                     await trigger_game_start_check(room_id)

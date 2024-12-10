@@ -157,6 +157,14 @@ class GameConsumer(AsyncWebsocketConsumer):
             "role_info": role_info
         }))
 
+    async def join_werewolf_group(self, event):
+        room_id = event.get('room_id')
+
+        await self.channel_layer.group_add(
+            f"room_{room_id}_werewolves",
+            self.channel_name
+        )
+
     @classmethod
     async def send_role_to_player(cls, room_id, user_id, role_info):
         try:
@@ -169,6 +177,16 @@ class GameConsumer(AsyncWebsocketConsumer):
                     "role_info": role_info
                 }
             )
+
+            if role_info['role'] == "Werewolf":
+                # 将狼人加入狼人私有频道
+                await channel_layer.group_send(
+                    f"room_{room_id}",
+                    {
+                        "type": "join_werewolf_group",
+                        "room_id": room_id
+                    }
+                )
         except Exception as e:
             print(f"发送角色信息时出错：{e}")
 
