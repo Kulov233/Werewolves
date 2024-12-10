@@ -29,19 +29,21 @@ def with_room_lock(timeout=5):
             retry_count = 3
             retry_delay = 0.5  # 500ms
 
-            for _ in range(retry_count):
+            for attempt in range(retry_count):
+                delay = retry_delay * (2 ** attempt)
+
                 if cache.add(lock_id, 1, timeout):
                     try:
                         return await func(consumer, data, *args, **kwargs)
                     finally:
                         cache.delete(lock_id)
 
-                await asyncio.sleep(retry_delay)
+                await asyncio.sleep(delay)
 
             # 多次重试失败后才返回错误
             await consumer.send(text_data=json.dumps({
                 "type": "error",
-                "message": "操作失败，请稍后重试"
+                "message": "操作失败，请稍后重试。"
             }))
 
         return wrapper
@@ -59,14 +61,16 @@ def with_room_list_lock(timeout=5):
             retry_count = 3
             retry_delay = 0.5  # 500ms
 
-            for _ in range(retry_count):
+            for attempt in range(retry_count):
+                delay = retry_delay * (2 ** attempt)
+
                 if cache.add(lock_id, 1, timeout):
                     try:
                         return await func(consumer, *args, **kwargs)
                     finally:
                         cache.delete(lock_id)
 
-                await asyncio.sleep(retry_delay)
+                await asyncio.sleep(delay)
 
             # 多次重试失败后才返回错误
             await consumer.send(text_data=json.dumps({
@@ -588,11 +592,13 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                             }
                             for idx, (player_id, player_info) in enumerate(room_data["ai_players"].items())
                         },
-                        "victory_conditions": {},
+                        "victory_conditions": {},  # 敏感
                         "game_specified_prompt": "",  # 敏感
                         "victims_info": [],  # 敏感
                         "poisoned_victims_info": [],  # 敏感
-                        "voted_victims_info": [],
+                        "voted_victims_info": [],  # 敏感
+                        "werewolves_targets": {}, # 敏感
+                        "votes": {},  # 敏感
                         "current_phase": "Waiting",
                         "phase_timer": {
                             "Initialize": 1,
