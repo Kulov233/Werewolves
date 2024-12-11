@@ -393,6 +393,11 @@
               </transition>
             </div>
             <div class="header-actions">
+              <!-- 开关组件 -->
+              <modern-toggle
+                v-model="isListening"
+                @change="handleListenChange"
+              />
               <!-- 添加刷新按钮 -->
               <button class="refresh-button" @click="fetchRoomData" title="刷新房间列表">
                 <img src="@/assets/refresh.svg" alt="Refresh" class="refresh-icon" />
@@ -416,7 +421,7 @@
             </div>
 
             <div v-for="room in filteredRooms.length > 0 ? filteredRooms : Rooms" 
-                :key="room.id" 
+                :key="room?.id" 
                 class="room-card">
               <div class="room-card-header">
                 <h3>{{ room.title }}</h3>
@@ -636,6 +641,7 @@
   
 <script>
 import { useWebSocket } from '@/composables/useWebSocket';
+import ModernToggle  from './ModernToggle.vue'
 import { onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useStore } from 'vuex';
@@ -677,7 +683,7 @@ api.interceptors.response.use(
       try {
         // 使用refresh token获取新的access token
         const refreshToken = localStorage.getItem('refresh_token');
-        const response = await axios.post('http://localhost:8000/api/token/refresh/', {
+        const response = await axios.post('http://localhost:8000/api/accounts/token/refresh/', {
           refresh: refreshToken
         });
 
@@ -707,7 +713,9 @@ api.interceptors.response.use(
 );
 
 export default {
-  
+  components: {
+    ModernToggle 
+  },
   data() {
     return {
       friendRequests: [
@@ -849,6 +857,10 @@ export default {
     };
   },
   setup() {
+    const isListening = ref(false);
+    const roomCreatedListenerCleanup = ref(null);
+    const roomRemovedListenerCleanup = ref(null);
+
     const store = useStore();
     const router = useRouter();
     
@@ -866,59 +878,59 @@ export default {
         { label: '评分', value: 0 }
       ]
     });
-    //const Rooms = ref([]);
-    const Rooms = ref([
-      {
-        id: 1,
-        title: '新手村',
-        description: '欢迎来到狼人杀,让我们一起愉快地玩耍吧!',
-        owner: 'player1',
-        ownerAvatar: require('@/assets/profile-icon.png'),
-        players: ['player1', 'player2'],
-        ai_players: {},
-        max_players: 12,
-      },
-      {
-        id: 2,
-        title: '高玩房',
-        description: '实力相当的高手对决,无限火力',
-        owner: 'player3', 
-        ownerAvatar: require('@/assets/profile-icon.png'),
-        players: ['player3', 'player4', 'player5'],
-        ai_players: { 'AI_1': '简单', 'AI_2': '普通' },
-        max_players: 8,
-      },
-      {
-        id: 3, 
-        title: '欢乐休闲',
-        description: '休闲玩家开黑,禁止语音',
-        owner: 'player6',
-        ownerAvatar: require('@/assets/profile-icon.png'),
-        players: ['player6', 'player7', 'player8', 'player9'],
-        ai_players: { 'AI_3': '简单' },
-        max_players: 12,
-      },
-      {
-        id: 4,
-        title: '9人标准局',
-        description: '标准9人局,争取胜利',
-        owner: 'player10',
-        ownerAvatar: require('@/assets/profile-icon.png'),
-        players: ['player10', 'player11', 'player12'],
-        ai_players: {},
-        max_players: 9, 
-      },
-      {
-        id: 5,
-        title: '大乱斗',
-        description: '16人混战,你能活到最后吗',
-        owner: 'player13', 
-        ownerAvatar: require('@/assets/profile-icon.png'),
-        players: ['player13', 'player14', 'player15'],
-        ai_players: { 'AI_4': '困难', 'AI_5': '地狱' },
-        max_players: 16,
-      },
-    ]);
+    const Rooms = ref([]);
+    //const Rooms = ref([
+    //  {
+    //    id: 1,
+    //    title: '新手村',
+    //    description: '欢迎来到狼人杀,让我们一起愉快地玩耍吧!',
+    //    owner: 'player1',
+    //    ownerAvatar: require('@/assets/profile-icon.png'),
+    //    players: ['player1', 'player2'],
+    //    ai_players: {},
+    //    max_players: 12,
+    //  },
+    //  {
+    //    id: 2,
+    //    title: '高玩房',
+    //    description: '实力相当的高手对决,无限火力',
+    //    owner: 'player3', 
+    //    ownerAvatar: require('@/assets/profile-icon.png'),
+    //    players: ['player3', 'player4', 'player5'],
+    //    ai_players: { 'AI_1': '简单', 'AI_2': '普通' },
+    //    max_players: 8,
+    //  },
+    //  {
+    //    id: 3, 
+    //    title: '欢乐休闲',
+    //    description: '休闲玩家开黑,禁止语音',
+    //    owner: 'player6',
+    //    ownerAvatar: require('@/assets/profile-icon.png'),
+    //    players: ['player6', 'player7', 'player8', 'player9'],
+    //    ai_players: { 'AI_3': '简单' },
+    //    max_players: 12,
+    //  },
+    //  {
+    //    id: 4,
+    //    title: '9人标准局',
+    //    description: '标准9人局,争取胜利',
+    //    owner: 'player10',
+    //    ownerAvatar: require('@/assets/profile-icon.png'),
+    //    players: ['player10', 'player11', 'player12'],
+    //    ai_players: {},
+    //    max_players: 9, 
+    //  },
+    //  {
+    //    id: 5,
+    //    title: '大乱斗',
+    //    description: '16人混战,你能活到最后吗',
+    //    owner: 'player13', 
+    //    ownerAvatar: require('@/assets/profile-icon.png'),
+    //    players: ['player13', 'player14', 'player15'],
+    //    ai_players: { 'AI_4': '困难', 'AI_5': '地狱' },
+    //    max_players: 16,
+    //  },
+    //]);
     const selectedProfile = ref({
       userId: '',
       name: '',
@@ -944,47 +956,54 @@ export default {
       newRoom.value.type = "无AI";
     };
 
-    const accessToken = localStorage.getItem('access_token');
-    const { connect, disconnect, sendMessage, onType, isConnected } = useWebSocket('ws://localhost:8000/ws/lobby/', accessToken);
+    const token = localStorage.getItem('access_token');
+    const { connect, disconnect, sendMessage, onType, isConnected } = useWebSocket(token);
 
     onMounted(() => {
-      connect();
+      // 只在未连接时初始化连接
+      if (!isConnected.value) {
+        connect();
+      }
       fetchRoomData();
       fetchUserInfo();
     });
 
+    // 不在组件卸载时断开连接
     onUnmounted(() => {
-      disconnect();
-      sendMessage();
+      // 确保组件卸载时移除监听器
+      if (roomCreatedListenerCleanup.value) {
+        roomCreatedListenerCleanup.value();
+      }
+      if (roomRemovedListenerCleanup.value) {
+        roomRemovedListenerCleanup.value();
+      }
     });
     const joinRoom = async (roomId) => {
-      // 找到对应的房间数据
-      const room = Rooms.value.find(r => r.id === roomId);
-      if (!room) return;
-      
+  
       try {
-        // 存储房间数据和用户信息到 Vuex
-        await store.dispatch('saveRoomData', room);
-        await store.dispatch('saveUserProfile', userProfile.value);
-        await store.dispatch('saveWebSocket', {
-          connect,
-          disconnect,
-          sendMessage,
-          onType,
-          isConnected
-        });
-
         // 发送加入房间的 websocket 消息
         sendMessage({
           action: 'join_room',
           room_id: roomId
         });
 
-        // 路由跳转
-        router.push({
-          name: 'room',
-          params: { id: roomId }
+        // 监听加入房间响应
+        const cleanup = onType('player_joined', async (data) => {
+
+          // 存储房间数据和用户信息到 Vuex
+          await store.dispatch('saveRoomData', data.room);
+          await store.dispatch('saveUserProfile', userProfile.value);
+
+          // 跳转到房间页面
+          router.push({
+            name: 'room',
+            params: { id: roomId }
+          });
+
+          // 清理监听器
+          cleanup();
         });
+
       } catch (error) {
         console.error('加入房间失败:', error);
         alert('加入房间失败，请重试');
@@ -1024,6 +1043,50 @@ export default {
       });
     };
 
+    const handleRoomCreated = async (data) => {
+      const newRoomData = data.room;
+      const avatarResponse = await api.get(`/api/accounts/avatar/${newRoomData.owner}/`);
+      Rooms.value.push({
+        ...newRoomData,
+        ownerAvatar: avatarResponse.status === 200 
+          ? avatarResponse.data.avatar_url
+          : require('@/assets/profile-icon.png')
+      });
+
+      // 删除 Rooms 中 ID 相同的房间
+      Rooms.value = Rooms.value.filter((room, index, self) =>
+        index === self.findIndex(m => m.id === room.id)
+      );
+    };
+
+    const handleRoomRemoved = (data) => {
+      const removedRoomId = data.room.id;
+      Rooms.value = Rooms.value.filter(room => room.id !== removedRoomId);
+    };
+
+    // 处理监听状态改变
+    const handleListenChange = (newValue) => {
+      if (newValue) {
+        fetchRoomData();
+        // 添加监听器
+        roomCreatedListenerCleanup.value = onType('room_created', handleRoomCreated)
+        roomRemovedListenerCleanup.value = onType('room_removed', handleRoomRemoved);
+      } else {
+        // 移除监听器
+        if (roomCreatedListenerCleanup.value) {
+          roomCreatedListenerCleanup.value()
+          roomCreatedListenerCleanup.value = null
+        }
+        if (roomRemovedListenerCleanup.value) {
+          roomRemovedListenerCleanup.value()
+          roomRemovedListenerCleanup.value = null
+        }
+      }
+    };
+
+    // 处理房间删除的监听器
+
+
     // 创建房间的方法
     const createRoom = async () => {
       try {
@@ -1037,18 +1100,14 @@ export default {
         });
         
         onType('room_created', async (data) => {
+          if(data.room.owner !== userProfile.value.userId){
+            return;
+          }
           room_created.value = data.room;
           
           // 存储房间数据和用户信息到 Vuex
           await store.dispatch('saveRoomData', room_created.value);
           await store.dispatch('saveUserProfile', userProfile.value);
-          await store.dispatch('saveWebSocket', {
-            connect,
-            disconnect,
-            sendMessage,
-            onType,
-            isConnected
-          });
           
           // 使用 router 进行导航
           router.push({
@@ -1192,6 +1251,8 @@ export default {
     };
 
     return {
+      isListening,
+      handleListenChange,
       newRoom,
       isConnected,
       sendMessage,
@@ -1207,6 +1268,7 @@ export default {
       initializeRoom,
       joinRoom,
       createRoom,
+      disconnect
       // 其他属性和方法
     };
     // 其他组件属性和方法

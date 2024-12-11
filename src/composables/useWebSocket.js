@@ -1,67 +1,39 @@
-import { ref, onUnmounted } from 'vue';
+import { onMounted, onUnmounted } from 'vue';
+import { useStore } from 'vuex';
 
-export function useWebSocket(url, accessToken) {
-    const socket = ref(null);
-    const isConnected = ref(false);
-    const listeners = {};              // 存储不同类型的消息回调
-  
-    function connect() {
-      // 在 URL 中附加 Access Token
-        const connectionUrl = `${url}?token=${accessToken}`;
+export function useWebSocket(token) {
+  const store = useStore();
 
-        socket.value = new WebSocket(connectionUrl);
+  const connect = () => {
+    store.dispatch('initializeWebSocket', token);
+  };
 
-        socket.value.onopen = () => {
-        console.log('WebSocket connection established');
-        isConnected.value = true;
-        };
+  const disconnect = () => {
+    store.dispatch('clearWebSocket');
+  };
 
-        socket.value.onclose = () => {
-        console.log('WebSocket connection closed');
-        isConnected.value = false;
-        };
+  const sendMessage = (message) => {
+    store.dispatch('sendWSMessage', message);
+  };
 
-        socket.value.onerror = (event) => {
-        console.error('WebSocket error:', event);
-        };
-        socket.value.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type && listeners[data.type]) {
-            listeners[data.type].forEach(callback => callback(data));
-          }
-        } catch (error) {
-          console.error('Error parsing WebSocket message:', error);
-        }
-      };
+  const onType = (type, handler) => {
+    store.dispatch('addMessageHandler', { type, handler });
+    
+    // 返回一个清理函数
+    return () => {
+      store.dispatch('removeMessageHandler', { type, handler });
+    };
+  };
+
+  onMounted(() => {
+    if (!store.state.isConnected) {
+      connect();
     }
-
-  function disconnect() {
-    if (socket.value) {
-      socket.value.close();
-      socket.value = null;
-      isConnected.value = false;
-    }
-  }
-
-  function sendMessage(message) {
-    if (socket.value && socket.value.readyState === WebSocket.OPEN) {
-      socket.value.send(JSON.stringify(message));
-    } else {
-      console.error('WebSocket is not connected');
-    }
-  }
-
-  // 监听特定类型的消息
-  function onType(type, callback) {
-    if (!listeners[type]) {
-      listeners[type] = [];
-    }
-    listeners[type].push(callback);
-  }
+  });
 
   onUnmounted(() => {
-    disconnect();
+    // 不在组件卸载时断开连接，仅移除消息处理器
+    // disconnect();
   });
 
   return {
@@ -69,6 +41,6 @@ export function useWebSocket(url, accessToken) {
     disconnect,
     sendMessage,
     onType,
-    isConnected
+    isConnected: store.state.isConnected
   };
 }

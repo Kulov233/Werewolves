@@ -1,4 +1,3 @@
-<!-- ConfirmDialog.vue -->
 <template>
   <transition name="dialog-fade">
     <div v-if="show" class="dialog-overlay" @click="handleOverlayClick">

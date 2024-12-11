@@ -146,7 +146,7 @@
 
         <!-- 成员部分 -->
         <div class="section">
-            <h2 class="section-title">成员（{{ currentRoom.currentPeople }}/{{ currentRoom.maxPeople }}）</h2>
+            <h2 class="section-title">成员（{{ currentRoom.currentPeople }}/{{ currentRoom.max_players }}）</h2>
             <div class="members-grid">
             <!-- 成员头像 -->
             <div v-for="member in members" 
@@ -155,9 +155,9 @@
                 @click.stop="!member.isAI && showProfile(member.id)">
                 <img :src="member.avatar" :alt="member.name" />
                 <span class="player-name">{{ member.name }}</span>
-                <button v-if="isHost" 
+                <button v-if="isHost && (member.isAI || !member.isAI)" 
                         class="kick-button" 
-                        @click.stop="handleKickMember(member.id)">×</button>
+                        @click.stop="member.isAI ? removeAIPlayer(member.id) : handleKickMember(member.id)">×</button>
                 
                 <!-- 成员资料卡 -->
                 <transition name="profile">
@@ -216,9 +216,16 @@
 
         <!-- 操作按钮部分 -->
         <div class="action-buttons">
-            <button class="action-btn add-ai">
-            <img src="@/assets/ai.svg" alt="AI" />
-            添加AI
+            <button class="action-btn add-ai" 
+                    @click="addAIPlayer" 
+                    :disabled="!isHost || currentRoom.currentPeople >= currentRoom.max_players || currentRoom.type === '无AI'"
+                    :style="(!isHost || currentRoom.currentPeople >= currentRoom.max_players || currentRoom.type === '无AI') ? {
+                      background: '#9ca3af',
+                      cursor: 'not-allowed',
+                      opacity: '0.6'
+                    } : {}">
+              <img src="@/assets/ai.svg" alt="AI" />
+              添加AI
             </button>
             <button class="action-btn invite-player">
             <img src="@/assets/addFriend.svg" alt="邀请" />
@@ -305,14 +312,42 @@
                 <!-- 可修改的设置部分 -->
                 <div class="settings-section">
                 <h3>房间设置</h3>
+
+                <!-- 房间名称设置 -->
+                <div class="form-group">
+                  <label class="setting-label">
+                    <img src="@/assets/roomTitle.svg" alt="房间" class="setting-icon"/>
+                    房间名称
+                  </label>
+                  <input 
+                    v-model="editRoomForm.title" 
+                    type="text" 
+                    class="setting-control"
+                    placeholder="请输入房间名称"
+                  />
+                </div>
                 
+                <!-- 房间简介设置 -->
+                <div class="form-group">
+                  <label class="setting-label">
+                    <img src="@/assets/description.svg" alt="简介" class="setting-icon"/>
+                    房间简介
+                  </label>
+                  <textarea 
+                    v-model="editRoomForm.description" 
+                    class="setting-control"
+                    placeholder="请输入房间简介"
+                    rows="3"
+                  ></textarea>
+                </div>
+
                 <!-- 人数设置 -->
                 <div class="form-group">
                     <label class="setting-label">
                     <img src="@/assets/people.svg" alt="人数" class="setting-icon"/>
                     房间人数
                     </label>
-                    <select v-model="currentRoom.maxPeople" class="select-input setting-control">
+                    <select v-model="editRoomForm.max_players" class="select-input setting-control">
                     <option v-for="count in peopleOptions" :key="count" :value="count">
                         {{ count }} 人
                     </option>
@@ -327,11 +362,11 @@
                     </label>
                     <div class="radio-group">
                     <label class="radio-label setting-option">
-                        <input type="radio" value="有AI" v-model="roomType" />
+                        <input type="radio" value="有AI" v-model="editRoomForm.allowAI" />
                         <span class="radio-text">启用AI</span>
                     </label>
                     <label class="radio-label setting-option">
-                        <input type="radio" value="无AI" v-model="roomType" />
+                        <input type="radio" value="无AI" v-model="editRoomForm.allowAI" />
                         <span class="radio-text">关闭AI</span>
                     </label>
                     </div>
@@ -372,6 +407,7 @@ import ConfirmDialog from './ConfirmDialog.vue'
 import { onMounted, ref , onUnmounted} from 'vue';
 import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';
+import { useWebSocket } from '@/composables/useWebSocket'; 
 import axios from 'axios';
 
 const router = useRouter();
@@ -444,11 +480,15 @@ export default {
   },
 
   setup() {
+    const aiCounter = ref(1);
+
     const store = useStore();
     const router = useRouter();
     const roomData = ref(store.state.currentRoom);
     const userProfile = ref(store.state.userProfile);
-    const ws = store.state.webSocket;
+    const token = localStorage.getItem('access_token');
+    const { connect, sendMessage, onType, isConnected } = useWebSocket(token);
+    
 
     // 弹窗相关的状态
     const showDialog = ref(false);
@@ -465,12 +505,18 @@ export default {
       title: "",
       description: "",
       currentPeople: 0,
-      maxPeople: 6,
+      max_players: 6,
       type: "无AI",
       aiPlayers: [],
       players: [],
       owner: null,
     });
+
+    // 编辑房间的表单数据
+    const editRoomForm = ref({"title": "", "description": "", "max_players": 6, "allowAI": "无AI"});
+
+    // 控制创建房间面板的显示
+    const showCreateRoomPanel=ref(false);
 
     // 房主信息
     const hostProfile = ref({
@@ -491,16 +537,23 @@ export default {
         return;
       }
 
+      editRoomForm.value = {
+        title: roomData.value.title,
+        description: roomData.value.description,
+        max_players: roomData.value.max_players,
+        allowAI: roomData.value.type === "有AI"
+      };
+
       // 设置房间基本信息
       currentRoom.value = {
         id: roomData.value.id,
         title: roomData.value.title,
         description: roomData.value.description,
         currentPeople: roomData.value.players.length + Object.keys(roomData.value.ai_players || {}).length,
-        maxPeople: roomData.value.max_players,
+        max_players: roomData.value.max_players,
         type: Object.keys(roomData.value.ai_players || {}).length > 0 ? "有AI" : "无AI",
         players: roomData.value.players,
-        aiPlayers: roomData.value.ai_players || [],
+        aiPlayers: roomData.value.ai_players,
         owner: roomData.value.owner,
       };
 
@@ -557,7 +610,7 @@ export default {
     
     // 这里添加接口调用
     // 示例：
-    // ws.sendMessage({
+    // sendMessage({
     //   type: 'kick_player',
     //   room_id: currentRoom.value.id,
     //   player_id: memberId
@@ -611,18 +664,23 @@ export default {
     async function handlePlayerJoined(data){
       
       // 检查是否是当前房间
-      if (data.room_id !== roomData.value.id) return;
+      if (data.room.id !== roomData.value.id) return;
 
-      // 找出新加入的玩家
-      const oldPlayerIds = currentRoom.value.players;
-      const newPlayerIds = data.room.players;
+      // 更新房间信息
+      currentRoom.value = {
+        ...currentRoom.value,
+        players: data.room.players,
+        currentPeople: data.room.players.length + Object.keys(data.room.ai_players || {}).length
+      };
     
-      // 找出新增的玩家ID
-      const newJoinedPlayers = newPlayerIds.filter(id => !oldPlayerIds.includes(id));
-
+      // 找出当前成员列表中没有的新玩家
+      const newJoinedPlayers = data.room.players.filter(
+        playerId => !members.value.some(member => member.id === playerId)
+      );
       // 为每个新玩家获取信息并添加到成员列表
       for (const newPlayerId of newJoinedPlayers) {
         const profile = await fetchSelectedProfile(newPlayerId);
+        console.log('新玩家信息:', newPlayerId);
         if (profile) {
           members.value.push({
             id: newPlayerId,
@@ -636,12 +694,12 @@ export default {
         }
       }
 
-      // 更新房间信息
-      currentRoom.value = {
-        ...currentRoom.value,
-        players: data.room.players,
-        currentPeople: data.room.players.length + Object.keys(data.room.ai_players || {}).length
-      };
+      // 遍历members，确保其中没有重复的玩家
+      members.value = members.value.filter((member, index, self) =>
+        index === self.findIndex(m => m.id === member.id)
+      );
+      // 调试输出所有玩家ID，使用members.value查看所有成员信息
+      console.log('所有玩家ID:', members.value.map(member => member.id));
 
     }
 
@@ -668,13 +726,9 @@ export default {
       };
 
       // 检查是否是房主离开
-      if (leftPlayerId === currentRoom.value.owner) {
-        // 新房主是players数组中的第一个玩家
-        const newOwnerId = data.room.players[0];
-        currentRoom.value.owner = newOwnerId;
-
+      if (data.room.owner !== currentRoom.value.owner) {
         // 获取新房主信息并更新
-        const newOwnerProfile = await fetchSelectedProfile(newOwnerId);
+        const newOwnerProfile = await fetchSelectedProfile(data.room.owner);
         if (newOwnerProfile) {
           hostProfile.value = {
             name: newOwnerProfile.name,
@@ -685,33 +739,151 @@ export default {
         }
         
         // 如果当前用户成为新房主，更新UI相关状态
-        if (newOwnerId === store.state.userId) {
+        if (data.room.owner === userProfile.value.userId) {
           // 例如显示房主特有的操作按钮等
           isHost.value = true;
         }
       }
     }
 
-    // WebSocket监听
+    const addAIPlayer = () => {
+      if (!currentRoom.value || !isHost.value) return;
+      
+      const aiName = `AI_${aiCounter.value}`;
+      
+      sendMessage({
+        action: "add_ai_player",
+        room_id: currentRoom.value.id,
+        player_info: {
+          name: aiName
+        }
+      });
+      aiCounter.value += 1;
+    };
+
+    // Method to remove AI player
+    const removeAIPlayer = (playerId) => {
+      if (!currentRoom.value || !isHost.value) return;
+      
+
+      sendMessage({
+        action: "remove_ai_player",
+        room_id: currentRoom.value.id,
+        player_id: playerId
+      });
+      aiCounter.value -= 1;
+    };
+
+    const handleAIPlayerJoined = (data) => {
+
+      if (data.room.id !== currentRoom.value.id) return;
+
+      const aiPlayers = data.room.ai_players || {};
+      
+      const aiMembers = Object.entries(aiPlayers).map(([id, info]) => ({
+        id,
+        name: info.name,
+        avatar: require("@/assets/ai.svg"),
+        isAI: true,
+        userId: id,
+        isOnline: true
+      }));
+
+
+      const nonAiMembers = members.value.filter(m => !m.isAI);
+      members.value = [...nonAiMembers, ...aiMembers];
+
+      currentRoom.value = {
+        ...currentRoom.value,
+        aiPlayers,
+        currentPeople: data.room.players.length + Object.keys(aiPlayers).length
+      };
+    };
+
+    const handleAIPlayerLeft = (data) => {
+      if (data.room.id !== currentRoom.value.id) return;
+
+      const aiPlayers = data.room.ai_players || {};
+
+      members.value = members.value.filter(member => {
+        if (member.isAI) {
+          return Object.keys(aiPlayers).includes(member.id);
+        }
+        return true;
+      });
+
+      currentRoom.value = {
+        ...currentRoom.value,
+        aiPlayers,
+        currentPeople: data.room.players.length + Object.keys(aiPlayers).length
+      };
+    };
+
     const setupWebsocketListeners = () => {
-      if (!ws) return;
 
-      ws.onType('player_joined', handlePlayerJoined);
+      // 处理玩家加入
+      const playerJoinedCleanup = onType('player_joined', handlePlayerJoined);
+      
+      // 处理玩家离开
+      const playerLeftCleanup = onType('player_left', handlePlayerLeft);
 
-      ws.onType('player_leave',handlePlayerLeft);
-
-      // 添加监听房间移除
-      ws.onType('room_removed', (data) => {
+      const aiPlayerJoinedCleanup = onType('ai_player_joined', handleAIPlayerJoined);
+      const aiPlayerLeftCleanup = onType('ai_player_left', handleAIPlayerLeft);
+      
+      // 处理房间被移除
+      const roomRemovedCleanup = onType('room_removed', (data) => {
         if (data.room.id === currentRoom.value.id) {
           router.push('/search');
         }
       });
-    };
+      
+      // 处理房间更新
+      const roomUpdatedCleanup = onType('room_updated', (data) => {
+        console.log('Room updated:', data);
+        if (data.room.id === currentRoom.value.id) {
+          currentRoom.value = {
+            ...currentRoom.value,
+            title: data.room.title,
+            description: data.room.description,
+            max_players: data.room.max_players,
+            type: data.room.allow_ai_players ? "有AI" : "无AI"
+          };
+          // 同步更新编辑表单数据
+          editRoomForm.value = {
+            title: data.room.title,
+            description: data.room.description,
+            max_players: data.room.max_players,
+            allowAI: data.room.allow_ai_players ? "有AI" : "无AI"
+          };
+
+          // 如果设置为无AI，清除所有AI玩家
+          if (!data.room.allow_ai_players) {
+            members.value = members.value.filter(member => !member.isAI);
+            currentRoom.value.aiPlayers = {};
+            currentRoom.value.currentPeople = data.room.players.length;
+            aiCounter.value = 1;
+          }
+          
+        }
+      });
+
+      // 返回清理函数
+      onUnmounted (() => {
+        playerJoinedCleanup();
+        playerLeftCleanup();
+        roomRemovedCleanup();
+        roomUpdatedCleanup();
+        aiPlayerJoinedCleanup();
+        aiPlayerLeftCleanup();
+        console.log('WebSocket listeners cleaned up');
+      });
+    }
+    
 
     // 离开房间
     const leaveRoom = () => {
-      if (ws && currentRoom.value) {
-        ws.sendMessage({
+      if (currentRoom.value) {
+        sendMessage({
           action: 'leave_room',
           room_id: currentRoom.value.id
         });
@@ -721,7 +893,7 @@ export default {
 
     // 销毁房间
     const removeRoom = () => {
-      if (!isHost.value || !ws || !currentRoom.value) return;
+      if (!isHost.value || !currentRoom.value) return;
       
       // 显示确认弹窗
       dialogTitle.value = '销毁房间';
@@ -735,13 +907,25 @@ export default {
     const handleDialogConfirm = () => {
       if (currentDialogAction.value === 'removeRoom') {
         // 执行销毁房间操作
-        if (ws && currentRoom.value) {
-          ws.sendMessage({
+        if (currentRoom.value) {
+          sendMessage({
             action: 'remove_room',
             room_id: currentRoom.value.id
           });
         }
         router.push('/search');
+      }
+
+      if (currentDialogAction.value === 'editRoom') {
+        // 发送编辑房间的消息
+        sendMessage({
+          action: "edit_room",
+          room_id: currentRoom.value.id,
+          allow_ai_players: editRoomForm.value.allowAI === "有AI",
+          max_players: editRoomForm.value.max_players,
+          title: editRoomForm.value.title,
+          description: editRoomForm.value.description
+        });
       }
       showDialog.value = false;
     };
@@ -751,15 +935,37 @@ export default {
       showDialog.value = false;
     };
 
+    // 保存房间设置
+    const saveRoomSettings = async () => {
+      if (!isHost.value ||!currentRoom.value) return;
+
+      try {
+        dialogTitle.value = '更新房间';
+        dialogMessage.value = '确定要更新这个房间吗？';
+        dialogShowConfirm.value = true;
+        currentDialogAction.value = 'editRoom';
+        showDialog.value = true;
+      
+      } catch (error) {
+        console.error('保存房间设置失败:', error);
+        // 可以添加错误提示
+      }
+    };
+
 
     onMounted(() => {
+      // 只在未连接时初始化连接
+      if (!isConnected.value) {
+        connect();
+      }
       initializeRoom();
+      
       setupWebsocketListeners();
     });
 
     onUnmounted(() => {
-      if (ws && roomData.value) {
-        ws.sendMessage({
+      if (roomData.value) {
+        sendMessage({
           action: 'leave_room',
           room_id: roomData.value.id
         });
@@ -782,6 +988,12 @@ export default {
       dialogTitle,
       dialogMessage,
       dialogShowConfirm,
+      editRoomForm,
+      saveRoomSettings,
+      showCreateRoomPanel,
+      addAIPlayer,
+      removeAIPlayer,
+      aiCounter,
       // ... 其他需要的数据和方法
     };
   },
@@ -798,7 +1010,7 @@ export default {
       showFriendsSidebar: false,
       showHistorySidebar: false,
 
-      showCreateRoomPanel: false, // 控制创建房间面板的显示
+      
       selectedRoom: null, // 用于控制显示哪个房间的个人资料卡
       
       //userProfile: null,
@@ -807,14 +1019,14 @@ export default {
         description: "无",
         type: "无AI",
         currentPeople: 1,
-        maxPeople: 2
+        max_players: 2
       },
       
       // 当前房间信息
       currentRoom_test: {
         title: "示例房间",
         currentPeople: 3,
-        maxPeople: 6,
+        max_players: 6,
         type: "无AI"
       },
       
@@ -914,12 +1126,12 @@ export default {
   computed: {
     // 计算是否需要更多玩家
     needMorePlayers() {
-      return this.currentRoom.currentPeople < this.currentRoom.maxPeople;
+      return this.currentRoom.currentPeople < this.currentRoom.max_players;
     },
     
     // 计算还需要多少玩家
     requiredPlayers() {
-      return this.currentRoom.maxPeople - this.currentRoom.currentPeople;
+      return this.currentRoom.max_players - this.currentRoom.currentPeople;
     }
   },
   methods: {
@@ -990,32 +1202,6 @@ export default {
     },
     friendRecord() {
       alert("好友记录功能！");
-    },
-    quickMatch() {
-      alert(`快速匹配：${this.roomType}`);
-    },
-    createRoom() {
-      const roomId = this.filteredRooms.length + 1;
-      const newRoom = {
-        id: roomId,
-        title: this.newRoom.title,
-        type: this.roomType,
-        description: this.newRoom.description,
-        currentPeople: 1,
-        maxPeople: this.selectedPeopleCount
-      };
-      
-      this.filteredRooms.push(newRoom);
-      this.toggleCreateRoom(); // 关闭创建面板
-      
-      // 重置表单
-      this.newRoom.title = `云想衣裳花想容的房间`;
-      this.newRoom.description = "无";
-      this.roomType = "无AI";
-      this.selectedPeopleCount = 2;
-    },
-    joinRoom(roomId) {
-    alert(`加入房间 ID: ${roomId}`);
     },
 
     toggleCreateRoom() {
@@ -1513,13 +1699,16 @@ export default {
 /* 房间标题样式调整 */
 .room-title {
   text-align: center;
-  font-size: 28px;
-  font-weight: bold;
+  font-family: 'Roboto', sans-serif;
+  font-weight: 800; /* 字体粗细 */
+  font-size: 32px; /* 调整字体大小 */
+  letter-spacing: 2px; /* 字符间距 */
   color: #2c3e50;
   margin: 0;
   position: absolute; /* 使用绝对定位 */
   left: 50%;
   transform: translateX(-50%); /* 确保完全居中 */
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3); 
 }
 
 /* 房间描述样式 */
@@ -1918,6 +2107,15 @@ export default {
 .setting-control:focus {
   border-color: #3b82f6;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+textarea.setting-control {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.form-group {
+  margin-bottom: 20px;
 }
 
 .setting-option {
