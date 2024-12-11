@@ -382,6 +382,11 @@ class GameConsumer(AsyncWebsocketConsumer):
         # 广播发言
         await self.broadcast_talk_message(room_id, index, content)
 
+        # 记录发言
+        game_data['action_history'].append({
+            "speak": f"{index} 号玩家说：“{content}”。"
+        })
+
     @ensure_player_is_alive()
     @with_game_data_lock(timeout=5)
     async def handle_talk_end(self, data):
