@@ -53,13 +53,37 @@
       <div class="room-container" :class="{ 'show-create-room': showCreateRoomPanel }"> 
         <!-- 主要房间区域 -->
         <div class="room-list" :class="{ 'shrink': showCreateRoomPanel }" ref="roomList">
+            <!-- 房间标题区域 -->
             <div class="room-list-header">
-                <h1 class="room-title">{{ currentRoom.name }}</h1>
-                <!-- 在搜索框右边添加一个创建房间按钮 -->
-                <button class="create-Room-button" @click="toggleCreateRoom" title="修改配置">
-                    <img src="@/assets/modifyRoom.svg" alt="Create Room" />
+              <div class="title-section">
+                <button class="leave-room-btn" @click="leaveRoom">
+                  <img src="@/assets/leaveRoom.svg" alt="Leave" />
                 </button>
-             </div>
+                <h1 class="room-title">{{ currentRoom.title }}</h1>
+              </div>
+              <div class="control-buttons">
+                <button 
+                  v-if="isHost"
+                  class="remove-room-btn" 
+                  @click="removeRoom"
+                >
+                  <img src="@/assets/removeRoom.svg" alt="Remove" />
+                </button>
+                <button class="create-Room-button" @click="toggleCreateRoom" title="修改配置">
+                  <img src="@/assets/modifyRoom.svg" alt="Create Room" />
+                </button>
+              </div>
+            </div>
+
+            <!-- 房间描述 -->
+            <div class="room-description">
+              {{ currentRoom.description }}
+            </div>
+
+            <!-- 房间ID (放在room-list底部) -->
+            <div class="room-id">
+              Room ID: {{ currentRoom.id }}
+            </div>
         
         <!-- 房主部分 -->
         <div class="section">
@@ -133,7 +157,7 @@
                 <span class="player-name">{{ member.name }}</span>
                 <button v-if="isHost" 
                         class="kick-button" 
-                        @click.stop="kickMember(member.id)">×</button>
+                        @click.stop="handleKickMember(member.id)">×</button>
                 
                 <!-- 成员资料卡 -->
                 <transition name="profile">
@@ -316,7 +340,12 @@
 
                 <!-- 保存按钮 -->
                 <div class="action-buttons">
-                <button class="save-settings-btn" @click="saveRoomSettings">
+                <button
+                   class="save-settings-btn" 
+                   @click="saveRoomSettings"
+                   :disabled="!isHost"
+                   :class="{ 'disabled': !isHost }"
+                   >
                     <img src="@/assets/wolf.svg" alt="保存" class="btn-icon"/>
                     保存设置
                 </button>
@@ -325,11 +354,21 @@
           </section>
         </transition>
     </div>
-
+     <!-- 添加确认弹窗组件 -->
+    <ConfirmDialog
+      :show="showDialog"
+      :title="dialogTitle"
+      :message="dialogMessage"
+      :showConfirm="dialogShowConfirm"
+      @confirm="handleDialogConfirm"
+      @cancel="handleDialogCancel"
+    />
     </div>
+    
 </template>
   
 <script>
+import ConfirmDialog from './ConfirmDialog.vue'
 import { onMounted, ref , onUnmounted} from 'vue';
 import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';
@@ -400,6 +439,10 @@ api.interceptors.response.use(
 );
 
 export default {
+  components: {
+    ConfirmDialog
+  },
+
   setup() {
     const store = useStore();
     const router = useRouter();
@@ -407,13 +450,26 @@ export default {
     const userProfile = ref(store.state.userProfile);
     const ws = store.state.webSocket;
 
+    // 弹窗相关的状态
+    const showDialog = ref(false);
+    const dialogTitle = ref('');
+    const dialogMessage = ref('');
+    const dialogShowConfirm = ref(true);
+    const currentDialogAction = ref('');
+
+    // 是否为房主
+    const isHost = ref(false);
+
     const currentRoom = ref({
-      name: "",
+      id: '',
+      title: "",
+      description: "",
       currentPeople: 0,
       maxPeople: 6,
       type: "无AI",
       aiPlayers: [],
-      players: []
+      players: [],
+      owner: null,
     });
 
     // 房主信息
@@ -431,30 +487,22 @@ export default {
     // 初始化房间信息
     const initializeRoom = async () => {
       if (!roomData.value) {
-        router.push('/lobby');
+        router.push('/search');
         return;
       }
 
       // 设置房间基本信息
       currentRoom.value = {
-        name: roomData.value.title,
+        id: roomData.value.id,
+        title: roomData.value.title,
+        description: roomData.value.description,
         currentPeople: roomData.value.players.length + Object.keys(roomData.value.ai_players || {}).length,
         maxPeople: roomData.value.max_players,
         type: Object.keys(roomData.value.ai_players || {}).length > 0 ? "有AI" : "无AI",
         players: roomData.value.players,
-        aiPlayers: roomData.value.ai_players || []
+        aiPlayers: roomData.value.ai_players || [],
+        owner: roomData.value.owner,
       };
-
-      // 获取并设置房主信息
-      const ownerProfile = await fetchSelectedProfile(roomData.value.owner);
-      if (ownerProfile) {
-        hostProfile.value = {
-          name: ownerProfile.name,
-          avatar: ownerProfile.avatar,
-          isOnline: ownerProfile.isOnline,
-          stats: ownerProfile.stats
-        };
-      }
 
       // 获取并设置所有玩家信息
       const playerProfiles = await Promise.all(
@@ -474,6 +522,17 @@ export default {
         })
       );
 
+      // 从 playerProfiles 中找出房主信息
+      const ownerProfile = playerProfiles.find(profile => profile.id === currentRoom.value.owner);
+      if (ownerProfile) {
+        hostProfile.value = {
+          name: ownerProfile.name,
+          avatar: ownerProfile.avatar,
+          isOnline: ownerProfile.isOnline,
+          stats: ownerProfile.stats
+        };
+      }
+
       // 添加AI玩家信息
       const aiPlayerProfiles = Object.entries(currentRoom.value.aiPlayers).map(([id, name]) => ({
         id,
@@ -487,7 +546,25 @@ export default {
 
       // 合并所有玩家信息
       members.value = [...playerProfiles, ...aiPlayerProfiles];
+
+      // 判断当前用户是否为房主
+      isHost.value = (userProfile.value.userId === currentRoom.value.owner);
     };
+
+    // 踢人
+    const handleKickMember = (memberId) => {
+    if (!isHost.value) return; // 二次验证确保只有房主能踢人
+    
+    // 这里添加接口调用
+    // 示例：
+    // ws.sendMessage({
+    //   type: 'kick_player',
+    //   room_id: currentRoom.value.id,
+    //   player_id: memberId
+    // });
+    
+    console.log('踢出玩家:', memberId);
+  };
 
     // 获取选中的人信息
     const fetchSelectedProfile = async (userId) => {
@@ -530,28 +607,150 @@ export default {
       return `${Math.round((wins / games.length) * 100)}%`;
     };
 
+    // 处理新玩家加入
+    async function handlePlayerJoined(data){
+      
+      // 检查是否是当前房间
+      if (data.room_id !== roomData.value.id) return;
+
+      // 找出新加入的玩家
+      const oldPlayerIds = currentRoom.value.players;
+      const newPlayerIds = data.room.players;
+    
+      // 找出新增的玩家ID
+      const newJoinedPlayers = newPlayerIds.filter(id => !oldPlayerIds.includes(id));
+
+      // 为每个新玩家获取信息并添加到成员列表
+      for (const newPlayerId of newJoinedPlayers) {
+        const profile = await fetchSelectedProfile(newPlayerId);
+        if (profile) {
+          members.value.push({
+            id: newPlayerId,
+            name: profile.name,
+            avatar: profile.avatar,
+            isAI: false,
+            userId: newPlayerId,
+            isOnline: true,
+            stats: profile.stats
+          });
+        }
+      }
+
+      // 更新房间信息
+      currentRoom.value = {
+        ...currentRoom.value,
+        players: data.room.players,
+        currentPeople: data.room.players.length + Object.keys(data.room.ai_players || {}).length
+      };
+
+    }
+
+    // 处理玩家离开
+    async function handlePlayerLeft(data) {
+      // 检查是否是当前房间
+      if (data.room.id !== currentRoom.value.id) {
+        return;
+      }
+
+      // 找出离开的玩家
+      const leftPlayerId = currentRoom.value.players.find(
+        id => !data.room.players.includes(id)
+      );
+
+      // 从成员列表中移除离开的玩家
+      members.value = members.value.filter(member => member.id !== leftPlayerId);
+
+      // 更新房间玩家列表和人数
+      currentRoom.value = {
+        ...currentRoom.value,
+        players: data.room.players,
+        currentPeople: data.room.players.length + Object.keys(data.room.ai_players || {}).length
+      };
+
+      // 检查是否是房主离开
+      if (leftPlayerId === currentRoom.value.owner) {
+        // 新房主是players数组中的第一个玩家
+        const newOwnerId = data.room.players[0];
+        currentRoom.value.owner = newOwnerId;
+
+        // 获取新房主信息并更新
+        const newOwnerProfile = await fetchSelectedProfile(newOwnerId);
+        if (newOwnerProfile) {
+          hostProfile.value = {
+            name: newOwnerProfile.name,
+            avatar: newOwnerProfile.avatar,
+            isOnline: newOwnerProfile.isOnline,
+            stats: newOwnerProfile.stats
+          };
+        }
+        
+        // 如果当前用户成为新房主，更新UI相关状态
+        if (newOwnerId === store.state.userId) {
+          // 例如显示房主特有的操作按钮等
+          isHost.value = true;
+        }
+      }
+    }
+
     // WebSocket监听
     const setupWebsocketListeners = () => {
       if (!ws) return;
 
-      ws.onType('player_join', (data) => {
-        currentRoom.value.currentPeople++;
-        members.value.push({
-          id: data.player_id,
-          name: data.player_name,
-          avatar: data.avatar,
-          isAI: false,
-          userId: data.player_id,
-          isOnline: true,
-          stats: data.stats || []
-        });
-      });
+      ws.onType('player_joined', handlePlayerJoined);
 
-      ws.onType('player_leave', (data) => {
-        currentRoom.value.currentPeople--;
-        members.value = members.value.filter(m => m.id !== data.player_id);
+      ws.onType('player_leave',handlePlayerLeft);
+
+      // 添加监听房间移除
+      ws.onType('room_removed', (data) => {
+        if (data.room.id === currentRoom.value.id) {
+          router.push('/search');
+        }
       });
     };
+
+    // 离开房间
+    const leaveRoom = () => {
+      if (ws && currentRoom.value) {
+        ws.sendMessage({
+          action: 'leave_room',
+          room_id: currentRoom.value.id
+        });
+        router.push('/search');
+      }
+    };
+
+    // 销毁房间
+    const removeRoom = () => {
+      if (!isHost.value || !ws || !currentRoom.value) return;
+      
+      // 显示确认弹窗
+      dialogTitle.value = '销毁房间';
+      dialogMessage.value = '确定要销毁这个房间吗？此操作不可撤销。';
+      dialogShowConfirm.value = true;
+      currentDialogAction.value = 'removeRoom';
+      showDialog.value = true;
+    };
+
+    // 处理弹窗确认
+    const handleDialogConfirm = () => {
+      if (currentDialogAction.value === 'removeRoom') {
+        // 执行销毁房间操作
+        if (ws && currentRoom.value) {
+          ws.sendMessage({
+            action: 'remove_room',
+            room_id: currentRoom.value.id
+          });
+        }
+        router.push('/search');
+      }
+      showDialog.value = false;
+    };
+
+    // 处理弹窗取消
+    const handleDialogCancel = () => {
+      showDialog.value = false;
+    };
+
 
     onMounted(() => {
       initializeRoom();
@@ -573,12 +772,23 @@ export default {
       members,
       selectedPlayerId,
       userProfile,
+      isHost,
+      handleKickMember,
+      leaveRoom,
+      removeRoom,
+      handleDialogConfirm,
+      handleDialogCancel,
+      showDialog,
+      dialogTitle,
+      dialogMessage,
+      dialogShowConfirm,
       // ... 其他需要的数据和方法
     };
   },
   data() {
     return {
 
+      
       roomType: "无AI", // 房间类型（默认无AI）
 
       selectedPeopleCount: 2, // 默认选中2人
@@ -593,7 +803,7 @@ export default {
       
       //userProfile: null,
       newRoom: {
-        name: `云想衣裳花想容的房间`,  // 这里需要替换实际的用户名
+        title: `云想衣裳花想容的房间`,  // 这里需要替换实际的用户名
         description: "无",
         type: "无AI",
         currentPeople: 1,
@@ -602,7 +812,7 @@ export default {
       
       // 当前房间信息
       currentRoom_test: {
-        name: "示例房间",
+        title: "示例房间",
         currentPeople: 3,
         maxPeople: 6,
         type: "无AI"
@@ -699,8 +909,6 @@ export default {
       // 选中的玩家ID (用于显示资料卡)
       selectedPlayerId_test: null,
       
-      // 是否是房主
-      isHost: true,
     };
   },
   computed: {
@@ -790,7 +998,7 @@ export default {
       const roomId = this.filteredRooms.length + 1;
       const newRoom = {
         id: roomId,
-        name: this.newRoom.name,
+        title: this.newRoom.title,
         type: this.roomType,
         description: this.newRoom.description,
         currentPeople: 1,
@@ -801,7 +1009,7 @@ export default {
       this.toggleCreateRoom(); // 关闭创建面板
       
       // 重置表单
-      this.newRoom.name = `云想衣裳花想容的房间`;
+      this.newRoom.title = `云想衣裳花想容的房间`;
       this.newRoom.description = "无";
       this.roomType = "无AI";
       this.selectedPeopleCount = 2;
@@ -972,14 +1180,6 @@ export default {
 }
 .room-list.shrink {
   transform: translateX(-1%);
-}
-
-.room-title {
-  text-align: center;
-  font-size: 28px;
-  font-weight: bold;
-  color: #2c3e50;
-  margin-bottom: 32px;
 }
 
 .section {
@@ -1243,26 +1443,109 @@ export default {
 
 /* 房间列表头部布局 */
 .room-list-header {
+  position: relative;  /* 添加相对定位 */
   display: flex;
-  justify-content: space-between; /* 元素分布在两端和中间 */
+  justify-content: center; /* 居中对齐 */
   align-items: center;
   margin-bottom: 24px;
   padding: 0 10px;
   height: 50px;
 }
 
-.room-list-header h1 {
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3); /* 阴影效果 */
+.title-section {
+  margin-top: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.leave-room-btn {
+  position: absolute;
+  left: 20px;
+  background: transparent;
+  border: none;
+  padding: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 1; /* 确保按钮在标题上层 */
+}
+
+.leave-room-btn img {
+  width: 24px;
+  height: 24px;
+  /* 使用适合的颜色, 例如蓝色系 */
+  filter: invert(45%) sepia(50%) saturate(1000%) hue-rotate(190deg) brightness(90%) contrast(95%);
+}
+
+.leave-room-btn:hover {
+  transform: scale(1.1);
+}
+
+/* 控制按钮区域 */
+.control-buttons {
+  position: absolute;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 1; /* 确保按钮在标题上层 */
+}
+
+.remove-room-btn {
+  background: transparent;
+  border: none;
+  padding: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.remove-room-btn img {
+  width: 24px;
+  height: 24px;
+  /* 使用偏红色的颜色 */
+  filter: invert(50%) sepia(75%) saturate(5000%) hue-rotate(330deg) brightness(90%) contrast(95%);
+}
+
+.remove-room-btn:hover {
+  transform: scale(1.1);
+}
+
+/* 房间标题样式调整 */
+.room-title {
+  text-align: center;
+  font-size: 28px;
+  font-weight: bold;
   color: #2c3e50;
-  font-family: 'Roboto', sans-serif;
-  font-weight: 800; /* 字体粗细 */
-  font-size: 32px; /* 调整字体大小 */
-  letter-spacing: 2px; /* 字符间距 */
-  margin-top: 50px;
-  margin-left: 120px;
-  flex-grow: 1; /* 让 h1 占满剩余空间，从而实现居中 */
-  text-align: center; /* 标题内容居中 */
-  
+  margin: 0;
+  position: absolute; /* 使用绝对定位 */
+  left: 50%;
+  transform: translateX(-50%); /* 确保完全居中 */
+}
+
+/* 房间描述样式 */
+.room-description {
+  text-align: center;
+  font-size: 16px;
+  color: #64748b;
+  margin-bottom: 10px;
+  padding: 0 20px;
+}
+
+/* 房间ID样式 */
+.room-id {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  font-size: 12px;
+  color: #94a3b8;
+  font-family: monospace;
+  opacity: 0.8;
+}
+
+/* 调整room-list以适应绝对定位的room-id */
+.room-list {
+  position: relative;
+  padding-bottom: 40px; /* 为room-id留出空间 */
 }
 
 .create-Room-button {
@@ -1664,6 +1947,12 @@ export default {
   gap: 8px;
   cursor: pointer;
   transition: all 0.3s ease;
+}
+
+.save-settings-btn.disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .save-settings-btn:hover {
