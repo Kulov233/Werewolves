@@ -11,8 +11,6 @@ from django.core.cache import caches
 
 from functools import wraps
 
-from .tasks import end_current_phase
-
 def with_game_data_lock(timeout=5):
     def decorator(func):
         @wraps(func)
@@ -275,6 +273,7 @@ class GameConsumer(AsyncWebsocketConsumer):
         role = game_data['players'][target]['role']
         await self.send_check_result(room_id, user_id, target, role)
 
+        from .tasks import end_current_phase
         # 取消定时器
         await end_current_phase(room_id)
 
@@ -352,6 +351,7 @@ class GameConsumer(AsyncWebsocketConsumer):
         # 返回操作结果
         await self.send_witch_action_result(room_id, user_id, cure, poison)
 
+        from .tasks import end_current_phase
         # 取消定时器
         await end_current_phase(room_id)
 
