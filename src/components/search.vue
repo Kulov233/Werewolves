@@ -425,8 +425,8 @@
                 class="room-card">
               <div class="room-card-header">
                 <h3>{{ room.title }}</h3>
-                <span class="room-type" :class="{ 'ai': Object.keys(room.ai_players).length > 0 }">
-                  {{ Object.keys(room.ai_players).length > 0 ? '有AI' : '无AI' }}
+                <span class="room-type" :class="{ 'ai': room.allow_ai_players }">
+                  {{ room.allow_ai_players ? '有AI' : '无AI' }}
                 </span>
                 <!-- 添加房主头像 -->
                 <div class="owner-avatar" @click.stop="showProfile(room.id)">
@@ -568,11 +568,11 @@
                 <label>房间类型</label>
                 <div class="radio-group">
                   <label class="radio-label">
-                    <input type="radio" value="有AI" v-model="newRoom.type" />
+                    <input type="radio" v-model="newRoom.allowAI" :value="true" />
                     <span class="radio-text">有AI</span>
                   </label>
                   <label class="radio-label">
-                    <input type="radio" value="无AI" v-model="newRoom.type" />
+                    <input type="radio" v-model="newRoom.allowAI" :value="false" />
                     <span class="radio-text">无AI</span>
                   </label>
                 </div>
@@ -617,11 +617,11 @@
             <label>是否有AI</label>
             <div class="radio-group">
               <label class="radio-label">
-                <input type="radio" value="有AI" v-model="matchAI" />
-                <span class="radio-text">有AI</span>
-              </label>
-              <label class="radio-label">
-                <input type="radio" value="无AI" v-model="matchAI" />
+                <input type="radio" v-model="matchAI" :value="true" />
+                  <span class="radio-text">有AI</span>
+                </label>
+                <label class="radio-label">
+                  <input type="radio" v-model="matchAI" :value="false" />
                 <span class="radio-text">无AI</span>
               </label>
             </div>
@@ -636,17 +636,28 @@
           </div>
         </div>
       </transition>
+
+      <ConfirmDialog
+        :show="showDialog"
+        :title="dialogTitle"
+        :message="dialogMessage"
+        :showConfirm="dialogShowConfirm"
+        @confirm="handleDialogConfirm"
+        @cancel="handleDialogCancel"
+      />
     </div>
 </template>
   
 <script>
 import { useWebSocket } from '@/composables/useWebSocket';
 import ModernToggle  from './ModernToggle.vue'
+import ConfirmDialog from './ConfirmDialog.vue';
 import { onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useStore } from 'vuex';
 import { ref } from 'vue';
 import axios from 'axios';
+
 
 const router = useRouter();
 // 创建axios实例
@@ -714,7 +725,9 @@ api.interceptors.response.use(
 
 export default {
   components: {
-    ModernToggle 
+    ModernToggle,
+    ConfirmDialog,
+
   },
   data() {
     return {
@@ -852,11 +865,20 @@ export default {
       dragOffset: { x: 0, y: 0 },
       showQuickMatchPanel: false, // 显示快速匹配窗口
       matchPeopleCount: 6, // 快速匹配人数
-      matchAI: "有AI", // 快速匹配是否有AI
+      matchAI: false // 快速匹配是否有AI
       
     };
   },
   setup() {
+    // 弹窗相关的状态
+    const showDialog = ref(false);
+    const dialogTitle = ref('');
+    const dialogMessage = ref('');
+    const dialogShowConfirm = ref(true);
+    const currentDialogAction = ref('');
+
+    const selectedRoomForMatch = ref(null);
+
     const isListening = ref(false);
     const roomCreatedListenerCleanup = ref(null);
     const roomRemovedListenerCleanup = ref(null);
@@ -945,7 +967,7 @@ export default {
       title: '',
       description: "无",
       maxPlayers: 6,
-      type: "无AI",
+      allowAI: false,
     });
 
     // 函数用于初始化或重新设置房间信息
@@ -953,7 +975,7 @@ export default {
       newRoom.value.title = `${userProfile.value.name}的房间`; // 设置房间标题
       newRoom.value.description = "无";
       newRoom.value.maxPlayers = 6;
-      newRoom.value.type = "无AI";
+      newRoom.value.allowAI = false;
     };
 
     const token = localStorage.getItem('access_token');
@@ -967,6 +989,39 @@ export default {
       fetchRoomData();
       fetchUserInfo();
     });
+
+    const handleDialogConfirm = async () => {
+      if (currentDialogAction.value === 'deleteFriend') {
+        // 处理删除好友的逻辑
+        console.log('删除好友');
+      } else if (currentDialogAction.value === 'acceptFriend') {
+        // 处理接受好友请求的逻辑
+        console.log('接受好友请求');
+      }
+      else if (currentDialogAction.value === 'rejectFriend') {
+        // 处理拒绝好友请求的逻辑
+        console.log('拒绝好友请求');
+      }
+      else if (currentDialogAction.value === 'reportUser') {
+        // 处理举报用户的逻辑
+        console.log('举报用户');
+      }
+      else if (currentDialogAction.value === 'clearAllHistory') {
+        // 处理清空历史记录的逻辑
+        console.log('清空历史记录');
+      }
+      else if(currentDialogAction.value === 'quickMatchSuccess'){
+        // 处理快速匹配成功的逻辑
+        joinRoom(selectedRoomForMatch.value.id);
+      }
+      showDialog.value = false;
+    };
+
+    // 处理对话框取消
+    const handleDialogCancel = () => {
+      showDialog.value = false;
+      currentDialogAction.value = '';
+    };
 
     // 不在组件卸载时断开连接
     onUnmounted(() => {
@@ -1071,6 +1126,7 @@ export default {
         // 添加监听器
         roomCreatedListenerCleanup.value = onType('room_created', handleRoomCreated)
         roomRemovedListenerCleanup.value = onType('room_removed', handleRoomRemoved);
+        
       } else {
         // 移除监听器
         if (roomCreatedListenerCleanup.value) {
@@ -1096,7 +1152,7 @@ export default {
           title: newRoom.value.title,
           description: newRoom.value.description,
           max_players: newRoom.value.maxPlayers,
-          type: newRoom.value.type,
+          allow_ai_players: newRoom.value.allowAI,
         });
         
         onType('room_created', async (data) => {
@@ -1251,6 +1307,14 @@ export default {
     };
 
     return {
+      handleDialogConfirm,
+      handleDialogCancel,
+      showDialog,
+      dialogTitle,
+      dialogMessage,
+      dialogShowConfirm,
+      currentDialogAction,
+      selectedRoomForMatch,
       isListening,
       handleListenChange,
       newRoom,
@@ -1387,27 +1451,6 @@ export default {
     // 显示好友操作菜单的逻辑
     console.log('Show menu for friend:', friend.name);
     // 这里可以实现一个包含删除好友、屏蔽等操作的下拉菜单
-  },
-
-  setupWebSocket() {
-    // 设置WebSocket连接
-    this.ws = new WebSocket('ws://your-websocket-server');
-    
-    this.ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      
-      switch (data.type) {
-        case 'friendRequest':
-          this.handleNewFriendRequest(data.request);
-          break;
-        case 'friendStatusChange':
-          this.updateFriendStatus(data.friend);
-          break;
-        case 'gameInvite':
-          this.handleGameInvite(data.invite);
-          break;
-      }
-    };
   },
 
   handleNewFriendRequest(request) {
@@ -1599,18 +1642,48 @@ export default {
     performQuickMatch() {
       // 过滤符合条件的房间
       const matchedRooms = this.Rooms.filter(room => {
-        const matchesPeople = room.maxPeople === this.matchPeopleCount;
-        const matchesAI = room.type === this.matchAI;
-        return matchesPeople && matchesAI && room.currentPeople < room.maxPeople;
+        const matchesPeople = room.max_players  === this.matchPeopleCount;
+        const matchesAI = room.allow_ai_players === (this.matchAI === true);
+        // 检查房间是否还有空位
+        const currentPeople = room.players.length + Object.keys(room.ai_players || {}).length;
+        const hasSpace = currentPeople < room.max_players;
+
+        return matchesPeople && matchesAI && hasSpace;
       });
 
-      if (matchedRooms.length > 0) {
-        // 加入第一个匹配的房间
-        this.joinRoom(matchedRooms[0].id);
-        this.toggleQuickMatchPanel();
-      } else {
-        alert("符合条件的房间不存在！");
+      if (matchedRooms.length === 0) {
+        this.dialogTitle = '提示';
+        this.dialogMessage = '没有找到符合条件的房间！';
+        this.dialogShowConfirm = false;
+        this.currentDialogAction = 'quickMatchFail';
+        this.showDialog = true;
+        return;
       }
+
+      // 找出当前人数最多的房间
+      const maxPeople = Math.max(...matchedRooms.map(room => 
+        room.players.length + Object.keys(room.ai_players || {}).length
+      ));
+
+      // 筛选出人数最多的所有房间
+      const mostPopulatedRooms = matchedRooms.filter(room => 
+        (room.players.length + Object.keys(room.ai_players || {}).length) === maxPeople
+      );
+
+      // 从人数最多的房间中随机选择一个
+      const selectedRoom = mostPopulatedRooms[Math.floor(Math.random() * mostPopulatedRooms.length)];
+
+      // 存储选中的房间并显示确认对话框
+
+      this.dialogTitle = '匹配成功';
+      this.dialogMessage = `已找到房间：${selectedRoom.title}<br>是否加入？`;
+      this.dialogShowConfirm = true;
+      this.currentDialogAction = 'quickMatchSuccess';
+      this.showDialog = true;
+      this.selectedRoomForMatch = selectedRoom;
+
+      // 关闭快速匹配面板
+      this.showQuickMatchPanel = false;
     },
 
     onFocus() {
@@ -1704,10 +1777,6 @@ export default {
     friendRecord() {
       alert("好友记录功能！");
     },
-    quickMatch() {
-      alert(`快速匹配：${this.newRoom.type}`);
-    },
-
     toggleCreateRoom() {
       this.showCreateRoomPanel = !this.showCreateRoomPanel;
       // 添加延迟以确保动画效果同步

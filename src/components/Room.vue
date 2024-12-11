@@ -541,7 +541,7 @@ export default {
         title: roomData.value.title,
         description: roomData.value.description,
         max_players: roomData.value.max_players,
-        allowAI: roomData.value.type === "有AI"
+        allowAI: roomData.value.allow_ai_players ? "有AI" : "无AI",
       };
 
       // 设置房间基本信息
@@ -551,7 +551,7 @@ export default {
         description: roomData.value.description,
         currentPeople: roomData.value.players.length + Object.keys(roomData.value.ai_players || {}).length,
         max_players: roomData.value.max_players,
-        type: Object.keys(roomData.value.ai_players || {}).length > 0 ? "有AI" : "无AI",
+        type: roomData.value.allow_ai_players ? "有AI" : "无AI",
         players: roomData.value.players,
         aiPlayers: roomData.value.ai_players,
         owner: roomData.value.owner,
@@ -1416,11 +1416,10 @@ export default {
 }
 
 .members-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 20px;
   padding: 16px;
-  grid-auto-flow: column;
 }
 
 .kick-button {

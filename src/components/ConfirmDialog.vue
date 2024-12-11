@@ -8,9 +8,7 @@
             <img src="@/assets/close.svg" alt="Close" />
           </button>
         </div>
-        <div class="dialog-content">
-          {{ message }}
-        </div>
+        <div class="dialog-content" v-html="message"></div>
         <div class="dialog-footer">
           <button 
             v-if="showConfirm" 
