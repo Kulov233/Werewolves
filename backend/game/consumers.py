@@ -164,6 +164,14 @@ class GameConsumer(AsyncWebsocketConsumer):
             await self.handle_kill_vote(data)
         elif type == "check":
             await self.handle_check(data)
+        elif type == "witch_action":
+            await self.handle_witch_action(data)
+        elif type == "talk_content":
+            await self.handle_talk_content(data)
+        elif type == "talk_end":
+            await self.handle_talk_end(data)
+        elif type == "vote":
+            await self.handle_vote(data)
 
     @ensure_player_is_alive()
     @with_game_data_lock(timeout=5)
@@ -272,7 +280,7 @@ class GameConsumer(AsyncWebsocketConsumer):
 
     @ensure_player_is_alive()
     @with_game_data_lock(timeout=5)
-    async def handle_witch(self, data):
+    async def handle_witch_action(self, data):
         # 获取房间 ID
         room_id = self.scope['url_route']['kwargs']['room_id']
 
@@ -349,7 +357,7 @@ class GameConsumer(AsyncWebsocketConsumer):
 
     @ensure_player_is_alive()
     @with_game_data_lock(timeout=5)
-    async def handle_talk(self, data):
+    async def handle_talk_content(self, data):
         # 获取房间 ID
         room_id = self.scope['url_route']['kwargs']['room_id']
 
@@ -376,7 +384,7 @@ class GameConsumer(AsyncWebsocketConsumer):
 
     @ensure_player_is_alive()
     @with_game_data_lock(timeout=5)
-    async def handle_end_talk(self, data):
+    async def handle_talk_end(self, data):
         # 获取房间 ID
         room_id = self.scope['url_route']['kwargs']['room_id']
 

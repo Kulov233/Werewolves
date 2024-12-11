@@ -297,6 +297,85 @@ def get_vote_result(room_id):
         game_data["voted_victims_info"].append(vote_result)
 
 @with_game_data_lock(timeout=5)
+def check_victory(room_id):
+    """
+    检查游戏胜利条件
+    """
+    game_cache = caches['game_cache']
+    game_data = game_cache.get(f"room:{room_id}")
+
+    # 检查游戏胜利条件
+    idiot_voted_out = False
+    good_num = sum(1 for player in game_data["players"].values() if player["role"] != "Werewolf" and player["alive"])
+    good_num += sum(1 for player in game_data["ai_players"].values() if player["role"] != "Werewolf" and player["alive"])
+    wolf_num = sum(1 for player in game_data["players"].values() if player["role"] == "Werewolf" and player["alive"])
+    wolf_num += sum(1 for player in game_data["ai_players"].values() if player["role"] == "Werewolf" and player["alive"])
+
+    gods_alive = any(player["role"] in ["Prophet", "Witch"] and player["alive"] for player in game_data["players"].values())
+    villagers_alive = any(player["role"] == "Villager" and player["alive"] for player in game_data["players"].values())
+
+    result = {
+        "end": False,
+        "victory": None,
+        "victory_side": None,
+        "reveal_role": None
+    }
+
+    players = {**game_data["players"], **game_data["ai_players"]}
+
+    try:
+        for victim in game_data["voted_victims_info"]:
+            for _, data in players.items():
+                if data["index"] == victim:
+                    if data["role"] == "Idiot":
+                        idiot_voted_out = True
+                        break
+
+        if eval(game_data["victory_conditions"]['idiot_win'], {"voted_out": idiot_voted_out}):
+            # TODO: 白痴胜利
+            result["end"] = True
+            result["victory"] = {
+                role: False
+                for role, _ in game_data["roles"].items()
+            }
+            result["victory"]["Idiot"] = True
+            result["victory_side"] = "Idiot"
+            result["reveal_role"] = {}
+            for _, data in players.items():
+                result["reveal_role"][data["index"]] = data["role"]
+            return result
+    except:
+        pass
+    if eval(game_data["victory_conditions"]['good_win'], {"wolf_num": wolf_num, "good_num": good_num}):
+        # TODO: 好人胜利
+        result["end"] = True
+        result["victory"] = {
+            role: False
+            for role, _ in game_data["roles"].items()
+        }
+        result["victory"]["Villager"] = True
+        result["victory"]["Prophet"] = True
+        result["victory"]["Witch"] = True
+        result["victory_side"] = "Good"
+        result["reveal_role"] = {}
+        for _, data in players.items():
+            result["reveal_role"][data["index"]] = data["role"]
+        return result
+    if eval(game_data["victory_conditions"]['wolf_win'], {"wolf_num": wolf_num, "good_num": good_num, "gods_alive": gods_alive, "villagers_alive": villagers_alive}):
+        result["end"] = True
+        result["victory"] = {
+            role: False
+            for role, _ in game_data["roles"].items()
+        }
+        result["victory"]["Werewolf"] = True
+        result["victory_side"] = "Bad"
+        result["reveal_role"] = {}
+        for _, data in players.items():
+            result["reveal_role"][data["index"]] = data["role"]
+        return result
+
+
+@with_game_data_lock(timeout=5)
 async def end_current_phase(room_id):
     try:
         game_cache = caches['game_cache']
@@ -336,6 +415,21 @@ def handle_phase_timed_out(room_id: str, current_phase: str):
         # 1. 获取下一个阶段
         next_phase = phase_transitions[current_phase]
 
+        # 对于玩家发言，跳过死亡的玩家
+        if next_phase.startswith("Speak_"):
+            found = False
+            players = {**game_data["players"], **game_data["ai_players"]}
+            while next_phase != 'Vote' and not found:
+                index = next_phase.split("_")[1]
+                for _, data in players.items():
+                    if data["index"] == str(index):
+                        if not data["alive"]:
+                            next_phase = phase_transitions[next_phase]
+                            break
+                        else:
+                            found = True
+                            break
+
         # 2. 通知当前阶段结束
         # TODO: 阶段结束，进行相应处理
         if current_phase == 'Initialize':
@@ -364,9 +458,16 @@ def handle_phase_timed_out(room_id: str, current_phase: str):
             async_to_sync(GameConsumer.broadcast_game_update)(room_id, 'vote_phase_end', game_data)
             async_to_sync(GameConsumer.broadcast_day_death_info)(room_id, game_data["voted_victims_info"])
         elif current_phase == 'End':
-            print(f"{room_id}游戏结束。")
-            return {"room_id": room_id, "status": "success", "message": "游戏结束。"}
-
+            # 结算游戏胜利
+            victory_result = check_victory(room_id)
+            end = victory_result["end"]
+            victory = victory_result["victory"]
+            victory_side = victory_result["victory_side"]
+            reveal_role = victory_result["reveal_role"]
+            async_to_sync(GameConsumer.broadcast_game_end)(room_id, end, victory, victory_side, reveal_role)
+            if end:
+                print(f"{room_id}游戏结束。")
+                # TODO: 清理房间数据，留一个阶段以供复盘？
 
         # 3. 开始下一个阶段
         next_phase_task = start_phase.delay(room_id, next_phase)
@@ -397,6 +498,12 @@ def start_phase(room_id: str, phase: str):
         # 1. 通知阶段开始
         # TODO: 接入 AI
         if phase == 'Werewolf':
+            # 清理昨晚的数据
+            game_data["victims_info"] = []
+            game_data["poisoned_victims_info"] = []
+            game_data["voted_victims_info"] = []
+            game_data["votes"] = {}
+
             # 初始化狼人选择
             game_data["werewolves_targets"] = {
                 data["index"]: None
@@ -424,6 +531,8 @@ def start_phase(room_id: str, phase: str):
             async_to_sync(GameConsumer.broadcast_game_update)(room_id, 'day_phase', game_data)
             # 结算昨晚的结果
             victims = game_data["victims_info"] + game_data["poisoned_victims_info"]
+            # 按序号排序
+            victims.sort(key=int)
             async_to_sync(GameConsumer.broadcast_night_death_info)(room_id, victims)
         elif phase.startswith("Speak_"):
             index = phase.split("_")[1]
