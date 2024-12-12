@@ -403,7 +403,7 @@
 </template>
   
 <script>
-import ConfirmDialog from './ConfirmDialog.vue'
+import ConfirmDialog from './shared_components/ConfirmDialog.vue'
 import { onMounted, ref , onUnmounted} from 'vue';
 import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';
@@ -533,7 +533,7 @@ export default {
     // 初始化房间信息
     const initializeRoom = async () => {
       if (!roomData.value) {
-        router.push('/search');
+        router.push('/GameLobby');
         return;
       }
 
@@ -833,7 +833,7 @@ export default {
       // 处理房间被移除
       const roomRemovedCleanup = onType('room_removed', (data) => {
         if (data.room.id === currentRoom.value.id) {
-          router.push('/search');
+          router.push('/GameLobby');
         }
       });
       
@@ -887,7 +887,7 @@ export default {
           action: 'leave_room',
           room_id: currentRoom.value.id
         });
-        router.push('/search');
+        router.push('/GameLobby');
       }
     };
 
@@ -913,7 +913,7 @@ export default {
             room_id: currentRoom.value.id
           });
         }
-        router.push('/search');
+        router.push('/GameLobby');
       }
 
       if (currentDialogAction.value === 'editRoom') {

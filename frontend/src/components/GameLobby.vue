@@ -650,8 +650,8 @@
   
 <script>
 import { useWebSocket } from '@/composables/useWebSocket';
-import ModernToggle  from './ModernToggle.vue'
-import ConfirmDialog from './ConfirmDialog.vue';
+import ModernToggle  from './shared_components/ModernToggle.vue'
+import ConfirmDialog from './shared_components/ConfirmDialog.vue';
 import { onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useStore } from 'vuex';
@@ -1051,7 +1051,7 @@ export default {
 
           // 跳转到房间页面
           router.push({
-            name: 'room',
+            name: 'GameRoom',
             params: { id: roomId }
           });
 
@@ -1167,7 +1167,7 @@ export default {
           
           // 使用 router 进行导航
           router.push({
-            name: 'room',
+            name: 'GameRoom',
             params: { id: room_created.value.id }
           });
         });
