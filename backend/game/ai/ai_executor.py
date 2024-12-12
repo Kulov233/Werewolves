@@ -52,10 +52,11 @@ class AIExecutor:
 
         messages = []
         # 组装历史记录
-        for receiver, message in game_data['action_history'].items():
-            if (receiver == game_data['ai_players'][ai_id]['index'] or receiver == "all")\
-                    or (game_data['ai_players'][ai_id]['role'] == receiver):
-                messages.append(message)
+        for message in game_data['action_history']:
+            for receiver, content in message.items():
+                if (receiver == game_data['ai_players'][ai_id]['index'] or receiver == "all")\
+                        or (game_data['ai_players'][ai_id]['role'] == receiver):
+                    messages.append(content)
 
         # 设置AI的基本信息
         ai_player.set_messages(messages)

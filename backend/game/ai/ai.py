@@ -1,9 +1,9 @@
 
 from zhipuai import ZhipuAI
 import time, json, random
-from keys import ZHIPUAI_API_KEY
+from .keys import ZHIPUAI_API_KEY
 from typing import Literal, List, Dict, Optional, Tuple, Any
-from prompts import PromptGenerator
+from .prompts import PromptGenerator
 # from zhipuai.types.chat.chat_completion import Completion
 # from player import Player
 
@@ -66,7 +66,7 @@ class AIPlayer():
         # self.messages.append(Message(content=ans, type='reply', recipients=[]))
         return ans
 
-    def recv(self, message: Dict[str, Optional[str, Dict]], alive_players: List[str]):
+    def recv(self, message, alive_players: List[str]):
         #if message.type == "info":
         #    self.messages.append(message)
         if message["type"] == "speak":

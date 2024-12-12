@@ -1,4 +1,5 @@
 # game/tasks.py
+import asyncio
 import json
 import random
 import time
@@ -14,15 +15,11 @@ from asgiref.sync import async_to_sync
 from .ai.ai_executor import AIExecutor
 from .consumers import GameConsumer
 
-
-def with_game_data_lock(timeout=5):
+def with_game_data_lock_async(timeout=5):
     def decorator(func):
         @wraps(func)
         async def wrapper(room_id, *args, **kwargs):
             cache = caches["game_cache"]
-
-            # if not room_id:
-            #     return await func(*args, **kwargs)
 
             lock_id = f"lock:game:room:{room_id}"
             retry_count = 3
@@ -36,6 +33,32 @@ def with_game_data_lock(timeout=5):
                     finally:
                         cache.delete(lock_id)
 
+                await asyncio.sleep(delay)
+
+            print(f"有关房间{room_id}的操作超时。")
+
+        return wrapper
+
+    return decorator
+
+def with_game_data_lock(timeout=5):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(room_id, *args, **kwargs):
+            cache = caches["game_cache"]
+
+            lock_id = f"lock:game:room:{room_id}"
+            retry_count = 3
+            retry_delay = 0.5  # 500ms
+
+            for attempt in range(retry_count):
+                delay = retry_delay * (2 ** attempt)
+                if cache.add(lock_id, 1, timeout):
+                    try:
+                        return func(room_id, *args, **kwargs)
+                    finally:
+                        cache.delete(lock_id)
+
                 time.sleep(delay)
 
             print(f"有关房间{room_id}的操作超时。")
@@ -45,7 +68,6 @@ def with_game_data_lock(timeout=5):
     return decorator
 
 
-@with_game_data_lock(timeout=5)
 def check_is_game_ready(room_id):
     """
     检查游戏房间是否所有玩家已连接
@@ -76,7 +98,6 @@ def check_is_game_ready(room_id):
         }
 
 
-@with_game_data_lock(timeout=5)
 def handle_game_readiness(room_id, result):
     """
     发送房间准备状态消息
@@ -103,12 +124,11 @@ def handle_game_readiness(room_id, result):
 
     else:
         # TODO: 返回未连接玩家列表
-        async_to_sync(GameConsumer.handle_not_connected)(room_id, result['status'], result['message'],
-                                                         result['offline_players'])
+        pass
+        #async_to_sync(GameConsumer.handle_not_connected)(room_id, result['status'], result['message'],
+                                                         # result['offline_players'])
         # TODO: 前端应该在此时返回大厅。处理channel和cache中的残留？
 
-
-@with_game_data_lock(timeout=5)
 def initialize(room_id):
     try:
         game_cache = caches['game_cache']
@@ -154,7 +174,6 @@ def initialize(room_id):
         return {"room_id": room_id, "status": "error", "message": "初始化游戏失败。", "error": str(e)}
 
 
-@with_game_data_lock(timeout=5)
 def assign_roles_to_players(room_id):
     try:
         game_cache = caches['game_cache']
@@ -245,7 +264,7 @@ def assign_roles_to_players(room_id):
         message += "、".join(werewolves)
 
         game_data["action_history"].append({
-            "Werewolf", message
+            "Werewolf": message
         })
 
         game_cache.set(f"room:{room_id}", game_data)
@@ -255,8 +274,8 @@ def assign_roles_to_players(room_id):
     except Exception as e:
         return {"room_id": room_id, "status": "error", "message": f"房间{room_id}分配角色失败。", "error": str(e)}
 
-
 @shared_task
+@with_game_data_lock(timeout=5)
 def combined_game_check(room_id):
     """
     组合检查和发送消息的任务
@@ -268,7 +287,6 @@ def combined_game_check(room_id):
     return result
 
 
-@with_game_data_lock(timeout=5)
 def get_kill_result(room_id):
     """
     获取狼人杀人结果
@@ -296,14 +314,14 @@ def get_kill_result(room_id):
         pass
     else:
         # 暂存被杀玩家，白天时统一处理
-        kill_result = players_with_max_votes[0]
-        game_data["victims_info"].append(kill_result)
-        game_cache.set(f"room:{room_id}", game_data)
+        if players_with_max_votes:
+            kill_result = players_with_max_votes[0]
+            game_data["victims_info"].append(kill_result)
+            game_cache.set(f"room:{room_id}", game_data)
 
     async_to_sync(GameConsumer.send_kill_result)(room_id, kill_result)
 
 
-@with_game_data_lock(timeout=5)
 def get_vote_result(room_id):
     """
     获取投票
@@ -344,7 +362,6 @@ def get_vote_result(room_id):
             game_data["voted_victims_info"].append(vote_result)
 
 
-@with_game_data_lock(timeout=5)
 def check_victory(room_id):
     """
     检查游戏胜利条件
@@ -425,7 +442,6 @@ def check_victory(room_id):
         for _, data in players.items():
             result["reveal_role"][data["index"]] = data["role"]
         return result
-
 
 @with_game_data_lock(timeout=5)
 async def end_current_phase(room_id):
@@ -545,7 +561,6 @@ def handle_phase_timed_out(room_id: str, current_phase: str):
         print(f"Error in phase_timer: {e}")
         # 可能需要进行错误恢复
 
-@with_game_data_lock
 def set_game_data(room_id, game_data):
     game_cache = caches['game_cache']
     game_cache.set(f"room:{room_id}", game_data)
@@ -584,6 +599,7 @@ def handle_ai_action(room_id: str, ai_id: str, phase: str, action: dict):
                 game_data["ai_players"][ai_id]["index"]: f"我选择杀死 {result} 号玩家。"
             })
             async_to_sync(GameConsumer.sync_werewolf_target)(room_id, game_data['werewolves_targets'])
+            print(f"AI {ai_id}选择杀死 {result} 号玩家。")
         elif action["type"] == "check":
             if result not in alive_player_indices:
                 print(f"AI在验人时选择的目标不合法：{result}")
@@ -599,6 +615,7 @@ def handle_ai_action(room_id: str, ai_id: str, phase: str, action: dict):
             game_data['action_history'].append({
                 game_data["ai_players"][ai_id]["index"]: f"我选择查验 {result} 号玩家，他的角色是 {role}。"
             })
+            print(f"AI {ai_id}选择查验 {result} 号玩家，他的角色是 {role}。")
         elif action["type"] == "witch":
             cure = result[0]
             poison = result[1]
@@ -637,6 +654,7 @@ def handle_ai_action(room_id: str, ai_id: str, phase: str, action: dict):
             game_data['action_history'].append({
                 game_data["ai_players"][ai_id]["index"]: message
             })
+            print(f"AI {ai_id}选择救人 {cure} 号玩家，毒人 {poison} 号玩家。")
         elif action["type"] == "speak":
             async_to_sync(GameConsumer.broadcast_talk_message)(room_id, game_data["ai_players"][ai_id]["index"], result)
             async_to_sync(end_current_phase)(room_id)
@@ -671,119 +689,161 @@ def start_phase(room_id: str, phase: str):
     :param phase: 将要开始的阶段
     :return:
     """
-    try:
-        game_cache = caches['game_cache']
-        game_data = game_cache.get(f"room:{room_id}")
-        phase_timer = game_data["phase_timer"]
+    # try:
+    game_cache = caches['game_cache']
+    game_data = game_cache.get(f"room:{room_id}")
+    phase_timer = game_data["phase_timer"]
 
-        # 1. 通知阶段开始
-        # TODO: 接入 AI
-        if phase == 'Werewolf':
-            # 清理昨晚的数据
-            game_data["victims_info"] = []
-            game_data["poisoned_victims_info"] = []
-            game_data["voted_victims_info"] = []
-            game_data["votes"] = {}
+    game_data["current_phase"] = phase
 
-            # 初始化狼人选择
-            game_data["werewolves_targets"] = {
-                data["index"]: None
-                for user_id, data in game_data["players"].items() if data["role"] == "Werewolf"
-            }
+    # 1. 通知阶段开始
+    # TODO: 接入 AI
+    action = {}
+    delay = 10
 
-            # 通知狼人杀人
-            async_to_sync(GameConsumer.broadcast_game_update)(room_id, 'night_phase', game_data)
-            async_to_sync(GameConsumer.broadcast_game_update)(room_id, 'kill_phase', game_data)
+    if phase == 'Werewolf':
+        # 清理昨晚的数据
+        game_data["victims_info"] = []
+        game_data["poisoned_victims_info"] = []
+        game_data["voted_victims_info"] = []
+        game_data["votes"] = {}
 
-            # 记录在对战历史中
-            game_data["action_history"].append({
-                "info": "天黑请闭眼。"
-            })
-            game_data["action_history"].append({
-                "info": "狼人请睁眼。"
-            })
+        # 初始化狼人选择
+        game_data["werewolves_targets"] = {
+            data["index"]: None
+            for user_id, data in game_data["players"].items() if data["role"] == "Werewolf"
+        }
 
-            # 给出 AI 选择
-            for uuid, data in game_data["ai_players"].items():
-                if data["role"] == "Werewolf":
-                    ai_id = uuid
-                    break
-        elif phase == 'Prophet':
-            # 通知预言家验人
-            async_to_sync(GameConsumer.broadcast_game_update)(room_id, 'check_phase', game_data)
+        # 通知狼人杀人
+        async_to_sync(GameConsumer.broadcast_game_update)(room_id, 'night_phase', game_data)
+        async_to_sync(GameConsumer.broadcast_game_update)(room_id, 'kill_phase', game_data)
 
-            # 记录在对战历史中
-            game_data["action_history"].append({
-                "all": "预言家请睁眼。"
-            })
-        elif phase == 'Witch':
-            # 通知女巫救人
-            async_to_sync(GameConsumer.broadcast_game_update)(room_id, 'witch_phase', game_data)
-            # 发送女巫的解药和毒药数量
-            for user_id, data in game_data["players"].items():
-                if data["role"] == "Witch":
-                    cure_count = data["role_skills"]["cure_count"]
-                    poison_count = data["role_skills"]["poison_count"]
-                    cure_target = game_data["victims_info"]
-                    async_to_sync(GameConsumer.send_witch_info)(room_id, user_id, cure_count, poison_count, cure_target)
+        # 记录在对战历史中
+        game_data["action_history"].append({
+            "all": "天黑请闭眼。"
+        })
+        game_data["action_history"].append({
+            "all": "狼人请睁眼。"
+        })
 
-            game_data["action_history"].append({
-                "all": "女巫请睁眼。"
-            })
+        # 给出 AI 选择
+        action["type"] = "kill"
 
-            # victim_indices = game_data["victims_info"]
-            # alive_indices = []
-            # players = {**game_data["players"], **game_data["ai_players"]}
-            #
-            # for _, data in players.items():
-            #     if data['alive']:
-            #         alive_indices.append(data['index'])
-            #
-            # special_info = {"cure": game_data["ai_players"][ai_id]["role_skills"]["cure_count"],
-            #                 "poison": game_data["ai_players"][ai_id]["role_skills"]["poison_count"],
-            #                 "victims": victim_indices, "targets": alive_indices}
-        elif phase == 'Day':
-            # 通知天亮
-            async_to_sync(GameConsumer.broadcast_game_update)(room_id, 'day_phase', game_data)
-            # 结算昨晚的结果
-            victims = game_data["victims_info"] + game_data["poisoned_victims_info"]
-            # 按序号排序
-            victims.sort(key=int)
-            async_to_sync(GameConsumer.broadcast_night_death_info)(room_id, victims)
-            # 记录在对战历史中
-            # TODO: 确定对战历史的数据结构
-            victims_str = "、".join(victims)
-            game_data["action_history"].append({
-                "all": f"天亮了，昨晚序号为{victims_str}的玩家死亡。"
-            })
-        elif phase.startswith("Speak_"):
-            index = phase.split("_")[1]
-            # 此处是游戏内编号！
-            async_to_sync(GameConsumer.broadcast_talk_start)(room_id, index)
-        elif phase == "Vote":
-            # 通知投票
-            async_to_sync(GameConsumer.broadcast_game_update)(room_id, 'vote_phase', game_data)
+        for ai_id, data in game_data["ai_players"].items():
+            if data["role"] == "Werewolf":
+                handle_ai_action.apply_async(
+                    args=[room_id, ai_id, phase, action],
+                    countdown=delay
+                )
+                delay = min(delay + 5, 40)
+    elif phase == 'Prophet':
+        # 通知预言家验人
+        async_to_sync(GameConsumer.broadcast_game_update)(room_id, 'check_phase', game_data)
 
-        # 2. 设置阶段结束定时器
-        if phase.startswith("Speak_"):
-            phase_duration = phase_timer["Speak"]
-        else:
-            phase_duration = phase_timer[phase]
-        timer_task = handle_phase_timed_out.apply_async(
-            args=[room_id, phase],
-            countdown=phase_duration
-        )
-        print(f"{room_id}中{phase}阶段开始，将在{phase_duration}秒后结束。")
-        game_data["current_phase"] = phase
-        game_cache.set(f"room:{room_id}", game_data)
+        # 记录在对战历史中
+        game_data["action_history"].append({
+            "all": "预言家请睁眼。"
+        })
+        action["type"] = "check"
+        for ai_id, data in game_data["ai_players"].items():
+            if data["role"] == "Prophet":
+                handle_ai_action.apply_async(
+                    args=[room_id, ai_id, phase, action],
+                    countdown=delay
+                )
+                delay = min(delay + 5, 40)
+    elif phase == 'Witch':
+        # 通知女巫救人
+        async_to_sync(GameConsumer.broadcast_game_update)(room_id, 'witch_phase', game_data)
+        # 发送女巫的解药和毒药数量
+        for user_id, data in game_data["players"].items():
+            if data["role"] == "Witch":
+                cure_count = data["role_skills"]["cure_count"]
+                poison_count = data["role_skills"]["poison_count"]
+                cure_target = game_data["victims_info"]
+                async_to_sync(GameConsumer.send_witch_info)(room_id, user_id, cure_count, poison_count, cure_target)
 
-        # 3. 存储当前task_id
-        game_cache.set(f"room_{room_id}_current_task", timer_task.id, timeout=3600)
+        game_data["action_history"].append({
+            "all": "女巫请睁眼。"
+        })
 
-        return timer_task.id
+        victim_indices = game_data["victims_info"]
+        alive_indices = []
+        players = {**game_data["players"], **game_data["ai_players"]}
 
-    except Exception as e:
-        print(f"Error in start_phase: {e}")
+        for _, data in players.items():
+            if data['alive']:
+                alive_indices.append(data['index'])
+
+        action["type"] = "witch"
+        for ai_id, data in game_data["ai_players"].items():
+            if data["role"] == "Witch":
+                special_info = {"cure": game_data["ai_players"][ai_id]["role_skills"]["cure_count"],
+                                "poison": game_data["ai_players"][ai_id]["role_skills"]["poison_count"],
+                                "victims": victim_indices, "targets": alive_indices}
+                action["special_info"] = special_info
+                handle_ai_action.apply_async(
+                    args=[room_id, ai_id, phase, action],
+                    countdown=delay
+                )
+                delay = min(delay + 5, 40)
+    elif phase == 'Day':
+        # 通知天亮
+        async_to_sync(GameConsumer.broadcast_game_update)(room_id, 'day_phase', game_data)
+        # 结算昨晚的结果
+        victims = game_data["victims_info"] + game_data["poisoned_victims_info"]
+        # 按序号排序
+        victims.sort(key=int)
+        async_to_sync(GameConsumer.broadcast_night_death_info)(room_id, victims)
+        # 记录在对战历史中
+        # TODO: 确定对战历史的数据结构
+        victims_str = "、".join(victims)
+        game_data["action_history"].append({
+            "all": f"天亮了，昨晚序号为{victims_str}的玩家死亡。"
+        })
+    elif phase.startswith("Speak_"):
+        index = phase.split("_")[1]
+        # 此处是游戏内编号！
+        async_to_sync(GameConsumer.broadcast_talk_start)(room_id, index)
+        if int(index) - len(game_data["players"]) > 0:
+            action["type"] = "speak"
+            for ai_id, data in game_data["ai_players"].items():
+                if data["index"] == index:
+                    handle_ai_action.apply_async(
+                        args=[room_id, ai_id, phase, action],
+                        countdown=delay
+                    )
+    elif phase == "Vote":
+        # 通知投票
+        async_to_sync(GameConsumer.broadcast_game_update)(room_id, 'vote_phase', game_data)
+        action["type"] = "vote"
+
+        for ai_id, data in game_data["ai_players"].items():
+            handle_ai_action.apply_async(
+                args=[room_id, ai_id, phase, action],
+                countdown=delay
+            )
+            delay = min(delay + 3, 40)
+
+    # 2. 设置阶段结束定时器
+    if phase.startswith("Speak_"):
+        phase_duration = phase_timer["Speak"]
+    else:
+        phase_duration = phase_timer[phase]
+    timer_task = handle_phase_timed_out.apply_async(
+        args=[room_id, phase],
+        countdown=phase_duration
+    )
+    print(f"{room_id}中{phase}阶段开始，将在{phase_duration}秒后结束。")
+    game_cache.set(f"room:{room_id}", game_data)
+
+    # 3. 存储当前task_id
+    game_cache.set(f"room_{room_id}_current_task", timer_task.id, timeout=3600)
+
+    return timer_task.id
+
+    # except Exception as e:
+    #     print(f"Error in start_phase: {e}")
 
 
 async def trigger_game_start_check(room_id) -> AsyncResult:

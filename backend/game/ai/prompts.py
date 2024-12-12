@@ -1,5 +1,4 @@
-from socket import socket
-from typing import List, Literal, Dict
+from typing import List, Literal
 
 character_prompts = {
             "狼人":  "你的角色是狼人，属于狼人阵营。你的特殊能力是每晚可以和其他狼人一起杀死一位其他玩家。"
@@ -15,7 +14,7 @@ character_prompts = {
                     "你的任务是尽可能通过发言和推理引导其他玩家找出狼人，必要时可以引诱狼人在白天发言中归票自己，来帮助其他好人确定狼人身份。",
         }
 
-basic_logis_prompts = """
+basic_logic_prompts = """
     如果昨晚是平安夜，那么证明是女巫用解药救了被杀的人（如果本局中有女巫），或者守卫保护了今晚被杀的人（如果本局中有女巫）。
 """
 
@@ -75,7 +74,7 @@ class PromptGenerator:
         :return: 处理好的过去消息列表
         """
 
-        past_prompt = "以下是之前的游戏动态。"
+        past_prompt = "以下是之前的游戏动态，按发生时间排序。"
         processed_messages = '\n'.join([message for message in previous_messages])
         result = [
             {"role": "system", "content": past_prompt},

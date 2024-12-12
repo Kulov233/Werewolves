@@ -9,6 +9,8 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.layers import get_channel_layer
 from django.core.cache import caches
 
+import copy
+
 from functools import wraps
 
 def with_game_data_lock(timeout=5):
@@ -156,19 +158,19 @@ class GameConsumer(AsyncWebsocketConsumer):
         接收客户端发送的消息。应该根据游戏目前所处阶段处理信息。
         """
         data = json.loads(text_data)
-        type = data.get("type")
+        action = data.get("type")
 
-        if type == "kill_vote":
+        if action == "kill_vote":
             await self.handle_kill_vote(data)
-        elif type == "check":
+        elif action == "check":
             await self.handle_check(data)
-        elif type == "witch_action":
+        elif action == "witch_action":
             await self.handle_witch_action(data)
-        elif type == "talk_content":
+        elif action == "talk_content":
             await self.handle_talk_content(data)
-        elif type == "talk_end":
+        elif action == "talk_end":
             await self.handle_talk_end(data)
-        elif type == "vote":
+        elif action == "vote":
             await self.handle_vote(data)
 
     @ensure_player_is_alive()
@@ -483,20 +485,6 @@ class GameConsumer(AsyncWebsocketConsumer):
         event_type = event.get("event")
         game_data = event.get("game")
 
-        # TODO: 去掉敏感信息
-        keys_to_remove = ["roles_for_humans_first", "game_specified_prompt", "victims_info", "poisoned_victims_info"]
-        for key in keys_to_remove:
-            game_data.pop(key, None)
-
-        keys_to_remove_in_players = ["role", "role_skills"]
-        for player in game_data['players']:
-            for key in keys_to_remove_in_players:
-                game_data['players'][player].pop(key, None)
-
-        for ai_player in game_data['ai_players']:
-            for key in keys_to_remove_in_players:
-                game_data['ai_players'][ai_player].pop(key, None)
-
         # 将广播的消息发送到客户端
         await self.send(text_data=json.dumps({
             "type": event_type,
@@ -505,19 +493,40 @@ class GameConsumer(AsyncWebsocketConsumer):
 
     @classmethod
     async def broadcast_game_update(cls, room_id, event_type, game_data):
-        try:
-            channel_layer = get_channel_layer()
+        # try:
+        channel_layer = get_channel_layer()
 
-            await channel_layer.group_send(
-                f"room_{room_id}",
-                {
-                    "type": "game_message",
-                    "event": event_type,
-                    "game": game_data
-                }
-            )
-        except Exception as e:
-            print(f"广播消息时出错：{e}")
+        public_game_data = copy.deepcopy(game_data)
+
+        # TODO: 去掉敏感信息
+        keys_to_remove = ["roles_for_humans_first", "game_specified_prompt", "victims_info",
+                          "poisoned_victims_info"]
+
+        for key in keys_to_remove:
+            public_game_data.pop(key, None)
+
+        keys_to_remove_in_players = ["role", "role_skills"]
+
+        for player in public_game_data['players']:
+            for key in keys_to_remove_in_players:
+                public_game_data['players'][player].pop(key, None)
+
+        for ai_player in public_game_data['ai_players']:
+            for key in keys_to_remove_in_players:
+                public_game_data['ai_players'][ai_player].pop(key, None)
+
+        # print(public_game_data)
+
+        await channel_layer.group_send(
+            f"room_{room_id}",
+            {
+                "type": "game_message",
+                "event": event_type,
+                "game": public_game_data
+            }
+        )
+        # except Exception as e:
+        #     print(f"广播消息时出错：{e}")
 
     async def role_info(self, event):
         role_info = event.get("role_info")

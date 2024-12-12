@@ -615,10 +615,10 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                         "werewolves_targets": {}, # 敏感
                         "votes": {},  # 敏感
                         "current_phase": "Waiting",
-                        "action_history": "", # 敏感
+                        "action_history": [], # 敏感
                         "phase_timer": {
                             "Initialize": 1,
-                            "Werewolf": 120,
+                            "Werewolf": 60,
                             "Prophet": 20,
                             "Witch": 30,
                             "Day": 3,
@@ -648,11 +648,11 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                      如果编号 n - len(room_data["players"]) > 0，则 Speak_n 为 AI 玩家发言
                     """
 
-                    all_phases = list(room_data_in_game["phase_transitions"].keys()) + list(
-                        room_data_in_game["phase_transitions"].values())
-                    unique_phases = set(all_phases)
-                    unique_phases_list = list(unique_phases)
-                    room_data_in_game["phases"] = unique_phases_list
+                    # all_phases = list(room_data_in_game["phase_transitions"].keys()) + list(
+                    #     room_data_in_game["phase_transitions"].values())
+                    # unique_phases = set(all_phases)
+                    # unique_phases_list = list(unique_phases)
+                    # room_data_in_game["phases"] = unique_phases_list
 
                     await self.set_room_data_in_game_cache(room_id, room_data_in_game)
                     # TODO: 在大厅中删除房间？
