@@ -1,0 +1,24 @@
+:root {
+    --label-color: #333; /* 默认标签文字颜色为黑色 */
+    --placeholder-color: #aaa; /* 默认 placeholder 文字颜色为浅色 */
+    --background-color: #f4f7fa; /* 白色背景 */
+    --card-bg: #fff; /* 默认卡片背景 */
+    --card-text: #333; /* 默认卡片文本颜色 */
+    --input-bg: #fff; /* 默认输入框背景 */
+    --input-color: #333; /* 默认输入框文字颜色 */
+    --button-bg: #fff; /* 默认按钮背景 */
+    --button-color: #333; /* 默认按钮文字颜色 */
+    --img-filter: invert(0); /* 初始状态图标为黑色 */
+    --svg-color: #333; /* 默认SVG图标颜色为黑色 */
+    --name-color: #333;
+
+    --primary-color: #3498db;
+    --secondary-color: #2ecc71;
+    --text-color: #333333;
+    --sidebar-bg: #ffffff;
+    --border-color: #e0e0e0;
+    --button-hover: #2980b9;
+    --button-active: #1c5980;
+    --transition-speed: 0.3s;
+  }
+  
