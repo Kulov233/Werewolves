@@ -1,0 +1,60 @@
+name: werewolves
+networks:
+  db_network:
+    driver: bridge
+
+services:
+  mysql:
+    container_name: mysql
+    restart: always
+    image: mysql:9.1
+    volumes:
+      - ./mysql:/var/lib/mysql # TODO: 更改路径
+    env_file:
+      - .env # TODO: 修改env文件
+    command: ['mysqld', '--character-set-server=utf8mb4', '--collation-server=utf8mb4_unicode_ci']
+    expose:
+      - 3306
+    networks:
+      - db_network
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7.4.1
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - db_network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+  app:
+    container_name: backend
+    restart: always
+    build: .
+    # TODO: 更改命令
+    command: >
+      bash -c
+      "python manage.py makemigrations accounts lobby &&
+      python manage.py migrate &&
+      celery -A app worker --loglevel=info &&
+      DJANGO_SETTINGS_MODULE=app.settings app.asgi:application --host 0.0.0.0 --port 8000 --reload"
+    expose:
+      - 8000
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - web_network
+      - db_network
