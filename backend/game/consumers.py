@@ -202,13 +202,11 @@ class GameConsumer(AsyncWebsocketConsumer):
 
         # 校验投票目标是否合法
         valid_targets = []
-        for user_id in game_data['players']:
-            if game_data['players'][user_id]['alive']:
-                valid_targets.append(game_data['players'][user_id]['index'])
+        players = {**game_data["players"], **game_data["ai_players"]}
 
-        for uuid in game_data['ai_players']:
-            if game_data['ai_players'][uuid]['alive']:
-                valid_targets.append(game_data['ai_players'][uuid]['index'])
+        for _, data in players.items():
+            if data['alive']:
+                valid_targets.append(data['index'])
 
         if target not in valid_targets:
             await self.send(text_data=json.dumps({
@@ -216,6 +214,11 @@ class GameConsumer(AsyncWebsocketConsumer):
                 "message": "投票目标不合法。目标不存在，或者已经死亡。"
             }))
             return
+
+        # 记录操作
+        game_data['action_history'].append({
+            "Werewolf": f"狼人 {game_data['players'][user_id]['index']} 号玩家投票杀死 {target} 号玩家。"
+        })
 
         # 同步狼人投票结果
         game_data['werewolves_targets'][game_data['players'][user_id]['index']] = target
@@ -252,26 +255,29 @@ class GameConsumer(AsyncWebsocketConsumer):
 
         target = data.get("target")
 
-        # 校验投票目标是否合法
+        # 校验目标是否合法
         valid_targets = []
-        for user_id in game_data['players']:
-            if game_data['players'][user_id]['alive']:
-                valid_targets.append(game_data['players'][user_id]['index'])
+        players = {**game_data["players"], **game_data["ai_players"]}
 
-        for uuid in game_data['ai_players']:
-            if game_data['ai_players'][uuid]['alive']:
-                valid_targets.append(game_data['ai_players'][uuid]['index'])
+        for _, data in players.items():
+            if data['alive']:
+                valid_targets.append(data['index'])
 
         if target not in valid_targets:
             await self.send(text_data=json.dumps({
                 "type": "error",
-                "message": "投票目标不合法。目标不存在，或者已经死亡。"
+                "message": "查验目标不合法。目标不存在，或者已经死亡。"
             }))
             return
 
         # 返回查验结果
         role = game_data['players'][target]['role']
         await self.send_check_result(room_id, user_id, target, role)
+
+        index = game_data['players'][user_id]['index']
+        game_data['action_history'].append({
+            index: f"预言家 {index} 号玩家查验 {target} 号玩家，他的身份是 {role}。"
+        })
 
         from .tasks import end_current_phase
         # 取消定时器
@@ -325,13 +331,11 @@ class GameConsumer(AsyncWebsocketConsumer):
 
         # 校验毒目标是否合法
         valid_targets = []
-        for user_id in game_data['players']:
-            if game_data['players'][user_id]['alive']:
-                valid_targets.append(game_data['players'][user_id]['index'])
+        players = {**game_data["players"], **game_data["ai_players"]}
 
-        for uuid in game_data['ai_players']:
-            if game_data['ai_players'][uuid]['alive']:
-                valid_targets.append(game_data['ai_players'][uuid]['index'])
+        for _, data in players.items():
+            if data['alive']:
+                valid_targets.append(data['index'])
 
         if poison:
             if target not in valid_targets:
@@ -350,6 +354,16 @@ class GameConsumer(AsyncWebsocketConsumer):
 
         # 返回操作结果
         await self.send_witch_action_result(room_id, user_id, cure, poison)
+
+        index = game_data['players'][user_id]['index']
+        if cure:
+            game_data['action_history'].append({
+                index: f"女巫 {index} 号玩家使用解药救治了 {cure} 号玩家。"
+            })
+        if poison:
+            game_data['action_history'].append({
+                index: f"女巫 {index} 号玩家使用毒药毒杀了 {poison} 号玩家。"
+            })
 
         from .tasks import end_current_phase
         # 取消定时器
@@ -384,7 +398,7 @@ class GameConsumer(AsyncWebsocketConsumer):
 
         # 记录发言
         game_data['action_history'].append({
-            "speak": f"{index} 号玩家说：“{content}”。"
+            "all": f"{index} 号玩家说：“{content}”。"
         })
 
     @ensure_player_is_alive()
@@ -446,13 +460,11 @@ class GameConsumer(AsyncWebsocketConsumer):
 
         # 校验投票目标是否合法
         valid_targets = []
-        for user_id in game_data['players']:
-            if game_data['players'][user_id]['alive']:
-                valid_targets.append(game_data['players'][user_id]['index'])
+        players = {**game_data["players"], **game_data["ai_players"]}
 
-        for uuid in game_data['ai_players']:
-            if game_data['ai_players'][uuid]['alive']:
-                valid_targets.append(game_data['ai_players'][uuid]['index'])
+        for _, data in players.items():
+            if data['alive']:
+                valid_targets.append(data['index'])
 
         if target not in valid_targets:
             await self.send(text_data=json.dumps({
