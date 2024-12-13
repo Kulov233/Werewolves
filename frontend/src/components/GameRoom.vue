@@ -488,7 +488,7 @@ export default {
     const roomData = ref(store.state.currentRoom);
     const userProfile = ref(store.state.userProfile);
     const token = localStorage.getItem('access_token');
-    const { connect, sendMessage, onType, isConnected } = useWebSocket(token);
+    const { connect, sendMessage, onType, isConnected, disconnect } = useWebSocket(token);
     
 
     // 弹窗相关的状态
@@ -986,16 +986,17 @@ export default {
       // TODO：可以加个弹窗，然后弹窗点确定后跳转到游戏界面
 
       onType('game_prepared',   (data) => {
-        
+
+        disconnect()
         // TODO: 存储房间信息
-
-
         // 跳转到游戏界面
         router.push({
           name: 'GameInterface',
           params: { id: data.room.id }
         });
       });
+
+
     };
 
 

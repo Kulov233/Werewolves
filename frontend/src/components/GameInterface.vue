@@ -53,14 +53,15 @@
 
       <!-- 左侧玩家列表 -->
       <div class="player-list">
-        <div v-for="(player, index) in gamdData.players" :key="index" :class="['player', { dead: !(player.alive) }]">
+        <div v-for="(player, index) in [...players, ...aiPlayers]" :key="index"
+             :class="['player', { dead: {...gameData.players, ...gameData.ai_players}[player.userId] }]">
           <img 
-            :src="player.avatar" 
+            :src="player.avatar"
             alt="avatar" 
             class="avatar0"
             @click.stop="showPlayerDetails(player, $event)" 
             /><!-- 点击头像触发查看详情 -->
-          <p>{{ player.id }}号{{" "}}{{ player.name }}<span v-if="player.id === currentPlayerId"> (你)</span></p> <!-- 如果是当前玩家，显示 "(你)" -->
+          <p>{{ index }}号{{" "}}{{ player.name }}<span v-if="player.index === currentPlayerId"> (你)</span></p> <!-- 如果是当前玩家，显示 "(你)" -->
         </div>
       </div>
   
@@ -183,15 +184,16 @@
     </div>
   </template>
   
-<script lang="ts">
-import ConfirmDialog from './shared_components/ConfirmDialog.vue'
+<script>
 import { onMounted, ref , onUnmounted} from 'vue';
 import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';
 import { useWebSocket } from '@/composables/useWebSocket';
-import { validateGame, GameData } from '@/schemas/schemas';
+// import { validateGame } from '@/schemas/schemas.js';
 import axios from 'axios';
 
+
+const router = useRouter();
 // 创建axios实例
 const api = axios.create({
   baseURL: 'http://localhost:8000'
@@ -413,7 +415,7 @@ export default {
   setup() {
     // 弹窗以及websocket建立
     const store = useStore();
-    const router = useRouter();
+    // const router = useRouter();
     const roomData = ref(store.state.currentRoom);
     const userProfile = ref(store.state.userProfile);
     const token = localStorage.getItem('access_token');
@@ -429,36 +431,66 @@ export default {
     const dialogShowConfirm = ref(true);
     const currentDialogAction = ref('');
 
-    const gameData = ref<GameData>({
-      id: "",
-      title: "",
-      description: "",
-      max_players: 12,
-      night_count: 0,
-      roles: {
-        Werewolf: 2,
-        Prophet: 1,
-        Witch: 1,
-        Villager: 8
+    // 成员列表
+    const players = ref({});
+    const aiPlayers = ref({});
+    // const selectedPlayerId = ref(null);
+    const gameData = ref({
+      id: "1c134013-3b54-4ccd-a2b9-e42ef088d9a9",
+      title: "一个房间",
+      description: "房间简介",
+      max_players: 6,
+      night_count: 1,
+      roles: {},
+      witch_config: {},
+      players: {
+          1: {
+              index: "1",
+              name: "apifox",
+              alive: true,
+              online: true
+          }
       },
-      witch_config: {
-        cure_count: 1,
-        poison_count: 1
+      ai_players: {
+          "987ada2b-7263-4475-9864-77bf34ed0a1e": {
+              index: "2",
+              name: "AI",
+              alive: true
+          },
+          "96fc46bf-c540-41a2-ad65-a123f586f4ac": {
+              index: "3",
+              name: "AI",
+              alive: true
+          },
+          "aa561e5c-95f8-4d16-88fa-56f8ac78e1b5": {
+              index: "4",
+              name: "AI",
+              alive: true
+          },
+          "010d703a-edd5-4390-b998-2c464321d3f6": {
+              index: "5",
+              name: "AI",
+              alive: true
+          },
+          "57bf3e0a-ee1b-4772-83b9-155b4081e63e": {
+              index: "6",
+              name: "AI",
+              alive: true
+          }
       },
-      players: {},
-      ai_players: {},
-      current_phase: "Initialize",
+      current_phase: "Waiting",
       phase_timer: {
-        Initialize: 30,
-        Werewolf: 30,
-        Prophet: 30,
-        Witch: 30,
-        Day: 60,
-        Speak: 60,
-        Vote: 30,
-        End: 30
+          Initialize: 1,
+          Werewolf: 40,
+          Prophet: 40,
+          Witch: 40,
+          Day: 3,
+          Speak: 40,
+          Vote: 40,
+          End: 3
       }
-    })
+    });
+
 
     const fetchSelectedProfile = async (userId) => {
       try {
@@ -470,7 +502,7 @@ export default {
           return {
             userId: userData.id,
             name: userData.username,
-            avatar: avatarResponse.status === 200
+            avatar: (avatarResponse.status === 200 && avatarResponse.data.avatar_url)
               ? avatarResponse.data.avatar_url
               : require('@/assets/profile-icon.png'),
             isOnline: true, // 这里可以从websocket获取在线状态
@@ -493,56 +525,74 @@ export default {
       }
     };
 
+    // 辅助函数：计算胜率
+    const calculateWinRate = (games) => {
+      if (!games || games.length === 0) return '0%';
+      const wins = games.filter(game => game.won).length;
+      return `${Math.round((wins / games.length) * 100)}%`;
+    };
 
-    const InitializeGameInterface = async () => {
 
-      // 获取并设置所有玩家信息
-      const playerProfiles = await Promise.all(
-        currentRoom.value.players.map(async (playerId) => {
-          const profile = await fetchSelectedProfile(playerId);
-          return {
-            id: playerId,
-            name: profile.name,
-            avatar: profile.avatar,
-            isAI: false,
-            userId: playerId,
-            isOnline: profile.isOnline,
-            isFriend: profile.isFriend,
-            stats: profile.stats,
-            recentGames: profile.recentGames
-          };
-        })
-      );
 
-      // 添加AI玩家信息
-      const aiPlayerProfiles = Object.entries(currentRoom.value.aiPlayers).map(([id, name]) => ({
-        id,
-        name,
-        avatar: require("@/assets/ai.svg"),
-        isAI: true,
-        userId: id,
-        isOnline: true,
-        stats: []
-      }));
+    // 这里的信息以后就不动了
+    const initializeGameInterface = async () => {
+      try {
+        // Initialize the raw player data
+        players.value = gameData.value.players;
+        aiPlayers.value = gameData.value.ai_players;
 
-      // 合并所有玩家信息
-      members.value = [...playerProfiles, ...aiPlayerProfiles];
+        // Process human players
+        const playerProfiles = await Promise.all(
+          Object.keys(gameData.value.players).map(async (playerId) => {
+            const profile = await fetchSelectedProfile(playerId);
+            return {
+              index: gameData.value.players[playerId].index,
+              name: profile.name,
+              avatar: profile.avatar,
+              isAI: false,
+              userId: playerId,
+              isOnline: profile.isOnline,
+              isFriend: profile.isFriend,
+              stats: profile.stats,
+              recentGames: profile.recentGames
+            };
+          })
+        );
 
+        // Process AI players
+        const aiPlayerProfiles = Object.entries(gameData.value.ai_players).map(([id, info]) => ({
+          index: info.index,
+          name: info.name,
+          avatar: require("@/assets/ai.svg"),
+          isAI: true,
+          userId: id,
+          isOnline: true,
+          stats: [],
+          info: info  // Preserve original AI info if needed
+        }));
+
+        // Update the reactive references
+        players.value = playerProfiles;
+        aiPlayers.value = aiPlayerProfiles;
+
+      } catch (error) {
+        console.error('Error initializing game interface:', error);
+        // Handle error appropriately (e.g., show error message to user)
+      }
     };
 
 
     // 工具函数，用于阶段转换时更新信息; 要求为GameData类型
-    function updateGame(game: GameData){
-      const result = validateGame(game)
-      if (result){
-        for (const player of this.players){
-
-        }
-      }
-      else {
-        console.error('Validation errors: GameData validate failed; ' +
-            'stopped updating game data.', result.errors);
-      }
+    function updateGame(game){
+      // const result = validateGame(game)
+      // if (result){
+      //   gameData.value
+      // }
+      // else {
+      //   console.error('Validation errors: GameData validate failed; ' +
+      //       'stopped updating game data.', result.errors);
+      // }
+      gameData.value = game
 
     }
 
@@ -572,25 +622,25 @@ export default {
       return 0;
     }
 
-    // 狼人投票方法
-    function handleKillVote(seq_num){
-      sendMessage(
-          {
-            type: "kill_vote",
-            target: seq_num,  // TODO: 需要把这里改为真实投票。弹窗？
-          }
-      )
-    }
+    // // 狼人投票方法
+    // function handleKillVote(seq_num){
+    //   sendMessage(
+    //       {
+    //         type: "kill_vote",
+    //         target: seq_num,  // TODO: 需要把这里改为真实投票。弹窗？
+    //       }
+    //   )
+    // }
 
-    // 预言家查人
-    function handleCheck(seq_num){
-      sendMessage(
-          {
-            type: "check",
-            target: seq_num,
-          }
-      )
-    }
+    // // 预言家查人
+    // function handleCheck(seq_num){
+    //   sendMessage(
+    //       {
+    //         type: "check",
+    //         target: seq_num,
+    //       }
+    //   )
+    // }
 
     // 女巫操作
     function handleWitchAction(cure_num, poison_num){
@@ -603,37 +653,43 @@ export default {
       )
     }
 
-    // 聊天说话
-    function handleTalk(content){
-      sendMessage(
-          {
-            type: "talk_content",
-            content: content
-          }
-      )
-    }
+    // // 聊天说话
+    // function handleTalk(content){
+    //   sendMessage(
+    //       {
+    //         type: "talk_content",
+    //         content: content
+    //       }
+    //   )
+    // }
 
-    // 主动结束发言
-    function handleTalkEnd(){
-      sendMessage(
-          {
-            type: "talk_end",
-            player: this.currentPlayerId
-          }
-      )
-    }
-
-    // 白天投票
-    function handleVote(seq_num){
-      sendMessage(
-          {
-            type: "vote",
-            target: seq_num,
-          }
-      )
-    }
+    // // 主动结束发言
+    // function handleTalkEnd(){
+    //   sendMessage(
+    //       {
+    //         type: "talk_end",
+    //         player: this.currentPlayerId
+    //       }
+    //   )
+    // }
+    //
+    // // 白天投票
+    // function handleVote(seq_num){
+    //   sendMessage(
+    //       {
+    //         type: "vote",
+    //         target: seq_num,
+    //       }
+    //   )
+    // }
 
     /* WebSocket实时监听部分*/
+    function handlePlayerJoined(message){
+      // 有人加入，更新内容
+      updateGame(message.game);
+    }
+
+
     function handleRoleInfo(message) {
       // 处理分配角色信息
       this.role = message.role_info['role'];
@@ -766,7 +822,7 @@ export default {
     function handleTalkEndByServer() {
       // 处理服务器发过来的聊天结束
       this.scrollToBottom();
-      this.userMessage = "";  // 是不是有点残忍了
+      // this.userMessage = "";  // 没必要直接清空
       // TODO: 消息按钮重新变成灰的
     }
 
@@ -816,6 +872,7 @@ export default {
 
     const setupWebsocketListeners = () => {
         // 处理各个阶段和事件
+        const playerJoinedCleanup = onType('player_joined', handlePlayerJoined);
         const roleInfoCleanup = onType('role_info', handleRoleInfo);
         const nightPhaseCleanup = onType('night_phase', handleNightPhase);
         const killPhaseCleanup = onType('kill_phase', handleKillPhase);
@@ -840,28 +897,29 @@ export default {
 
         // 返回清理函数
         onUnmounted(() => {
-            roleInfoCleanup();
-            nightPhaseCleanup();
-            killPhaseCleanup();
-            wolfSyncCleanup();
-            killResultCleanup();
-            killPhaseEndCleanup();
-            checkPhaseCleanup();
-            checkResultCleanup();
-            witchPhaseCleanup();
-            witchInfoCleanup();
-            witchActionResultCleanup();
-            dayPhaseCleanup();
-            nightDeathInfoCleanup();
-            talkPhaseCleanup();
-            talkUpdateCleanup();
-            talkStartCleanup();
-            talkEndCleanup();
-            votePhaseCleanup();
-            voteResultCleanup();
-            dayDeathInfoCleanup();
-            gameEndCleanup();
-            console.log('WebSocket listeners cleaned up');
+          playerJoinedCleanup();
+          roleInfoCleanup();
+          nightPhaseCleanup();
+          killPhaseCleanup();
+          wolfSyncCleanup();
+          killResultCleanup();
+          killPhaseEndCleanup();
+          checkPhaseCleanup();
+          checkResultCleanup();
+          witchPhaseCleanup();
+          witchInfoCleanup();
+          witchActionResultCleanup();
+          dayPhaseCleanup();
+          nightDeathInfoCleanup();
+          talkPhaseCleanup();
+          talkUpdateCleanup();
+          talkStartCleanup();
+          talkEndCleanup();
+          votePhaseCleanup();
+          voteResultCleanup();
+          dayDeathInfoCleanup();
+          gameEndCleanup();
+          console.log('WebSocket listeners cleaned up');
         });
     }
 
@@ -872,20 +930,25 @@ export default {
         connect(roomId);
       }
       setupWebsocketListeners();
+      initializeGameInterface();
     });
 
     onUnmounted(() => {
-      sendMessage({
-        type: 'quit',
-        action: 'leave_combat',
-        player_id: this.currentPlayerId,
-      });
+      // sendMessage({
+      //   type: 'quit',
+      //   action: 'leave_combat',
+      //   player_id: this.currentPlayerId,
+      // });
+
     });
 
 
 
     return{
       gameData,
+      userProfile,
+      players,
+      aiPlayers,
       // ...
     }
   },
