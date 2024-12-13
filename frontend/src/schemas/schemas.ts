@@ -1,17 +1,25 @@
-// src/schemas.ts
 import { z } from 'zod';
 
-// Enums
-export const PhaseEnum = z.enum([
+// Regular phases excluding 'Speak'
+const BasePhases = z.enum([
   'Initialize',
   'Werewolf',
   'Prophet',
   'Witch',
   'Day',
-  'Speak',
   'Vote',
   'End'
 ]);
+
+// Pattern for Speak_{num}
+const SpeakPattern = z.string().regex(/^Speak_\d+$/);
+
+// Combined phase type
+export const PhaseEnum = z.union([
+  BasePhases,
+  SpeakPattern
+]);
+
 
 // Base Schemas
 export const RolesSchema = z.object({

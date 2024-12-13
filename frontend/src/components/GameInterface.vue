@@ -53,7 +53,7 @@
 
       <!-- 左侧玩家列表 -->
       <div class="player-list">
-        <div v-for="(player, index) in players" :key="index" :class="['player', { dead: player.isDead }]">
+        <div v-for="(player, index) in gamdData.players" :key="index" :class="['player', { dead: !(player.alive) }]">
           <img 
             :src="player.avatar" 
             alt="avatar" 
@@ -189,7 +189,7 @@ import { onMounted, ref , onUnmounted} from 'vue';
 import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';
 import { useWebSocket } from '@/composables/useWebSocket';
-import { validateGame, type GameData } from '@/schemas/schemas';
+import { validateGame, GameData } from '@/schemas/schemas';
 import axios from 'axios';
 
 
@@ -261,54 +261,54 @@ export default {
         ]
         // ... 可以继续添加其他角色的技能配置
       },
-      players: [
-        {
-          id: 1,
-          name: "Wang",
-          avatar: require('@/assets/head.png'),
-          isDead: false,
-          role: "Werewolf",
-          team: "Werewolf阵营",
-          victoryCondition: "淘汰所有人类"
-        },
-        {
-          id: 2,
-          name: "Huang",
-          avatar: require('@/assets/head.png'),
-          isDead: true,
-          role: "平民",
-          team: "人类阵营",
-          victoryCondition: "找出所有Werewolf"
-        },
-        {
-          id: 3,
-          name: "Zhao",
-          avatar: require('@/assets/head.png'),
-          isDead: false,
-          role: "Werewolf",
-          team: "Werewolf阵营",
-          victoryCondition: "淘汰所有人类"
-        },
-        {
-          id: 4,
-          name: "Li",
-          avatar: require('@/assets/head.png'),
-          isDead: true,
-          role: "平民",
-          team: "人类阵营",
-          victoryCondition: "找出所有Werewolf"
-        },
-        {
-          id: 5,
-          name: "Liu",
-          avatar: require('@/assets/head.png'),
-          isDead: true,
-          role: "平民",
-          team: "人类阵营",
-          victoryCondition: "找出所有Werewolf"
-        }
-
-      ],
+      // players: [
+      //   {
+      //     id: 1,
+      //     name: "Wang",
+      //     avatar: require('@/assets/head.png'),
+      //     isDead: false,
+      //     role: "Werewolf",
+      //     team: "Werewolf阵营",
+      //     victoryCondition: "淘汰所有人类"
+      //   },
+      //   {
+      //     id: 2,
+      //     name: "Huang",
+      //     avatar: require('@/assets/head.png'),
+      //     isDead: true,
+      //     role: "平民",
+      //     team: "人类阵营",
+      //     victoryCondition: "找出所有Werewolf"
+      //   },
+      //   {
+      //     id: 3,
+      //     name: "Zhao",
+      //     avatar: require('@/assets/head.png'),
+      //     isDead: false,
+      //     role: "Werewolf",
+      //     team: "Werewolf阵营",
+      //     victoryCondition: "淘汰所有人类"
+      //   },
+      //   {
+      //     id: 4,
+      //     name: "Li",
+      //     avatar: require('@/assets/head.png'),
+      //     isDead: true,
+      //     role: "平民",
+      //     team: "人类阵营",
+      //     victoryCondition: "找出所有Werewolf"
+      //   },
+      //   {
+      //     id: 5,
+      //     name: "Liu",
+      //     avatar: require('@/assets/head.png'),
+      //     isDead: true,
+      //     role: "平民",
+      //     team: "人类阵营",
+      //     victoryCondition: "找出所有Werewolf"
+      //   }
+      //
+      // ],
       messages: [
         { senderid: 1, sendername: "Wang", recipients: "all", avatar: require('@/assets/head.png'), text: "天亮请睁眼。昨晚，4号玩家被杀了。" },
         { senderid: 2, sendername: "Huang", recipients: "dead", avatar: require('@/assets/head.png'), text: "我只是个平民，什么也不知道，但我们绝对找出Werewolf了。" },
@@ -367,57 +367,114 @@ export default {
     const dialogShowConfirm = ref(true);
     const currentDialogAction = ref('');
 
-    // 游戏数据类型
-    type GameData = {
-    id: string;
-    title: string;
-    description: string;
-    max_players: number;
-    night_count: number;
-    roles: {
-      Werewolf: number;
-      Prophet: number;
-      Witch: number;
-      Villager: number;
+    const gameData = ref<GameData>({
+      id: "",
+      title: "",
+      description: "",
+      max_players: 12,
+      night_count: 0,
+      roles: {
+        Werewolf: 2,
+        Prophet: 1,
+        Witch: 1,
+        Villager: 8
+      },
+      witch_config: {
+        cure_count: 1,
+        poison_count: 1
+      },
+      players: {},
+      ai_players: {},
+      current_phase: "Initialize",
+      phase_timer: {
+        Initialize: 30,
+        Werewolf: 30,
+        Prophet: 30,
+        Witch: 30,
+        Day: 60,
+        Speak: 60,
+        Vote: 30,
+        End: 30
+      }
+    })
+
+    const fetchSelectedProfile = async (userId) => {
+      try {
+        const avatarResponse = await api.get(`/api/accounts/avatar/${userId}/`);
+        const userResponse = await api.get(`/api/accounts/public_info/${userId}/`);
+
+        if (userResponse.status === 200) {
+          const userData = userResponse.data;
+          return {
+            userId: userData.id,
+            name: userData.username,
+            avatar: avatarResponse.status === 200
+              ? avatarResponse.data.avatar_url
+              : require('@/assets/profile-icon.png'),
+            isOnline: true, // 这里可以从websocket获取在线状态
+            isFriend: false, // 这里可以从好友列表判断
+            stats: [
+              { label: '游戏场数', value: userData.profile.wins + userData.profile.loses },
+              { label: '胜率', value: calculateWinRate(userData.profile.games) },
+              { label: '评分', value: userData.profile.rating || 0 }
+            ],
+            recentGames: (userData.profile.recent_games || []).map((game, index) => ({
+              id: index.toString(),
+              result: game.won ? 'win' : 'lose',
+              date: new Date(game.date).toLocaleDateString()
+            }))
+          };
+        }
+      } catch (error) {
+        console.error('获取用户信息失败:', error);
+        return null;
+      }
     };
-    witch_config: {
-      cure_count: number;
-      poison_count: number;
-    };
-    players: {
-      [key: string]: {
-        index: string;
-        name: string;
-        alive: boolean;
-        online: boolean;
-      };
-    };
-    ai_players: {
-      [key: string]: {
-        index: string;
-        name: string;
-        alive: boolean;
-      };
-    };
-    current_phase: 'Initialize' | 'Werewolf' | 'Prophet' | 'Witch' | 'Day' | 'Speak' | 'Vote' | 'End';
-    phase_timer: {
-      Initialize: number;
-      Werewolf: number;
-      Prophet: number;
-      Witch: number;
-      Day: number;
-      Speak: number;
-      Vote: number;
-      End: number;
-    };
-  }
+
+
+    const InitializeGameInterface = async () => {
+
+      // 获取并设置所有玩家信息
+      const playerProfiles = await Promise.all(
+        currentRoom.value.players.map(async (playerId) => {
+          const profile = await fetchSelectedProfile(playerId);
+          return {
+            id: playerId,
+            name: profile.name,
+            avatar: profile.avatar,
+            isAI: false,
+            userId: playerId,
+            isOnline: profile.isOnline,
+            isFriend: profile.isFriend,
+            stats: profile.stats,
+            recentGames: profile.recentGames
+          };
+        })
+      );
+
+      // 添加AI玩家信息
+      const aiPlayerProfiles = Object.entries(currentRoom.value.aiPlayers).map(([id, name]) => ({
+        id,
+        name,
+        avatar: require("@/assets/ai.svg"),
+        isAI: true,
+        userId: id,
+        isOnline: true,
+        stats: []
+      }));
+
+      // 合并所有玩家信息
+      members.value = [...playerProfiles, ...aiPlayerProfiles];
+
+    }
+
 
     // 工具函数，用于阶段转换时更新信息; 要求为GameData类型
-    function updateGame(game){
+    function updateGame(game: GameData){
       const result = validateGame(game)
       if (result){
         for (const player of this.players){
-          player.isDead = game[player.id]["isDead"];
+
         }
       }
       else {
@@ -765,7 +822,10 @@ export default {
 
 
 
-
+    return{
+      gameData,
+      // ...
+    }
   },
   created() {
     // 初始化数据
@@ -931,24 +991,24 @@ export default {
     },
 
   },
-watch: {
-  messages() {
-    this.scrollToBottom();
-  },
-  showDetails(newVal) {
-    // 如果玩家信息框被打开，页面滚动到顶部
-    if (newVal) {
-      window.scrollTo(0, 0);
-    }
-  },
-  isDead(newVal) {
-    if (newVal) {
-      this.messageRecipient = "dead"; // 死亡玩家自动选择“死亡”频道
-    } else {
-      this.messageRecipient = "all";  // 活着的玩家可以选择所有人频道
-    }
-  },
-}
+  watch: {
+    messages() {
+      this.scrollToBottom();
+    },
+    showDetails(newVal) {
+      // 如果玩家信息框被打开，页面滚动到顶部
+      if (newVal) {
+        window.scrollTo(0, 0);
+      }
+    },
+    isDead(newVal) {
+      if (newVal) {
+        this.messageRecipient = "dead"; // 死亡玩家自动选择“死亡”频道
+      } else {
+        this.messageRecipient = "all";  // 活着的玩家可以选择所有人频道
+      }
+    },
+  }
 };
 </script>
 
