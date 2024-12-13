@@ -183,715 +183,775 @@
     </div>
   </template>
   
-  <script>
-  import {onMounted, onUnmounted, ref} from "vue";
-  // import {useStore} from "vuex";
-  // import {useRouter} from "vue-router";
-  import {useWebSocket} from "@/composables/useWebSocket";
+<script lang="ts">
+import ConfirmDialog from './shared_components/ConfirmDialog.vue'
+import { onMounted, ref , onUnmounted} from 'vue';
+import { useStore } from 'vuex';
+import { useRouter } from 'vue-router';
+import { useWebSocket } from '@/composables/useWebSocket';
+import { validateGame, type GameData } from '@/schemas/schemas';
+import axios from 'axios';
 
-  export default {
-      data() {
-        return {
-          // 角色能力配置
-          roleAbilitiesConfig: {
-            // Werewolf技能配置
-            Werewolf: [
-              {
-                id: 'kill',
-                name: '杀人',
-                icon: 'kill.svg',
-                description: '每晚可以杀死一名玩家',
-                hasCount: false, // 无限次数的技能
-              }
-            ],
-            // Witch技能配置
-            Witch: [
-              {
-                id: 'heal',
-                name: '解药',
-                icon: 'medicine.svg',
-                description: '可以救活一名被杀的玩家',
-                hasCount: true,
-                count: 1
-              },
-              {
-                id: 'poison',
-                name: '毒药',
-                icon: 'medicine.svg',
-                description: '可以毒死一名玩家',
-                hasCount: true,
-                count: 1
-              }
-            ],
-            // Prophet技能配置
-            Prophet: [
-              {
-                id: 'check',
-                name: '查验',
-                icon: 'kill.svg',
-                description: '每晚可以查验一名玩家的身份',
-                hasCount: false
-              }
-            ],
-            // Hunter技能配置
-            Hunter: [
-              {
-                id: 'shoot',
-                name: '开枪',
-                icon: 'kill.svg',
-                description: '死亡时可以开枪带走一名玩家',
-                hasCount: true,
-                count: 1
-              }
-            ],
-            // Guard技能配置
-            Guard: [
-              {
-                id: 'protect',
-                name: '守护',
-                icon: 'kill.svg',
-                description: '每晚可以守护一名玩家',
-                hasCount: false
-              }
-            ]
-            // ... 可以继续添加其他角色的技能配置
+
+
+export default {
+  data() {
+    return {
+      // 角色能力配置
+      roleAbilitiesConfig: {
+        // Werewolf技能配置
+        Werewolf: [
+          {
+            id: 'kill',
+            name: '杀人',
+            icon: 'kill.svg',
+            description: '每晚可以杀死一名玩家',
+            hasCount: false, // 无限次数的技能
+          }
+        ],
+        // Witch技能配置
+        Witch: [
+          {
+            id: 'heal',
+            name: '解药',
+            icon: 'medicine.svg',
+            description: '可以救活一名被杀的玩家',
+            hasCount: true,
+            count: 1
           },
-          players: [
-            {
-              id: 1,
-              name: "Wang",
-              avatar: require('@/assets/head.png'),
-              isDead: false,
-              role: "Werewolf",
-              team: "Werewolf阵营",
-              victoryCondition: "淘汰所有人类"
-            },
-            {
-              id: 2,
-              name: "Huang",
-              avatar: require('@/assets/head.png'),
-              isDead: true,
-              role: "平民",
-              team: "人类阵营",
-              victoryCondition: "找出所有Werewolf"
-            },
-            {
-              id: 3,
-              name: "Zhao",
-              avatar: require('@/assets/head.png'),
-              isDead: false,
-              role: "Werewolf",
-              team: "Werewolf阵营",
-              victoryCondition: "淘汰所有人类"
-            },
-            {
-              id: 4,
-              name: "Li",
-              avatar: require('@/assets/head.png'),
-              isDead: true,
-              role: "平民",
-              team: "人类阵营",
-              victoryCondition: "找出所有Werewolf"
-            },
-            {
-              id: 5,
-              name: "Liu",
-              avatar: require('@/assets/head.png'),
-              isDead: true,
-              role: "平民",
-              team: "人类阵营",
-              victoryCondition: "找出所有Werewolf"
-            }
-
-          ],
-          messages: [
-            { senderid: 1, sendername: "Wang", recipients: "all", avatar: require('@/assets/head.png'), text: "天亮请睁眼。昨晚，4号玩家被杀了。" },
-            { senderid: 2, sendername: "Huang", recipients: "dead", avatar: require('@/assets/head.png'), text: "我只是个平民，什么也不知道，但我们绝对找出Werewolf了。" },
-            { senderid: 3, sendername: "Zhao", recipients: "all", avatar: require('@/assets/head.png'), text: "他肯定有问题！" }
-          ],
-          userMessage: "",
-
-
-          role: "Witch",
-          objective: "淘汰全部人类",
-          victoryCondition: "再淘汰1名人类",
-          livingTeammates: 0,
-          showDetails: false,   // 控制显示详细信息
-
-          showMenuSidebar: false, // 控制侧边栏的显示与否
-          showFriendsSidebar: false,
-          showHistorySidebar: false,
-
-          isDead: false, // 当前玩家是否死亡
-          selectedPlayer: null,  // 被选中的玩家
-
-          playerDetailsTop: 0,  // 玩家详情框的top位置
-          playerDetailsLeft: 0,  // 玩家详情框的left位置
-
-          // （小）阶段标记
-          phase: null,
-          // 其他狼人的投票
-          sync_targets: [],
-
-          // 日夜切换
-          isDayTime: true,  // 默认是白天
-          sunMoonIcon: require('@/assets/sun.svg') , // 默认图标是太阳
-          messageRecipient: "all", // 消息的接收者，默认为"所有人"
-
-          currentPlayerId: 1,  // 当前玩家ID
-          currentPlayerName: "Wang",
-        };
+          {
+            id: 'poison',
+            name: '毒药',
+            icon: 'medicine.svg',
+            description: '可以毒死一名玩家',
+            hasCount: true,
+            count: 1
+          }
+        ],
+        // Prophet技能配置
+        Prophet: [
+          {
+            id: 'check',
+            name: '查验',
+            icon: 'kill.svg',
+            description: '每晚可以查验一名玩家的身份',
+            hasCount: false
+          }
+        ],
+        // Hunter技能配置
+        Hunter: [
+          {
+            id: 'shoot',
+            name: '开枪',
+            icon: 'kill.svg',
+            description: '死亡时可以开枪带走一名玩家',
+            hasCount: true,
+            count: 1
+          }
+        ],
+        // Guard技能配置
+        Guard: [
+          {
+            id: 'protect',
+            name: '守护',
+            icon: 'kill.svg',
+            description: '每晚可以守护一名玩家',
+            hasCount: false
+          }
+        ]
+        // ... 可以继续添加其他角色的技能配置
       },
+      players: [
+        {
+          id: 1,
+          name: "Wang",
+          avatar: require('@/assets/head.png'),
+          isDead: false,
+          role: "Werewolf",
+          team: "Werewolf阵营",
+          victoryCondition: "淘汰所有人类"
+        },
+        {
+          id: 2,
+          name: "Huang",
+          avatar: require('@/assets/head.png'),
+          isDead: true,
+          role: "平民",
+          team: "人类阵营",
+          victoryCondition: "找出所有Werewolf"
+        },
+        {
+          id: 3,
+          name: "Zhao",
+          avatar: require('@/assets/head.png'),
+          isDead: false,
+          role: "Werewolf",
+          team: "Werewolf阵营",
+          victoryCondition: "淘汰所有人类"
+        },
+        {
+          id: 4,
+          name: "Li",
+          avatar: require('@/assets/head.png'),
+          isDead: true,
+          role: "平民",
+          team: "人类阵营",
+          victoryCondition: "找出所有Werewolf"
+        },
+        {
+          id: 5,
+          name: "Liu",
+          avatar: require('@/assets/head.png'),
+          isDead: true,
+          role: "平民",
+          team: "人类阵营",
+          victoryCondition: "找出所有Werewolf"
+        }
 
-    setup() {
-
-      const token = localStorage.getItem('access_token');
-      const { connect, sendMessage, onType, isConnected } = useWebSocket(token);
-
-
-      // 弹窗相关的状态
-      const showDialog = ref(false);
-      const dialogTitle = ref('');
-      const dialogMessage = ref('');
-      const dialogShowConfirm = ref(true);
-      const currentDialogAction = ref('');
+      ],
+      messages: [
+        { senderid: 1, sendername: "Wang", recipients: "all", avatar: require('@/assets/head.png'), text: "天亮请睁眼。昨晚，4号玩家被杀了。" },
+        { senderid: 2, sendername: "Huang", recipients: "dead", avatar: require('@/assets/head.png'), text: "我只是个平民，什么也不知道，但我们绝对找出Werewolf了。" },
+        { senderid: 3, sendername: "Zhao", recipients: "all", avatar: require('@/assets/head.png'), text: "他肯定有问题！" }
+      ],
+      userMessage: "",
 
 
+      role: "Witch",
+      objective: "淘汰全部人类",
+      victoryCondition: "再淘汰1名人类",
+      livingTeammates: 0,
+      showDetails: false,   // 控制显示详细信息
+
+      showMenuSidebar: false, // 控制侧边栏的显示与否
+      showFriendsSidebar: false,
+      showHistorySidebar: false,
+
+      isDead: false, // 当前玩家是否死亡
+      selectedPlayer: null,  // 被选中的玩家
+
+      playerDetailsTop: 0,  // 玩家详情框的top位置
+      playerDetailsLeft: 0,  // 玩家详情框的left位置
+
+      // （小）阶段标记
+      phase: null,
+      // 其他狼人的投票
+      sync_targets: [],
+
+      // 日夜切换
+      isDayTime: true,  // 默认是白天
+      sunMoonIcon: require('@/assets/sun.svg') , // 默认图标是太阳
+      messageRecipient: "all", // 消息的接收者，默认为"所有人"
+
+      currentPlayerId: 1,  // 当前玩家ID
+      currentPlayerName: "Wang",
+    };
+  },
+
+  setup() {
+    // 弹窗以及websocket建立
+    const aiCounter = ref(1);
+
+    const store = useStore();
+    const router = useRouter();
+    const roomData = ref(store.state.currentRoom);
+    const userProfile = ref(store.state.userProfile);
+    const token = localStorage.getItem('access_token');
+    const { connect, sendMessage, onType, isConnected } = useWebSocket(token);
 
 
-      // 工具函数，用于阶段转换时更新信息
-      function updateGame(game){
-        // TODO: 更新信息
+    // 弹窗相关的状态
+    const showDialog = ref(false);
+    const dialogTitle = ref('');
+    const dialogMessage = ref('');
+    const dialogShowConfirm = ref(true);
+    const currentDialogAction = ref('');
+
+    // 游戏数据类型
+    type GameData = {
+    id: string;
+    title: string;
+    description: string;
+    max_players: number;
+    night_count: number;
+    roles: {
+      Werewolf: number;
+      Prophet: number;
+      Witch: number;
+      Villager: number;
+    };
+    witch_config: {
+      cure_count: number;
+      poison_count: number;
+    };
+    players: {
+      [key: string]: {
+        index: string;
+        name: string;
+        alive: boolean;
+        online: boolean;
+      };
+    };
+    ai_players: {
+      [key: string]: {
+        index: string;
+        name: string;
+        alive: boolean;
+      };
+    };
+    current_phase: 'Initialize' | 'Werewolf' | 'Prophet' | 'Witch' | 'Day' | 'Speak' | 'Vote' | 'End';
+    phase_timer: {
+      Initialize: number;
+      Werewolf: number;
+      Prophet: number;
+      Witch: number;
+      Day: number;
+      Speak: number;
+      Vote: number;
+      End: number;
+    };
+  }
+
+    // 工具函数，用于阶段转换时更新信息; 要求为GameData类型
+    function updateGame(game){
+      const result = validateGame(game)
+      if (result){
         for (const player of this.players){
           player.isDead = game[player.id]["isDead"];
         }
       }
-
-      // 投票用工具函数
-      function selectPlayer(title, content, players){
-        // TODO: 依据players列表展示相应的玩家，让玩家选中一个后弹窗消失
-        dialogTitle.value = title;
-        dialogMessage.value = content;
-        currentDialogAction.value = "selectPlayer";
-        dialogShowConfirm.value = true;
-        showDialog.value= true;
-        for (const player of players){
-          player.show()
-        }
-
-        return 0;
+      else {
+        console.error('Validation errors: GameData validate failed; ' +
+            'stopped updating game data.', result.errors);
       }
 
-      // 展示信息用工具函数
-      function showInfo(title, content){
-        // TODO: 依据players列表展示相应的玩家，让玩家选中一个后弹窗消失
-        dialogTitle.value = title;
-        dialogMessage.value = content;
-        currentDialogAction.value = "showInfo";
-        dialogShowConfirm.value = true;
-        showDialog.value= true;
-        return 0;
+    }
+
+    // 投票用工具函数
+    function selectPlayer(title, content, players){
+      // TODO: 依据players列表展示相应的玩家，让玩家选中一个后弹窗消失
+      dialogTitle.value = title;
+      dialogMessage.value = content;
+      currentDialogAction.value = "selectPlayer";
+      dialogShowConfirm.value = true;
+      showDialog.value= true;
+      for (const player of players){
+        player.show()
       }
 
-      // // 狼人投票方法
-      // function handleKillVote(seq_num){
-      //   useWebSocket(localStorage.getItem('access_token')).sendMessage(
-      //       {
-      //         type: "kill_vote",
-      //         target: seq_num,  // TODO: 需要把这里改为真实投票。弹窗？
-      //       }
-      //   )
-      // }
-      //
-      // // 预言家查人
-      // function handleCheck(seq_num){
-      //   useWebSocket(localStorage.getItem('access_token')).sendMessage(
-      //       {
-      //         type: "check",
-      //         target: seq_num,
-      //       }
-      //   )
-      // }
+      return 0;
+    }
 
-      // 女巫操作
-      function handleWitchAction(cure_num, poison_num){
-        useWebSocket(localStorage.getItem('access_token')).sendMessage(
-            {
-              type: "witch_action",
-              cure: cure_num,
-              poison: poison_num,
-            }
-        )
-      }
+    // 展示信息用工具函数
+    function showInfo(title, content){
+      // TODO: 依据players列表展示相应的玩家，让玩家选中一个后弹窗消失
+      dialogTitle.value = title;
+      dialogMessage.value = content;
+      currentDialogAction.value = "showInfo";
+      dialogShowConfirm.value = true;
+      showDialog.value= true;
+      return 0;
+    }
 
-      // // 聊天说话
-      // function handleTalk(content){
-      //   useWebSocket(localStorage.getItem('access_token')).sendMessage(
-      //       {
-      //         type: "talk_content",
-      //         content: content
-      //       }
-      //   )
-      // }
-      //
-      // // 主动结束发言
-      // function handleTalkEnd(){
-      //   useWebSocket(localStorage.getItem('access_token')).sendMessage(
-      //       {
-      //         type: "talk_end",
-      //         player: this.currentPlayerId
-      //       }
-      //   )
-      // }
-      //
-      // // 白天投票
-      // function handleVote(seq_num){
-      //   useWebSocket(localStorage.getItem('access_token')).sendMessage(
-      //       {
-      //         type: "vote",
-      //         target: seq_num,
-      //       }
-      //   )
-      // }
-
-      /* WebSocket实时监听部分*/
-      function handleRoleInfo(message) {
-        // 处理分配角色信息
-        this.role = message.role_info['role'];
-        if(message.role_skills != null){
-          if(this.role === 'Witch'){
-            this.roleAbilitiesConfig.Witch[0].count = message.role_skills['cure_count']
-            this.roleAbilitiesConfig.Witch[1].count = message.role_skills['poison_count']
+    // 狼人投票方法
+    function handleKillVote(seq_num){
+      sendMessage(
+          {
+            type: "kill_vote",
+            target: seq_num,  // TODO: 需要把这里改为真实投票。弹窗？
           }
+      )
+    }
+
+    // 预言家查人
+    function handleCheck(seq_num){
+      sendMessage(
+          {
+            type: "check",
+            target: seq_num,
+          }
+      )
+    }
+
+    // 女巫操作
+    function handleWitchAction(cure_num, poison_num){
+      sendMessage(
+          {
+            type: "witch_action",
+            cure: cure_num,
+            poison: poison_num,
+          }
+      )
+    }
+
+    // 聊天说话
+    function handleTalk(content){
+      sendMessage(
+          {
+            type: "talk_content",
+            content: content
+          }
+      )
+    }
+
+    // 主动结束发言
+    function handleTalkEnd(){
+      sendMessage(
+          {
+            type: "talk_end",
+            player: this.currentPlayerId
+          }
+      )
+    }
+
+    // 白天投票
+    function handleVote(seq_num){
+      sendMessage(
+          {
+            type: "vote",
+            target: seq_num,
+          }
+      )
+    }
+
+    /* WebSocket实时监听部分*/
+    function handleRoleInfo(message) {
+      // 处理分配角色信息
+      this.role = message.role_info['role'];
+      if(message.role_skills != null){
+        if(this.role === 'Witch'){
+          this.roleAbilitiesConfig.Witch[0].count = message.role_skills['cure_count']
+          this.roleAbilitiesConfig.Witch[1].count = message.role_skills['poison_count']
         }
       }
+    }
 
-      function handleNightPhase(message) {
-        // 处理夜晚阶段
-        this.isDayTime = false;
-        updateGame(message.game);
+    function handleNightPhase(message) {
+      // 处理夜晚阶段
+      this.isDayTime = false;
+      updateGame(message.game);
+    }
+
+    function handleKillPhase() {
+      // 处理Werewolf投票阶段
+      this.phase = 'kill';
+    }
+
+    function handleWolfSync(message) {
+      // 处理Werewolf投票同步
+      this.sync_targets = message.targets;
+    }
+
+    function handleKillResult(message) {
+      // 处理刀人结果
+      if (message.result != null){
+        this.players[Number(message.result)].isDead = true;
+      }
+    }
+
+    function handleKillPhaseEnd() {
+      // 刀人阶段结束的同步。这里其实不应同步游戏信息，因为到第二天早上人才会死。
+      // TODO: 这里该做什么？是不是什么都不需要做？
+    }
+
+    function handleCheckPhase() {
+      // 处理Prophet查人阶段
+      this.phase = 'check';
+    }
+
+    function handleCheckResult(message) {
+      // 处理查人结果
+      // TODO: 弹窗？需要改进，弹一个包含所有角色的窗出来
+      // 然后点击一个选中，消掉弹窗
+      selectPlayer("查验结果", String(message.target) + "号的身份: " + message.role, this.players);
+    }
+
+    function handleWitchPhase() {
+      // 处理Witch阶段
+      this.phase = "witch";
+    }
+
+    function handleWitchInfo(message) {
+      // 处理Witch信息
+      const victims = [];
+      for (const num of message.cure_target){
+        victims.push(this.players[num]);
+      }
+      const cure_target = selectPlayer("解药选择", "请选择你要使用解药救的角色", victims);
+      const poison_target = selectPlayer("毒药选择", "请选择你要使用毒药杀死的角色", this.players);
+      handleWitchAction(cure_target, poison_target);
+    }
+
+    function handleWitchActionResult() {
+      // 处理Witch操作结果
+      // let result1 , result2;
+      // result1 = message.cure;
+      // result2 = message.poison;
+      // TODO: 其实这个信息没有必要提示给玩家，本来也是不知道的。理论上完全不会出现非法情况。
+    }
+
+    function handleDayPhase(message) {
+      // 处理白天阶段
+      this.isDayTime = true;
+      updateGame(message.game);
+    }
+
+    function handleNightDeathInfo(message) {
+      // 处理晚上死掉的人
+      let line = "";
+      for (const num of message.victims){
+        line += String(num) + "号，";
+      }
+      if (message.victims === []){
+        line = "昨晚是平安夜";
+      }
+      else {
+        line = "昨晚" + line + "玩家被杀害了";
+      }
+      showInfo("夜晚报告", line)
+    }
+
+    function handleTalkPhase() {
+      // 处理发言阶段
+      this.phase = "talk";
+    }
+
+    function handleTalkUpdate(message) {
+      // 处理聊天消息更新
+
+      // 创建消息对象
+      // if (!message.source){
+      //   return;
+      // }
+      const newMessage = {
+        senderid: message.source, // 假设当前玩家是“你”
+        sendername: this.players[Number(message.source)].name,
+        avatar: this.players[Number(message.source)].avatar,
+        text: message.message,
+        recipients: this.isDead ? "dead" : this.messageRecipient // 死亡玩家只能发送给"dead"
+      };
+
+      // 将消息推送到消息列表
+      this.messages.push(newMessage);
+
+      // 滚动到底部
+      this.scrollToBottom();
+
+    }
+
+    function handleTalkStart() {
+      // 处理聊天到你
+      // TODO: 检测用户按下发消息案件；之前应该一直是灰的，只有这时候才能按。
+    }
+
+    function handleTalkEndByServer() {
+      // 处理服务器发过来的聊天结束
+      this.scrollToBottom();
+      this.userMessage = "";  // 是不是有点残忍了
+      // TODO: 消息按钮重新变成灰的
+    }
+
+    function handleVotePhase() {
+      // 处理投票阶段
+      this.phase = "vote";
+    }
+
+    function handleVoteResult(message) {
+      // 处理投票结果
+      if (message.result === null){
+        showInfo("投票结果", "由于出现平票，没有人被放逐");
+      }
+      else {
+        showInfo("投票结果", message.result + "号玩家被放逐");
       }
 
-      function handleKillPhase() {
-        // 处理Werewolf投票阶段
-        this.phase = 'kill';
-      }
+    }
 
-      function handleWolfSync(message) {
-        // 处理Werewolf投票同步
-        this.sync_targets = message.targets;
+    function handleDayDeathInfo(message) {
+      // 处理白天死掉的人
+      let line = "";
+      for (const num of message.victims){
+        line += String(num) + "号，";
       }
-
-      function handleKillResult(message) {
-        // 处理刀人结果
-        if (message.result != null){
-          this.players[Number(message.result)].isDead = true;
-        }
+      if (message.victims === []){
+        line = "今天白天没有人出局";
       }
-
-      function handleKillPhaseEnd() {
-        // 刀人阶段结束的同步。这里其实不应同步游戏信息，因为到第二天早上人才会死。
-        // TODO: 这里该做什么？是不是什么都不需要做？
+      else {
+        line = "白天" + line + "玩家出局了";
       }
+      showInfo("白天报告", line)
+    }
 
-      function handleCheckPhase() {
-        // 处理Prophet查人阶段
-        this.phase = 'check';
-      }
-
-      function handleCheckResult(message) {
-        // 处理查人结果
-        // TODO: 弹窗？需要改进，弹一个包含所有角色的窗出来
-        // 然后点击一个选中，消掉弹窗
-        selectPlayer("查验结果", String(message.target) + "号的身份: " + message.role, this.players);
-      }
-
-      function handleWitchPhase() {
-        // 处理Witch阶段
-        this.phase = "witch";
-      }
-
-      function handleWitchInfo(message) {
-        // 处理Witch信息
-        const victims = [];
-        for (const num of message.cure_target){
-          victims.push(this.players[num]);
-        }
-        const cure_target = selectPlayer("解药选择", "请选择你要使用解药救的角色", victims);
-        const poison_target = selectPlayer("毒药选择", "请选择你要使用毒药杀死的角色", this.players);
-        handleWitchAction(cure_target, poison_target);
-      }
-
-      function handleWitchActionResult() {
-        // 处理Witch操作结果
-        // let result1 , result2;
-        // result1 = message.cure;
-        // result2 = message.poison;
-        // TODO: 其实这个信息没有必要提示给玩家，本来也是不知道的。理论上完全不会出现非法情况。
-      }
-
-      function handleDayPhase(message) {
-        // 处理白天阶段
-        this.isDayTime = true;
-        updateGame(message.game);
-      }
-
-      function handleNightDeathInfo(message) {
-        // 处理晚上死掉的人
-        let line = "";
-        for (const num of message.victims){
-          line += String(num) + "号，";
-        }
-        if (message.victims === []){
-          line = "昨晚是平安夜";
+    function handleGameEnd(message) {
+      // 处理游戏结束
+      if (message.end){
+        if (message.victory[this.role]){
+          showInfo("游戏结束！", "你的阵营获胜！")
         }
         else {
-          line = "昨晚" + line + "玩家被杀害了";
+          showInfo("游戏结束！", "你的阵营失败了……再接再厉！")
         }
-        showInfo("夜晚报告", line)
       }
+      // TODO: 展示所有人的角色并留两分钟复盘
+    }
 
-      function handleTalkPhase() {
-        // 处理发言阶段
-        this.phase = "talk";
+    const setupWebsocketListeners = () => {
+        // 处理各个阶段和事件
+        const roleInfoCleanup = onType('role_info', handleRoleInfo);
+        const nightPhaseCleanup = onType('night_phase', handleNightPhase);
+        const killPhaseCleanup = onType('kill_phase', handleKillPhase);
+        const wolfSyncCleanup = onType('wolf_sync', handleWolfSync);
+        const killResultCleanup = onType('kill_result', handleKillResult);
+        const killPhaseEndCleanup = onType('kill_phase_end', handleKillPhaseEnd)
+        const checkPhaseCleanup = onType('check_phase', handleCheckPhase);
+        const checkResultCleanup = onType('check_result', handleCheckResult);
+        const witchPhaseCleanup = onType('witch_phase', handleWitchPhase);
+        const witchInfoCleanup = onType('witch_info', handleWitchInfo);
+        const witchActionResultCleanup = onType('witch_action_result', handleWitchActionResult);
+        const dayPhaseCleanup = onType('day_phase', handleDayPhase);
+        const nightDeathInfoCleanup = onType('night_death_info', handleNightDeathInfo);
+        const talkPhaseCleanup = onType('talk_phase', handleTalkPhase);
+        const talkUpdateCleanup = onType('talk_update', handleTalkUpdate);
+        const talkStartCleanup = onType('talk_start', handleTalkStart);
+        const talkEndCleanup = onType('talk_end', handleTalkEndByServer);
+        const votePhaseCleanup = onType('vote_phase', handleVotePhase);
+        const voteResultCleanup = onType('vote_result', handleVoteResult);
+        const dayDeathInfoCleanup = onType('day_death_info', handleDayDeathInfo);
+        const gameEndCleanup = onType('game_end', handleGameEnd);
+
+        // 返回清理函数
+        onUnmounted(() => {
+            roleInfoCleanup();
+            nightPhaseCleanup();
+            killPhaseCleanup();
+            wolfSyncCleanup();
+            killResultCleanup();
+            killPhaseEndCleanup();
+            checkPhaseCleanup();
+            checkResultCleanup();
+            witchPhaseCleanup();
+            witchInfoCleanup();
+            witchActionResultCleanup();
+            dayPhaseCleanup();
+            nightDeathInfoCleanup();
+            talkPhaseCleanup();
+            talkUpdateCleanup();
+            talkStartCleanup();
+            talkEndCleanup();
+            votePhaseCleanup();
+            voteResultCleanup();
+            dayDeathInfoCleanup();
+            gameEndCleanup();
+            console.log('WebSocket listeners cleaned up');
+        });
+    }
+
+
+    onMounted(() => {
+      // 只在未连接时初始化连接
+      if (!isConnected.value) {
+        connect();
       }
+      setupWebsocketListeners();
+    });
 
-      function handleTalkUpdate(message) {
-        // 处理聊天消息更新
+    onUnmounted(() => {
+      sendMessage({
+        type: 'quit',
+        action: 'leave_combat',
+        player_id: this.currentPlayerId,
+      });
+    });
 
+
+
+
+  },
+  created() {
+    // 初始化数据
+    this.initializeMessages();
+  },
+  computed: {
+     // 过滤消息，确保死亡玩家可以看到所有消息，活着的玩家不能看到死亡者的消息
+    filteredMessages() {
+      console.log('filteredMessages 被计算');
+      if (this.isDead) {
+        return this.messages;
+      }
+      return this.messages.filter(msg => msg.recipients !== 'dead');
+    },
+
+    // 根据当前角色获取对应的技能列表
+    roleAbilities() {
+      // 根据角色名获取对应的技能配置
+      return this.roleAbilitiesConfig[this.role.toLowerCase()] || [];
+    },
+  },
+
+  methods: {
+
+    // 使用技能的方法
+    useAbility(ability) {
+      if (ability.hasCount && ability.count > 0) {
+        ability.count--;
+        // 这里添加使用技能的具体逻辑
+        console.log(`使用技能: ${ability.name}`);
+      } else if (!ability.hasCount) {
+        // 无限次数技能的使用逻辑
+        console.log(`使用技能: ${ability.name}`);
+      }
+    },
+    initializeMessages() {
+      this.messages = [
+        { senderid: 1, sendername: "Wang", recipients: "all", avatar: require('@/assets/head.png'), text: "天亮请睁眼。昨晚，4号玩家被杀了。" },
+        { senderid: 2, sendername: "Huang", recipients: "dead", avatar: require('@/assets/head.png'), text: "我只是个平民，什么也不知道，但我们绝对找出Werewolf了。" },
+        { senderid: 3, sendername: "Zhao", recipients: "all", avatar: require('@/assets/head.png'), text: "他肯定有问题！" }
+      ];
+    },
+    // 可以设置一个动态方法来更新当前玩家名字,后续优化接口
+    setCurrentPlayer(playerId) {
+      this.currentPlayerId = playerId;  // 设置当前玩家ID
+    },
+    getRecipientLabel(recipients) {
+      if (recipients === 'all') {
+        return '所有人';
+      } else if (recipients === 'team') {
+        return '团队';
+      } else if (recipients === 'dead') {
+        return '死亡';
+      }
+      else{
+        return '未知';
+      }
+    },
+
+    toggleSidebar(type) {
+      if (type === 'menu') {
+        this.showMenuSidebar = !this.showMenuSidebar;
+        this.showFriendsSidebar = false;
+        this.showHistorySidebar = false;
+      } else if (type === 'friends') {
+        this.showFriendsSidebar = !this.showFriendsSidebar;
+        this.showMenuSidebar = false;
+        this.showHistorySidebar = false;
+      } else if (type === 'history') {
+        this.showHistorySidebar = !this.showHistorySidebar;
+        this.showMenuSidebar = false;
+        this.showFriendsSidebar = false;
+      }
+    },
+
+    // 关闭侧边栏
+    closeALL(){
+      this.closeMenuSidebar();
+      this.closeFriendsSidebar();
+      this.closeHistorySidebar();
+      this.closePlayerDetails();
+    },
+
+    closeMenuSidebar() {
+      this.showMenuSidebar = false;
+    },
+    closeFriendsSidebar() {
+      this.showMenuSidebar = false;
+    },
+    closeHistorySidebar() {
+      this.showMenuSidebar = false;
+    },
+    closePlayerDetails() {
+      this.showDetails = false;
+      this.selectedPlayer = null;
+    },
+
+
+    // 阻止点击菜单内部时关闭
+    stopClick(event) {
+      event.stopPropagation();
+    },
+
+    sendChatMessage() {
+
+      if (this.userMessage.trim()) {
         // 创建消息对象
-        // if (!message.source){
-        //   return;
-        // }
         const newMessage = {
-          senderid: message.source, // 假设当前玩家是“你”
-          sendername: this.players[Number(message.source)].name,
-          avatar: this.players[Number(message.source)].avatar,
-          text: message.message,
+          senderid: this.currentPlayerId, // 假设当前玩家是“你”
+          sendername: this.currentPlayerName,
+          avatar: require('@/assets/head.png'),
+          text: this.userMessage,
           recipients: this.isDead ? "dead" : this.messageRecipient // 死亡玩家只能发送给"dead"
         };
 
         // 将消息推送到消息列表
         this.messages.push(newMessage);
 
+        // 清空输入框
+        this.userMessage = "";
+
         // 滚动到底部
         this.scrollToBottom();
-
       }
+    },
 
-      function handleTalkStart() {
-        // 处理聊天到你
-        // TODO: 检测用户按下发消息案件；之前应该一直是灰的，只有这时候才能按。
-      }
-
-      function handleTalkEndByServer() {
-        // 处理服务器发过来的聊天结束
-        this.scrollToBottom();
-        this.userMessage = "";  // 是不是有点残忍了
-        // TODO: 消息按钮重新变成灰的
-      }
-
-      function handleVotePhase() {
-        // 处理投票阶段
-        this.phase = "vote";
-      }
-
-      function handleVoteResult(message) {
-        // 处理投票结果
-        if (message.result === null){
-          showInfo("投票结果", "由于出现平票，没有人被放逐");
-        }
-        else {
-          showInfo("投票结果", message.result + "号玩家被放逐");
-        }
-
-      }
-
-      function handleDayDeathInfo(message) {
-        // 处理白天死掉的人
-        let line = "";
-        for (const num of message.victims){
-          line += String(num) + "号，";
-        }
-        if (message.victims === []){
-          line = "今天白天没有人出局";
-        }
-        else {
-          line = "白天" + line + "玩家出局了";
-        }
-        showInfo("白天报告", line)
-      }
-
-      function handleGameEnd(message) {
-        // 处理游戏结束
-        if (message.end){
-          if (message.victory[this.role]){
-            showInfo("游戏结束！", "你的阵营获胜！")
-          }
-          else {
-            showInfo("游戏结束！", "你的阵营失败了……再接再厉！")
-          }
-        }
-        // TODO: 展示所有人的角色并留两分钟复盘
-      }
-
-      const setupWebsocketListeners = () => {
-          // 处理各个阶段和事件
-          const roleInfoCleanup = onType('role_info', handleRoleInfo);
-          const nightPhaseCleanup = onType('night_phase', handleNightPhase);
-          const killPhaseCleanup = onType('kill_phase', handleKillPhase);
-          const wolfSyncCleanup = onType('wolf_sync', handleWolfSync);
-          const killResultCleanup = onType('kill_result', handleKillResult);
-          const killPhaseEndCleanup = onType('kill_phase_end', handleKillPhaseEnd)
-          const checkPhaseCleanup = onType('check_phase', handleCheckPhase);
-          const checkResultCleanup = onType('check_result', handleCheckResult);
-          const witchPhaseCleanup = onType('witch_phase', handleWitchPhase);
-          const witchInfoCleanup = onType('witch_info', handleWitchInfo);
-          const witchActionResultCleanup = onType('witch_action_result', handleWitchActionResult);
-          const dayPhaseCleanup = onType('day_phase', handleDayPhase);
-          const nightDeathInfoCleanup = onType('night_death_info', handleNightDeathInfo);
-          const talkPhaseCleanup = onType('talk_phase', handleTalkPhase);
-          const talkUpdateCleanup = onType('talk_update', handleTalkUpdate);
-          const talkStartCleanup = onType('talk_start', handleTalkStart);
-          const talkEndCleanup = onType('talk_end', handleTalkEndByServer);
-          const votePhaseCleanup = onType('vote_phase', handleVotePhase);
-          const voteResultCleanup = onType('vote_result', handleVoteResult);
-          const dayDeathInfoCleanup = onType('day_death_info', handleDayDeathInfo);
-          const gameEndCleanup = onType('game_end', handleGameEnd);
-
-          // 返回清理函数
-          onUnmounted(() => {
-              roleInfoCleanup();
-              nightPhaseCleanup();
-              killPhaseCleanup();
-              wolfSyncCleanup();
-              killResultCleanup();
-              killPhaseEndCleanup();
-              checkPhaseCleanup();
-              checkResultCleanup();
-              witchPhaseCleanup();
-              witchInfoCleanup();
-              witchActionResultCleanup();
-              dayPhaseCleanup();
-              nightDeathInfoCleanup();
-              talkPhaseCleanup();
-              talkUpdateCleanup();
-              talkStartCleanup();
-              talkEndCleanup();
-              votePhaseCleanup();
-              voteResultCleanup();
-              dayDeathInfoCleanup();
-              gameEndCleanup();
-              console.log('WebSocket listeners cleaned up');
-          });
-      }
-
-
-      onMounted(() => {
-        // 只在未连接时初始化连接
-        if (!isConnected.value) {
-          connect();
-        }
-        setupWebsocketListeners();
+    scrollToBottom() {
+      // 滚动聊天框到底部
+      this.$nextTick(() => {
+        const chatBox = this.$refs.chatBox;
+        chatBox.scrollTop = chatBox.scrollHeight;
       });
-
-      onUnmounted(() => {
-        sendMessage({
-          type: 'quit',
-          action: 'leave_combat',
-          player_id: this.currentPlayerId,
-        });
-      });
-
-
-
-
     },
-    created() {
-      // 初始化数据
-      this.initializeMessages();
+    exitGame() {
+      alert("退出游戏");
     },
-    computed: {
-       // 过滤消息，确保死亡玩家可以看到所有消息，活着的玩家不能看到死亡者的消息
-      filteredMessages() {
-        console.log('filteredMessages 被计算');
-        if (this.isDead) {
-          return this.messages;
-        }
-        return this.messages.filter(msg => msg.recipients !== 'dead');
-      },
+    showPlayerDetails(player, event) {
+      this.selectedPlayer = player;
+      this.showDetails = true;
 
-      // 根据当前角色获取对应的技能列表
-      roleAbilities() {
-        // 根据角色名获取对应的技能配置
-        return this.roleAbilitiesConfig[this.role.toLowerCase()] || [];
-      },
+      // 获取头像的位置
+      const avatar = event.target; // 头像元素
+      const rect = avatar.getBoundingClientRect(); // 获取头像的位置信息
+
+      // 设置玩家详情框的位置
+      this.playerDetailsTop = rect.top + window.scrollY; // 距离页面顶部的距离
+      this.playerDetailsLeft = rect.left + window.scrollX + avatar.offsetWidth + 10; // 距离页面左侧的距离，加10像素的间隔
     },
 
-    methods: {
-      
-      // 使用技能的方法
-      useAbility(ability) {
-        if (ability.hasCount && ability.count > 0) {
-          ability.count--;
-          // 这里添加使用技能的具体逻辑
-          console.log(`使用技能: ${ability.name}`);
-        } else if (!ability.hasCount) {
-          // 无限次数技能的使用逻辑
-          console.log(`使用技能: ${ability.name}`);
-        }
-      },
-      initializeMessages() {
-        this.messages = [
-          { senderid: 1, sendername: "Wang", recipients: "all", avatar: require('@/assets/head.png'), text: "天亮请睁眼。昨晚，4号玩家被杀了。" },
-          { senderid: 2, sendername: "Huang", recipients: "dead", avatar: require('@/assets/head.png'), text: "我只是个平民，什么也不知道，但我们绝对找出Werewolf了。" },
-          { senderid: 3, sendername: "Zhao", recipients: "all", avatar: require('@/assets/head.png'), text: "他肯定有问题！" }
-        ];
-      },
-      // 可以设置一个动态方法来更新当前玩家名字,后续优化接口
-      setCurrentPlayer(playerId) {
-        this.currentPlayerId = playerId;  // 设置当前玩家ID
-      },
-      getRecipientLabel(recipients) {
-        if (recipients === 'all') {
-          return '所有人';
-        } else if (recipients === 'team') {
-          return '团队';
-        } else if (recipients === 'dead') {
-          return '死亡';
-        }
-        else{
-          return '未知';
-        }
-      },
-
-      toggleSidebar(type) {
-        if (type === 'menu') {
-          this.showMenuSidebar = !this.showMenuSidebar;
-          this.showFriendsSidebar = false;
-          this.showHistorySidebar = false;
-        } else if (type === 'friends') {
-          this.showFriendsSidebar = !this.showFriendsSidebar;
-          this.showMenuSidebar = false;
-          this.showHistorySidebar = false;
-        } else if (type === 'history') {
-          this.showHistorySidebar = !this.showHistorySidebar;
-          this.showMenuSidebar = false;
-          this.showFriendsSidebar = false;
-        }
-      },
-
-      // 关闭侧边栏
-      closeALL(){
-        this.closeMenuSidebar();
-        this.closeFriendsSidebar();
-        this.closeHistorySidebar();
-        this.closePlayerDetails();
-      },
-      
-      closeMenuSidebar() {
-        this.showMenuSidebar = false;
-      },
-      closeFriendsSidebar() {
-        this.showMenuSidebar = false;
-      },
-      closeHistorySidebar() {
-        this.showMenuSidebar = false;
-      },
-      closePlayerDetails() {
-        this.showDetails = false;
-        this.selectedPlayer = null;
-      },
-
-
-      // 阻止点击菜单内部时关闭
-      stopClick(event) {
-        event.stopPropagation();
-      },
-
-      sendChatMessage() {
-        
-        if (this.userMessage.trim()) {
-          // 创建消息对象
-          const newMessage = {
-            senderid: this.currentPlayerId, // 假设当前玩家是“你”
-            sendername: this.currentPlayerName, 
-            avatar: require('@/assets/head.png'),
-            text: this.userMessage,
-            recipients: this.isDead ? "dead" : this.messageRecipient // 死亡玩家只能发送给"dead"
-          };
-          
-          // 将消息推送到消息列表
-          this.messages.push(newMessage);
-
-          // 清空输入框
-          this.userMessage = "";
-          
-          // 滚动到底部
-          this.scrollToBottom();
-        }
-      },
-
-      scrollToBottom() {
-        // 滚动聊天框到底部
-        this.$nextTick(() => {
-          const chatBox = this.$refs.chatBox;
-          chatBox.scrollTop = chatBox.scrollHeight;
-        });
-      },
-      exitGame() {
-        alert("退出游戏");
-      },
-      showPlayerDetails(player, event) {
-        this.selectedPlayer = player;
-        this.showDetails = true;
-        
-        // 获取头像的位置
-        const avatar = event.target; // 头像元素
-        const rect = avatar.getBoundingClientRect(); // 获取头像的位置信息
-
-        // 设置玩家详情框的位置
-        this.playerDetailsTop = rect.top + window.scrollY; // 距离页面顶部的距离
-        this.playerDetailsLeft = rect.left + window.scrollX + avatar.offsetWidth + 10; // 距离页面左侧的距离，加10像素的间隔
-      },
-      
-      reportPlayer(player) {
-        alert(`${player.name} 已被举报！`);
-      },
-      addFriend(player) {
-        alert(`已向 ${player.name} 发送好友请求！`);
-      },
-
-       // 切换日夜模式
-      toggleDayNight() {
-        this.isDayTime = !this.isDayTime;
-        this.sunMoonIcon = this.isDayTime
-          ? require('@/assets/sun.svg')  // 白天显示太阳图标
-          : require('@/assets/night.svg');  // 晚上显示月亮图标
-      },
-
+    reportPlayer(player) {
+      alert(`${player.name} 已被举报！`);
     },
-	watch: {
-    messages() {
-      this.scrollToBottom();
+    addFriend(player) {
+      alert(`已向 ${player.name} 发送好友请求！`);
     },
-    showDetails(newVal) {
-      // 如果玩家信息框被打开，页面滚动到顶部
-      if (newVal) {
-        window.scrollTo(0, 0);
-      }
+
+     // 切换日夜模式
+    toggleDayNight() {
+      this.isDayTime = !this.isDayTime;
+      this.sunMoonIcon = this.isDayTime
+        ? require('@/assets/sun.svg')  // 白天显示太阳图标
+        : require('@/assets/night.svg');  // 晚上显示月亮图标
     },
-    isDead(newVal) {
-      if (newVal) {
-        this.messageRecipient = "dead"; // 死亡玩家自动选择“死亡”频道
-      } else {
-        this.messageRecipient = "all";  // 活着的玩家可以选择所有人频道
-      }
-    },
-  }
-  };
-  </script>
-  
+
+  },
+watch: {
+  messages() {
+    this.scrollToBottom();
+  },
+  showDetails(newVal) {
+    // 如果玩家信息框被打开，页面滚动到顶部
+    if (newVal) {
+      window.scrollTo(0, 0);
+    }
+  },
+  isDead(newVal) {
+    if (newVal) {
+      this.messageRecipient = "dead"; // 死亡玩家自动选择“死亡”频道
+    } else {
+      this.messageRecipient = "all";  // 活着的玩家可以选择所有人频道
+    }
+  },
+}
+};
+</script>
+
 <style scoped>
 /* 设置页面背景色 */
 body {
