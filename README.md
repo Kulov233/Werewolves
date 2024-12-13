@@ -1,5 +1,30 @@
 ## 智狼之夜  
 
+### 前端
+
+#### Project setup
+```
+npm install
+```
+
+#### Compiles and hot-reloads for development
+```
+npm run serve
+```
+
+#### Compiles and minifies for production
+```
+npm run build
+```
+
+#### Lints and fixes files
+```
+npm run lint
+```
+
+#### Customize configuration
+See [Configuration Reference](https://cli.vuejs.org/config/).
+
 ### 后端
 
 项目中的Dockerfile和docker-compose.yml文件只是一个示例，请暂时将mysql和redis的端口暴露到本机，并单独启动后端以进行调试。调试时，请修改redis的默认端口，以防止公网扫描。  
