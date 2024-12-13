@@ -52,19 +52,23 @@
       </transition>
 
       <!-- 左侧玩家列表 -->
-      <div class="player-list">
-        <div v-for="(player, index) in [...players, ...aiPlayers]" :key="index"
-             :class="['player', { dead: {...gameData.players, ...gameData.ai_players}[player.userId] }]">
-          <img 
-            :src="player.avatar"
-            alt="avatar" 
-            class="avatar0"
-            @click.stop="showPlayerDetails(player, $event)" 
-            /><!-- 点击头像触发查看详情 -->
-          <p>{{ index }}号{{" "}}{{ player.name }}<span v-if="player.index === currentPlayerId"> (你)</span></p> <!-- 如果是当前玩家，显示 "(你)" -->
-        </div>
+      <div class="player-list" v-if="Boolean(players && aiPlayers)">
+        <!-- 使用 Object.values() 将对象的值转换为数组，并确保通过 .value 访问 ref 的值 -->
+
+          <div v-for="(player, index) in [...Object.values(players), ...Object.values(aiPlayers)]" :key="index"
+               :class="['player', { dead: ![...Object.values(gameData.players), ...Object.values(gameData.ai_players)][index].alive }]">
+            <img
+              :src="player.avatar"
+              alt="avatar"
+              class="avatar0"
+              @click.stop="showPlayerDetails(player, $event)"
+              /><!-- 点击头像触发查看详情 -->
+            <p>{{ index + 1 }}号{{" "}}{{ player.name }}<span v-if="player.userId === currentPlayer.index"> (你)</span></p> <!-- 如果是当前玩家，显示 "(你)" -->
+          </div>
       </div>
-  
+
+
+
       <!-- 中间聊天框 -->
       <div class="chat-section">
         <div class="chat-box" ref="chatBox">
@@ -83,7 +87,7 @@
               <div class="message-sender">
                 <p>
                   {{ message.senderid }}号{{" "}}{{ message.sendername }}
-                  <span v-if="message.senderid === currentPlayerId"> (你)</span>
+                  <span v-if="message.senderid === currentPlayer.index"> (你)</span>
                 </p>
               </div>
               <div class="message-text">{{ message.text }}</div>
@@ -120,27 +124,33 @@
       <div class="role-info">
         <div class="role-item">
             <span class="label">你的身份：</span>
-            <span class="value">{{ role }}</span>
+            <span class="value">{{ roleInfo.role }}</span>
         </div>
         <div class="role-item">
             <span class="label">阵营目标：</span>
+<!--          TODO: 后端改好后这里改为roleInfo.objective-->
             <span class="value">{{ objective }}</span>
+
         </div>
         <div class="role-item">
             <span class="label">胜利条件：</span>
+<!--            <span class="value">{{ gameData.victory_condition }}</span>-->
             <span class="value">{{ victoryCondition }}</span>
         </div>
-        <div class="role-item">
-            <span class="label">存活队友：</span>
-            <span class="value">{{ livingTeammates }}人</span>
-        </div>
+
+<!--        这里可能不该出现这个信息，应该是被隐藏的吧-->
+<!--        <div class="role-item">-->
+<!--            <span class="label">存活队友：</span>-->
+<!--            <span class="value">{{ livingTeammates }}人</span>-->
+<!--        </div>-->
         <!-- 角色能力图标部分 -->
         <div class="role-abilities">
 
-          <div class="abilities-container">
+          <div class="abilities-container" v-if="roleInfo">
             <!-- 动态显示技能图标 -->
-            <template v-for="ability in roleAbilities" :key="ability.id">
-              <div class="ability-item" :class="{ 'disabled': ability.count === 0 }">
+            <template v-for="ability in roleAbilitiesConfig[roleInfo.role]" :key="ability.id">
+              <!-- 如果当前技能数量为0则不显示 -->
+              <div class="ability-item" v-if="roleInfo.role_skills[ability.id + '_count']">
                 <img 
                   :src="require(`@/assets/${ability.icon}`)" 
                   :alt="ability.name"
@@ -150,7 +160,7 @@
                 <div class="ability-info">
                   <span class="ability-name">{{ ability.name }}</span>
                   <span class="ability-count" v-if="ability.hasCount">
-                    剩余：{{ ability.count }}
+                    剩余：{{ roleInfo.role_skills[ability.id + '_count'] }}
                   </span>
                 </div>
               </div>
@@ -185,7 +195,7 @@
   </template>
   
 <script>
-import { onMounted, ref , onUnmounted} from 'vue';
+import {onMounted, ref, onUnmounted, onBeforeMount} from 'vue';
 import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';
 import { useWebSocket } from '@/composables/useWebSocket';
@@ -276,7 +286,7 @@ export default {
         // Witch技能配置
         Witch: [
           {
-            id: 'heal',
+            id: 'cure',
             name: '解药',
             icon: 'medicine.svg',
             description: '可以救活一名被杀的玩家',
@@ -381,7 +391,7 @@ export default {
       userMessage: "",
 
 
-      role: "Witch",
+
       objective: "淘汰全部人类",
       victoryCondition: "再淘汰1名人类",
       livingTeammates: 0,
@@ -407,16 +417,16 @@ export default {
       sunMoonIcon: require('@/assets/sun.svg') , // 默认图标是太阳
       messageRecipient: "all", // 消息的接收者，默认为"所有人"
 
-      currentPlayerId: 1,  // 当前玩家ID
-      currentPlayerName: "Wang",
     };
   },
+
 
   setup() {
     // 弹窗以及websocket建立
     const store = useStore();
     // const router = useRouter();
     const roomData = ref(store.state.currentRoom);
+    // console.log(JSON.stringify(roomData, null, 2));
     const userProfile = ref(store.state.userProfile);
     const token = localStorage.getItem('access_token');
     // 获取当前room
@@ -434,6 +444,10 @@ export default {
     // 成员列表
     const players = ref({});
     const aiPlayers = ref({});
+    const roleInfo = ref({
+      role: "",
+      role_skills: {},
+    });
     // const selectedPlayerId = ref(null);
     const gameData = ref({
       id: "1c134013-3b54-4ccd-a2b9-e42ef088d9a9",
@@ -489,8 +503,15 @@ export default {
           Vote: 40,
           End: 3
       }
-    });
+    })
 
+    const syncTargets = ref({});
+    const currentPlayer = ref({
+      index: "1",
+      name: "apifox",
+      alive: true,
+      online: true
+    })
 
     const fetchSelectedProfile = async (userId) => {
       try {
@@ -532,18 +553,28 @@ export default {
       return `${Math.round((wins / games.length) * 100)}%`;
     };
 
+    let initialized = false;
+
+    // 设置一个定时器，每过一段时间执行一次
+    // const intervalId = setInterval(() => {
+    //   console.log(Boolean(players.value && aiPlayers.value));
+    // }, 1000); // 这里设置为每1000毫秒（1秒）打印一次
 
 
     // 这里的信息以后就不动了
     const initializeGameInterface = async () => {
       // 初始化玩家信息
-      players.value = gameData.value.players;
-      aiPlayers.value = gameData.value.ai_players;
+      // console.log("GameInterfaceInit");
+      // console.log(gameData.value.players["1"].name);
 
+      if (!initialized){
+        players.value = gameData.value.players;
+        aiPlayers.value = gameData.value.ai_players;
 
-      // 获取并设置所有玩家信息
-      const playerProfiles = {};
-      for (const playerId in gameData.value.players) {
+        // 获取并设置所有玩家信息
+        const playerProfiles = {};
+        for (const playerId of Object.keys(gameData.value.players)) {
+        // console.log(playerId);
         const profile = await fetchSelectedProfile(playerId);
         playerProfiles[playerId] = {
           index: gameData.value.players[playerId].index,
@@ -555,13 +586,16 @@ export default {
           isFriend: profile.isFriend,
           stats: profile.stats,
           recentGames: profile.recentGames
-        };
+          };
 
-      }
+        }
 
-      // 添加AI玩家信息
-      const aiPlayerProfiles = {};
-      for (const id in gameData.value.ai_players) {
+
+        // 添加AI玩家信息
+        const aiPlayerProfiles = {};
+
+        for (const id of Object.keys(gameData.value.ai_players)) {
+          // console.log(id);
           aiPlayerProfiles[id] = {
             name: gameData.value.ai_players[id].name,
             index: gameData.value.ai_players[id].index,
@@ -571,14 +605,25 @@ export default {
             isOnline: true,
             stats: []
           };
+        }
+        // 展开并合并所有玩家信息
+        players.value = playerProfiles;
+        aiPlayers.value = aiPlayerProfiles;
+        // console.log("GameInterfaceInit: Done!!!");
+        // console.log(JSON.stringify(players.value, null, 2));
+        // console.log(JSON.stringify(aiPlayers.value, null, 2));
+        initialized = true;
 
+        // TODO: 添加对玩家自身信息的初始化
+      }
+      else {
+        console.log("Already initialized, passing...")
       }
 
-      // 展开并合并所有玩家信息
-      players.value = playerProfiles;
-      aiPlayers.value = aiPlayerProfiles;
+
 
     };
+
 
 
 
@@ -592,22 +637,52 @@ export default {
       //   console.error('Validation errors: GameData validate failed; ' +
       //       'stopped updating game data.', result.errors);
       // }
-      gameData.value = game
+      if (!gameData.value){
+        console.log("gameData is false");
+      }
+      else {
+        gameData.value = game
+        // console.log(JSON.stringify({data: [...Object.values(gameData.value.players), ...Object.values(gameData.value.ai_players)]}))
+      }
 
     }
 
     // 投票用工具函数
-    function selectPlayer(title, content, players){
-      // TODO: 依据players列表展示相应的玩家，让玩家选中一个后弹窗消失
+    async function selectPlayer(title, content, players, alive_as_target = false) {
+
+      if (alive_as_target){  // 选择所有活着的人，除了自己
+        players = []
+        for (const player of [...Object.values(gameData.value.players), ...Object.values(gameData.value.ai_players)]){
+          if (player.alive && player.index !== currentPlayer.value.index){
+            players.push(player.index);
+          }
+        }
+      }
+
+      // 设置对话框标题和内容
       dialogTitle.value = title;
       dialogMessage.value = content;
       currentDialogAction.value = "selectPlayer";
       dialogShowConfirm.value = true;
-      showDialog.value= true;
-      for (const player of players){
-        player.show()
+      showDialog.value = true;
+
+      // 显示所有玩家
+      for (const player of players) {
+        player.show();
       }
 
+      // 等待函数
+      const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+      // 等待此阶段对应的时间
+      await wait(1000 * gameData.value.phase_timer[gameData.value.current_phase.toString]);
+
+      // 弹窗消失的逻辑可以放在这里
+      // 例如：关闭对话框
+      showDialog.value = false;
+
+      // 返回选中的玩家或者其他逻辑
+      // 这里返回0作为示例，您可以根据实际情况返回相应的值
       return 0;
     }
 
@@ -686,52 +761,48 @@ export default {
     /* WebSocket实时监听部分*/
     function handlePlayerJoined(message){
       // 有人加入，更新内容
+      console.log("handle player join");
       updateGame(message.game);
+      // 进行初始化（如果还没有初始化过）
+      initializeGameInterface();
     }
 
 
     function handleRoleInfo(message) {
       // 处理分配角色信息
-      this.role = message.role_info['role'];
-      if(message.role_skills != null){
-        if(this.role === 'Witch'){
-          this.roleAbilitiesConfig.Witch[0].count = message.role_skills['cure_count']
-          this.roleAbilitiesConfig.Witch[1].count = message.role_skills['poison_count']
-        }
-      }
+      console.log("role_info received");
+      roleInfo.value = message.role_info;
+      console.log("role_info: " + JSON.stringify(roleInfo.value));
     }
 
     function handleNightPhase(message) {
       // 处理夜晚阶段
-      this.isDayTime = false;
       updateGame(message.game);
     }
 
-    function handleKillPhase() {
+    function handleKillPhase(message) {
       // 处理Werewolf投票阶段
-      this.phase = 'kill';
+      gameData.value = message.game;
     }
 
     function handleWolfSync(message) {
       // 处理Werewolf投票同步
-      this.sync_targets = message.targets;
+      syncTargets.value = message.targets
     }
 
     function handleKillResult(message) {
       // 处理刀人结果
-      if (message.result != null){
-        this.players[Number(message.result)].isDead = true;
-      }
+      updateGame(message.game)
     }
 
-    function handleKillPhaseEnd() {
+    function handleKillPhaseEnd(message) {
       // 刀人阶段结束的同步。这里其实不应同步游戏信息，因为到第二天早上人才会死。
-      // TODO: 这里该做什么？是不是什么都不需要做？
+      updateGame(message.game);
     }
 
-    function handleCheckPhase() {
-      // 处理Prophet查人阶段
-      this.phase = 'check';
+    function handleCheckPhase(message) {
+      // 处理Prophet查人阶段, 不能告诉他谁死了
+      gameData.value.current_phase = message.game.current_phase;
     }
 
     function handleCheckResult(message) {
@@ -741,19 +812,16 @@ export default {
       selectPlayer("查验结果", String(message.target) + "号的身份: " + message.role, this.players);
     }
 
-    function handleWitchPhase() {
-      // 处理Witch阶段
-      this.phase = "witch";
+    function handleWitchPhase(message) {
+      // 处理Witch阶段, 同样，不能真让人死了，否则就选不了了
+      gameData.value.current_phase = message.game.current_phase;
     }
 
     function handleWitchInfo(message) {
       // 处理Witch信息
-      const victims = [];
-      for (const num of message.cure_target){
-        victims.push(this.players[num]);
-      }
-      const cure_target = selectPlayer("解药选择", "请选择你要使用解药救的角色", victims);
-      const poison_target = selectPlayer("毒药选择", "请选择你要使用毒药杀死的角色", this.players);
+
+      const cure_target = selectPlayer("解药选择", "请选择你要使用解药救的角色", message.cure_target);
+      const poison_target = selectPlayer("毒药选择", "请选择你要使用毒药杀死的角色", null, true);
       handleWitchAction(cure_target, poison_target);
     }
 
@@ -861,10 +929,10 @@ export default {
       // 处理游戏结束
       if (message.end){
         if (message.victory[this.role]){
-          showInfo("游戏结束！", "你的阵营获胜！")
+          showInfo("游戏结束！", "你的阵营获胜！");
         }
         else {
-          showInfo("游戏结束！", "你的阵营失败了……再接再厉！")
+          showInfo("游戏结束！", "你的阵营失败了……再接再厉！");
         }
       }
       // TODO: 展示所有人的角色并留两分钟复盘
@@ -923,23 +991,27 @@ export default {
         });
     }
 
+    onBeforeMount(() =>{
+      setupWebsocketListeners();
+    }
+    )
 
     onMounted(() => {
       // 只在未连接时初始化连接
+      console.log("mounted");
       if (!isConnected.value) {
         connect(roomId);
       }
-      setupWebsocketListeners();
-      initializeGameInterface();
+
     });
 
     onUnmounted(() => {
-      // sendMessage({
-      //   type: 'quit',
-      //   action: 'leave_combat',
-      //   player_id: this.currentPlayerId,
-      // });
-
+      sendMessage({
+        type: 'quit',
+        action: 'leave_combat',
+        player_id: currentPlayer.value.index,
+      });
+      // clearInterval(intervalId);
     });
 
 
@@ -949,6 +1021,9 @@ export default {
       userProfile,
       players,
       aiPlayers,
+      roleInfo,
+      syncTargets,
+      currentPlayer,
       // ...
     }
   },
@@ -956,6 +1031,7 @@ export default {
     // 初始化数据
     this.initializeMessages();
   },
+
   computed: {
      // 过滤消息，确保死亡玩家可以看到所有消息，活着的玩家不能看到死亡者的消息
     filteredMessages() {
@@ -966,11 +1042,7 @@ export default {
       return this.messages.filter(msg => msg.recipients !== 'dead');
     },
 
-    // 根据当前角色获取对应的技能列表
-    roleAbilities() {
-      // 根据角色名获取对应的技能配置
-      return this.roleAbilitiesConfig[this.role.toLowerCase()] || [];
-    },
+
   },
 
   methods: {
@@ -994,9 +1066,6 @@ export default {
       ];
     },
     // 可以设置一个动态方法来更新当前玩家名字,后续优化接口
-    setCurrentPlayer(playerId) {
-      this.currentPlayerId = playerId;  // 设置当前玩家ID
-    },
     getRecipientLabel(recipients) {
       if (recipients === 'all') {
         return '所有人';
@@ -1059,8 +1128,8 @@ export default {
       if (this.userMessage.trim()) {
         // 创建消息对象
         const newMessage = {
-          senderid: this.currentPlayerId, // 假设当前玩家是“你”
-          sendername: this.currentPlayerName,
+          senderid: this.currentPlayer.index, // 假设当前玩家是“你”
+          sendername: this.currentPlayer.name,
           avatar: require('@/assets/head.png'),
           text: this.userMessage,
           recipients: this.isDead ? "dead" : this.messageRecipient // 死亡玩家只能发送给"dead"
