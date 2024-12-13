@@ -536,50 +536,50 @@ export default {
 
     // 这里的信息以后就不动了
     const initializeGameInterface = async () => {
-      try {
-        // Initialize the raw player data
-        players.value = gameData.value.players;
-        aiPlayers.value = gameData.value.ai_players;
+      // 初始化玩家信息
+      players.value = gameData.value.players;
+      aiPlayers.value = gameData.value.ai_players;
 
-        // Process human players
-        const playerProfiles = await Promise.all(
-          Object.keys(gameData.value.players).map(async (playerId) => {
-            const profile = await fetchSelectedProfile(playerId);
-            return {
-              index: gameData.value.players[playerId].index,
-              name: profile.name,
-              avatar: profile.avatar,
-              isAI: false,
-              userId: playerId,
-              isOnline: profile.isOnline,
-              isFriend: profile.isFriend,
-              stats: profile.stats,
-              recentGames: profile.recentGames
-            };
-          })
-        );
 
-        // Process AI players
-        const aiPlayerProfiles = Object.entries(gameData.value.ai_players).map(([id, info]) => ({
-          index: info.index,
-          name: info.name,
-          avatar: require("@/assets/ai.svg"),
-          isAI: true,
-          userId: id,
-          isOnline: true,
-          stats: [],
-          info: info  // Preserve original AI info if needed
-        }));
+      // 获取并设置所有玩家信息
+      const playerProfiles = {};
+      for (const playerId in gameData.value.players) {
+        const profile = await fetchSelectedProfile(playerId);
+        playerProfiles[playerId] = {
+          index: gameData.value.players[playerId].index,
+          name: profile.name,
+          avatar: profile.avatar,
+          isAI: false,
+          userId: playerId,
+          isOnline: profile.isOnline,
+          isFriend: profile.isFriend,
+          stats: profile.stats,
+          recentGames: profile.recentGames
+        };
 
-        // Update the reactive references
-        players.value = playerProfiles;
-        aiPlayers.value = aiPlayerProfiles;
-
-      } catch (error) {
-        console.error('Error initializing game interface:', error);
-        // Handle error appropriately (e.g., show error message to user)
       }
+
+      // 添加AI玩家信息
+      const aiPlayerProfiles = {};
+      for (const id in gameData.value.ai_players) {
+          aiPlayerProfiles[id] = {
+            name: gameData.value.ai_players[id].name,
+            index: gameData.value.ai_players[id].index,
+            avatar: require("@/assets/ai.svg"),
+            isAI: true,
+            userId: id,
+            isOnline: true,
+            stats: []
+          };
+
+      }
+
+      // 展开并合并所有玩家信息
+      players.value = playerProfiles;
+      aiPlayers.value = aiPlayerProfiles;
+
     };
+
 
 
     // 工具函数，用于阶段转换时更新信息; 要求为GameData类型
