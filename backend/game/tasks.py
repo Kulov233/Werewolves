@@ -451,8 +451,8 @@ def check_victory(room_id):
         return result
     return result
 
-@with_game_data_lock(timeout=5)
-async def end_current_phase(room_id): # TODO: BUG
+# @with_game_data_lock(timeout=5)
+def end_current_phase(room_id): # TODO: BUG
     try:
         game_cache = caches['game_cache']
         task_id = game_cache.get(f"room_{room_id}_current_task")
@@ -516,24 +516,29 @@ def handle_phase_timed_out(room_id: str, current_phase: str):
             # 结算狼人杀人
             get_kill_result(room_id)
             async_to_sync(GameConsumer.broadcast_game_update)(room_id, 'kill_phase_end', game_data)
+            game_data = game_cache.get(f"room:{room_id}")
             game_data["action_history"].append({
                 "all": "狼人请闭眼。"
             })
+            game_cache.set(f"room:{room_id}", game_data)
         elif current_phase == 'Prophet':
             async_to_sync(GameConsumer.broadcast_game_update)(room_id, 'check_phase_end', game_data)
             game_data["action_history"].append({
                 "all": "预言家请闭眼。"
             })
+            game_cache.set(f"room:{room_id}", game_data)
         elif current_phase == 'Witch':
             async_to_sync(GameConsumer.broadcast_game_update)(room_id, 'witch_phase_end', game_data)
             game_data["action_history"].append({
                 "all": "女巫请闭眼。"
             })
+            game_cache.set(f"room:{room_id}", game_data)
         elif current_phase == 'Day':
             async_to_sync(GameConsumer.broadcast_game_update)(room_id, 'talk_phase', game_data)
             game_data["action_history"].append({
                 "all": "请轮流发言。"
             })
+            game_cache.set(f"room:{room_id}", game_data)
         elif current_phase.startswith("Speak_"):
             index = current_phase.split("_")[1]
             # 此处是游戏内编号！
@@ -564,6 +569,7 @@ def handle_phase_timed_out(room_id: str, current_phase: str):
             async_to_sync(GameConsumer.broadcast_game_end)(room_id, end, victory, victory_side, reveal_role)
             if end:
                 print(f"{room_id}游戏结束。")
+                return
                 # TODO: 清理房间数据，留一个阶段以供复盘？
 
         # 3. 开始下一个阶段
@@ -684,7 +690,7 @@ def handle_ai_action(room_id: str, ai_id: str, phase: str, action: dict):
                 game_data["ai_players"][ai_id]["index"]: message
             })
 
-            async_to_sync(end_current_phase)(room_id)
+            end_current_phase(room_id)
         elif action["type"] == "vote":
             if result not in alive_player_indices:
                 print(f"AI在投票时选择的目标不合法：{result}")
@@ -751,7 +757,7 @@ def start_phase(room_id: str, phase: str):
         action["type"] = "kill"
 
         for ai_id, data in game_data["ai_players"].items():
-            if data["role"] == "Werewolf":
+            if data["role"] == "Werewolf" and data["alive"]:
                 handle_ai_action.apply_async(
                     args=[room_id, ai_id, phase, action],
                     countdown=delay
@@ -767,7 +773,7 @@ def start_phase(room_id: str, phase: str):
         })
         action["type"] = "check"
         for ai_id, data in game_data["ai_players"].items():
-            if data["role"] == "Prophet":
+            if data["role"] == "Prophet" and data["alive"]:
                 handle_ai_action.apply_async(
                     args=[room_id, ai_id, phase, action],
                     countdown=delay
@@ -778,7 +784,7 @@ def start_phase(room_id: str, phase: str):
         async_to_sync(GameConsumer.broadcast_game_update)(room_id, 'witch_phase', game_data)
         # 发送女巫的解药和毒药数量
         for user_id, data in game_data["players"].items():
-            if data["role"] == "Witch":
+            if data["role"] == "Witch" and data["alive"]:
                 cure_count = data["role_skills"]["cure_count"]
                 poison_count = data["role_skills"]["poison_count"]
                 cure_target = game_data["victims_info"]
@@ -853,11 +859,12 @@ def start_phase(room_id: str, phase: str):
         action["type"] = "vote"
 
         for ai_id, data in game_data["ai_players"].items():
-            handle_ai_action.apply_async(
-                args=[room_id, ai_id, phase, action],
-                countdown=delay
-            )
-            delay = min(delay + 3, 40)
+            if data["alive"]:
+                handle_ai_action.apply_async(
+                    args=[room_id, ai_id, phase, action],
+                    countdown=delay
+                )
+                delay = min(delay + 3, 40)
 
     # 2. 设置阶段结束定时器
     if phase.startswith("Speak_"):

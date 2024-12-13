@@ -10,6 +10,7 @@ from channels.layers import get_channel_layer
 from django.core.cache import caches
 
 import copy
+from asgiref.sync import sync_to_async
 
 from functools import wraps
 
@@ -278,9 +279,12 @@ class GameConsumer(AsyncWebsocketConsumer):
             }))
             return
 
+        role = None
+
         # 返回查验结果
         for _, data in players.items():
             if data['index'] == target:
+                role = data['role']
                 await self.send_check_result(room_id, user_id, target, role)
 
         index = game_data['players'][user_id]['index']
@@ -290,7 +294,7 @@ class GameConsumer(AsyncWebsocketConsumer):
 
         from .tasks import end_current_phase
         # 取消定时器
-        await end_current_phase(room_id)
+        await sync_to_async(end_current_phase)(room_id)
 
     @ensure_player_is_alive()
     @with_game_data_lock(timeout=5)
@@ -347,7 +351,7 @@ class GameConsumer(AsyncWebsocketConsumer):
                 valid_targets.append(data['index'])
 
         if poison:
-            if target not in valid_targets:
+            if poison not in valid_targets:
                 await self.send(text_data=json.dumps({
                     "type": "error",
                     "message": "毒杀目标不合法。目标不存在，或者已经死亡。"
@@ -376,7 +380,7 @@ class GameConsumer(AsyncWebsocketConsumer):
 
         from .tasks import end_current_phase
         # 取消定时器
-        await end_current_phase(room_id)
+        await sync_to_async(end_current_phase)(room_id)
 
     @ensure_player_is_alive()
     @with_game_data_lock(timeout=5)
@@ -442,7 +446,7 @@ class GameConsumer(AsyncWebsocketConsumer):
             return
 
         # 取消定时器
-        await end_current_phase(room_id)
+        await sync_to_async(end_current_phase)(room_id)
 
     @ensure_player_is_alive()
     @with_game_data_lock(timeout=5)

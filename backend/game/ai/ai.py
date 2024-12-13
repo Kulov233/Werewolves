@@ -9,7 +9,7 @@ from .prompts import PromptGenerator
 
 config_list = [
     {
-        'model': 'glm-4-plus',
+        'model': 'glm-4-air',
         'api_key': ZHIPUAI_API_KEY,  # 输入用户自己的api_key
         'base_url': 'https://open.bigmodel.cn/api/paas/v4/',
         'api_type': 'openai'
@@ -41,7 +41,7 @@ class AIPlayer():
         self.client = ZhipuAI(api_key=ZHIPUAI_API_KEY)
         self.session_id = time.time_ns()
         # self.messages: List[Message] = []
-        
+
         # self.tools_functions = {}  # 存储需要的工具函数
         # self.faction_indices: List[str] = []
         self.index = -1  # 未定义
@@ -58,7 +58,7 @@ class AIPlayer():
 
     def create(self, messages_to_send) -> str:
         response = self.client.chat.completions.create(
-            model="glm-4-plus",
+            model="glm-4-air",
             messages=messages_to_send,
             stream=False,
             temperature=0.6)
@@ -119,7 +119,7 @@ class AIPlayer():
             }
         ]
         response = self.client.chat.completions.create(
-            model="glm-4-plus",  # 请填写您要调用的模型名称
+            model="glm-4-air",  # 请填写您要调用的模型名称
             messages=prompt,
             tools=tools,
             tool_choice="auto",
@@ -162,7 +162,7 @@ class AIPlayer():
             }
         ]
         response = self.client.chat.completions.create(
-            model="glm-4-plus",  # 请填写您要调用的模型名称
+            model="glm-4-air",  # 请填写您要调用的模型名称
             messages=prompt,
             tools=tools,
             tool_choice="auto",
@@ -204,7 +204,7 @@ class AIPlayer():
             }
         ]
         response = self.client.chat.completions.create(
-            model="glm-4-plus",  # 请填写您要调用的模型名称
+            model="glm-4-air",  # 请填写您要调用的模型名称
             messages=prompt,
             tools=tools,
             tool_choice="auto",
@@ -282,7 +282,7 @@ class AIPlayer():
         if tools:
             prompt = self.prompt_generator.witch_prompt(self.messages, special_info, tool_prompt)
             response = self.client.chat.completions.create(
-                model="glm-4-plus",
+                model="glm-4-air",
                 messages=prompt,
                 tools=tools,
                 tool_choice="auto",
@@ -292,7 +292,7 @@ class AIPlayer():
             if tools.__len__() == 2:
                 result1 = json.loads(response.choices[0].message.tool_calls[0].function.arguments)["target"]
                 result2 = json.loads(response.choices[0].message.tool_calls[1].function.arguments)["target"]
-                return result1, result2
+                return str(result1), str(result2)
             else:
                 result = json.loads(response.choices[0].message.tool_calls[0].function.arguments)["target"]
                 if cure_tool in tools:
