@@ -869,6 +869,8 @@ def start_phase(room_id: str, phase: str):
     # 2. 设置阶段结束定时器
     if phase.startswith("Speak_"):
         phase_duration = phase_timer["Speak"]
+    elif phase.startswith("End"):
+        phase_duration = phase_timer["End"]
     else:
         phase_duration = phase_timer[phase]
     timer_task = handle_phase_timed_out.apply_async(
