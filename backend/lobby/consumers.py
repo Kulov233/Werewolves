@@ -603,7 +603,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                                 'alive': True,
                                 'role': None,  # 敏感
                                 'role_skills': None, # 敏感
-                                'action_history': None # 敏感
+                                # 'action_history': None # 敏感
                             }
                             for idx, (player_id, player_info) in enumerate(room_data["ai_players"].items())
                         },
@@ -618,12 +618,12 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                         "action_history": [], # 敏感
                         "phase_timer": {
                             "Initialize": 1,
-                            "Werewolf": 60,
-                            "Prophet": 20,
-                            "Witch": 30,
+                            "Werewolf": 40,
+                            "Prophet": 40,
+                            "Witch": 40,
                             "Day": 3,
-                            "Speak": 60,
-                            "Vote": 60,
+                            "Speak": 40,
+                            "Vote": 40,
                             'End': 3,
                         },
                         # ...

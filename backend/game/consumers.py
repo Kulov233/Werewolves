@@ -157,21 +157,27 @@ class GameConsumer(AsyncWebsocketConsumer):
         """
         接收客户端发送的消息。应该根据游戏目前所处阶段处理信息。
         """
-        data = json.loads(text_data)
-        action = data.get("type")
+        try:
+            data = json.loads(text_data)
+            action = data.get("type")
 
-        if action == "kill_vote":
-            await self.handle_kill_vote(data)
-        elif action == "check":
-            await self.handle_check(data)
-        elif action == "witch_action":
-            await self.handle_witch_action(data)
-        elif action == "talk_content":
-            await self.handle_talk_content(data)
-        elif action == "talk_end":
-            await self.handle_talk_end(data)
-        elif action == "vote":
-            await self.handle_vote(data)
+            if action == "kill_vote":
+                await self.handle_kill_vote(data)
+            elif action == "check":
+                await self.handle_check(data)
+            elif action == "witch_action":
+                await self.handle_witch_action(data)
+            elif action == "talk_content":
+                await self.handle_talk_content(data)
+            elif action == "talk_end":
+                await self.handle_talk_end(data)
+            elif action == "vote":
+                await self.handle_vote(data)
+        except Exception as e:
+            await self.send(text_data=json.dumps({
+                "type": "error",
+                "message": str(e)
+            }))
 
     @ensure_player_is_alive()
     @with_game_data_lock(timeout=5)
@@ -273,8 +279,9 @@ class GameConsumer(AsyncWebsocketConsumer):
             return
 
         # 返回查验结果
-        role = game_data['players'][target]['role']
-        await self.send_check_result(room_id, user_id, target, role)
+        for _, data in players.items():
+            if data['index'] == target:
+                await self.send_check_result(room_id, user_id, target, role)
 
         index = game_data['players'][user_id]['index']
         game_data['action_history'].append({
@@ -493,14 +500,15 @@ class GameConsumer(AsyncWebsocketConsumer):
 
     @classmethod
     async def broadcast_game_update(cls, room_id, event_type, game_data):
+        # TODO: 去掉注释
         # try:
         channel_layer = get_channel_layer()
 
         public_game_data = copy.deepcopy(game_data)
 
         # TODO: 去掉敏感信息
-        keys_to_remove = ["roles_for_humans_first", "game_specified_prompt", "victims_info",
-                          "poisoned_victims_info"]
+        keys_to_remove = ["roles_for_humans_first", "victory_conditions", "game_specified_prompt", "victims_info",
+                          "poisoned_victims_info", "voted_victims_info", "werewolves_targets", "votes", "action_history", "phase_transitions"]
 
         for key in keys_to_remove:
             public_game_data.pop(key, None)
@@ -522,7 +530,7 @@ class GameConsumer(AsyncWebsocketConsumer):
             {
                 "type": "game_message",
                 "event": event_type,
-                "game": public_game_data
+                "game": game_data
             }
         )
         # except Exception as e:
@@ -862,7 +870,7 @@ class GameConsumer(AsyncWebsocketConsumer):
         """
 
         await self.send(text_data=json.dumps({
-            "type": "talk_start",
+            "type": "talk_end",
             "player": player
         }))
 

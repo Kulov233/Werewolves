@@ -77,7 +77,8 @@ class AIExecutor:
             result = await sync_to_async(ai_player.recv)(message, alive_players)
         elif action["type"] == "witch":
             message = {
-                "type": "witch"
+                "type": "witch",
+                "special_info": action["special_info"]
             }
             result = await sync_to_async(ai_player.recv)(message, alive_players)
         elif action["type"] == "speak":
@@ -87,8 +88,7 @@ class AIExecutor:
             result = await sync_to_async(ai_player.recv)(message, alive_players)
         elif action["type"] == "vote":
             message = {
-                "type": "vote",
-                "special_info": action["special_info"]
+                "type": "vote"
             }
             result = await sync_to_async(ai_player.recv)(message, alive_players)
 
