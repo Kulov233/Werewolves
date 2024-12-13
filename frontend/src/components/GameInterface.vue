@@ -192,6 +192,68 @@ import { useWebSocket } from '@/composables/useWebSocket';
 import { validateGame, GameData } from '@/schemas/schemas';
 import axios from 'axios';
 
+// 创建axios实例
+const api = axios.create({
+  baseURL: 'http://localhost:8000'
+});
+
+// 添加请求拦截器
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// 添加响应拦截器
+api.interceptors.response.use(
+  (response) => {
+    return response;
+  },
+  async (error) => {
+    const originalRequest = error.config;
+
+    // 如果是401错误且不是刷新token的请求
+    if (error.response.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      try {
+        // 使用refresh token获取新的access token
+        const refreshToken = localStorage.getItem('refresh_token');
+        const response = await axios.post('http://localhost:8000/api/token/refresh/', {
+          refresh: refreshToken
+        });
+
+        // 更新access token
+        const newAccessToken = response.data.access;
+        localStorage.setItem('access_token', newAccessToken);
+
+        // 更新原始请求的Authorization header
+        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        
+        // 重试原始请求
+        return api(originalRequest);
+      } catch (refreshError) {
+        // refresh token也过期了，需要重新登录
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        // 重定向到登录页面
+        router.push('/login');  // 跳转到登录页面
+        
+        // 可以添加一些用户提示信息，提醒用户重新登录
+        alert('您的会话已过期，请重新登录。');
+        return Promise.reject(refreshError);
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 
 export default {
@@ -350,13 +412,13 @@ export default {
 
   setup() {
     // 弹窗以及websocket建立
-    const aiCounter = ref(1);
-
     const store = useStore();
     const router = useRouter();
     const roomData = ref(store.state.currentRoom);
     const userProfile = ref(store.state.userProfile);
     const token = localStorage.getItem('access_token');
+    // 获取当前room
+    const roomId = roomData.value.id;
     const { connect, sendMessage, onType, isConnected } = useWebSocket(token);
 
 
@@ -466,7 +528,7 @@ export default {
       // 合并所有玩家信息
       members.value = [...playerProfiles, ...aiPlayerProfiles];
 
-    }
+    };
 
 
     // 工具函数，用于阶段转换时更新信息; 要求为GameData类型
@@ -807,7 +869,7 @@ export default {
     onMounted(() => {
       // 只在未连接时初始化连接
       if (!isConnected.value) {
-        connect();
+        connect(roomId);
       }
       setupWebsocketListeners();
     });

@@ -4,8 +4,8 @@ import { useStore } from 'vuex';
 export function useWebSocket(token) {
   const store = useStore();
 
-  const connect = () => {
-    store.dispatch('initializeWebSocket', token);
+  const connect = (roomId = null) => {
+    store.dispatch('initializeWebSocket', { token, roomId });
   };
 
   const disconnect = () => {

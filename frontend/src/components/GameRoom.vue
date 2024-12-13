@@ -241,8 +241,9 @@
             </div>
             <button 
             class="start-game-btn"
-            :disabled="needMorePlayers"
-            :class="{ 'disabled': needMorePlayers }"
+            :disabled="needMorePlayers || !isHost"
+            :class="{ 'disabled': needMorePlayers || !isHost }"
+            @click="startGame"
             >
             开始游戏
             </button>
@@ -972,6 +973,32 @@ export default {
       }
     });
 
+    // 开始游戏方法
+    const startGame = () => {
+      if (!currentRoom.value || !isHost.value) return;
+      
+      sendMessage({
+        action: "start_game",
+        room_id: currentRoom.value.id
+      });
+
+
+      // TODO：可以加个弹窗，然后弹窗点确定后跳转到游戏界面
+
+      onType('game_prepared',   (data) => {
+        
+        // TODO: 存储房间信息
+
+
+        // 跳转到游戏界面
+        router.push({
+          name: 'GameInterface',
+          params: { id: data.room.id }
+        });
+      });
+    };
+
+
     return {
       currentRoom,
       hostProfile,
@@ -994,6 +1021,7 @@ export default {
       addAIPlayer,
       removeAIPlayer,
       aiCounter,
+      startGame,
       // ... 其他需要的数据和方法
     };
   },

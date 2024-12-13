@@ -6,9 +6,20 @@ export default createStore({
     wsHandlers: new Map(),
     currentRoom: null,
     userProfile: null,
-    isConnected: false
+    isConnected: false,
+    wsBaseUrl: 'ws://localhost:8000/ws', // WebSocket 基础 URL
+    wsEndpoint: 'lobby' // 默认端点
   },
   
+  getters: {
+    getWebSocketUrl: (state) => (token, roomId = null) => {
+      if (roomId) {
+        return `${state.wsBaseUrl}/game/${roomId}/?token=${token}`;
+      }
+      return `${state.wsBaseUrl}/${state.wsEndpoint}/?token=${token}`;
+    }
+  },
+
   mutations: {
     SET_WEBSOCKET(state, ws) {
       state.webSocket = ws;
@@ -32,16 +43,23 @@ export default createStore({
       if (state.wsHandlers.has(type)) {
         state.wsHandlers.get(type).delete(handler);
       }
+    },
+    SET_WS_BASE_URL(state, url) {
+      state.wsBaseUrl = url;
+    },
+    SET_WS_ENDPOINT(state, endpoint) {
+      state.wsEndpoint = endpoint;
     }
   },
   
   actions: {
-    initializeWebSocket({ commit, state }, token) {
+    initializeWebSocket({ commit, state, getters }, { token, roomId = null }) {
       if (state.webSocket && state.isConnected) {
-        return; // WebSocket already exists and is connected
+        return; // WebSocket 已连接
       }
 
-      const ws = new WebSocket(`ws://localhost:8000/ws/lobby/?token=${token}`);
+      const wsUrl = getters.getWebSocketUrl(token, roomId);
+      const ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
         commit('SET_CONNECTED', true);
@@ -55,7 +73,7 @@ export default createStore({
         // 自动重连逻辑
         setTimeout(() => {
           if (!state.isConnected) {
-            this.dispatch('initializeWebSocket', token);
+            this.dispatch('initializeWebSocket', { token, roomId });
           }
         }, 3000);
       };
@@ -74,6 +92,16 @@ export default createStore({
       };
 
       commit('SET_WEBSOCKET', ws);
+    },
+
+    // 配置 WebSocket URL
+    configureWebSocket({ commit }, { baseUrl, endpoint }) {
+      if (baseUrl) {
+        commit('SET_WS_BASE_URL', baseUrl);
+      }
+      if (endpoint) {
+        commit('SET_WS_ENDPOINT', endpoint);
+      }
     },
 
     // 发送WebSocket消息
