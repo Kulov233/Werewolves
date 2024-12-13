@@ -633,18 +633,19 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                         "Initialize": "Werewolf",
                         "Werewolf": "Prophet",
                         "Prophet": "Witch",
-                        "Witch": "Day",
+                        "Witch": "End_Night",
+                        "End_Night": "Day",
                         "Day": speaking_phases[0],
                     }
                     for i in range(room_data["max_players"] - 1):
                         room_data_in_game["phase_transitions"][speaking_phases[i]] = speaking_phases[i + 1]
                     room_data_in_game["phase_transitions"][speaking_phases[-1]] = "Vote"
-                    room_data_in_game["phase_transitions"]["Vote"] = "End"
-                    room_data_in_game["phase_transitions"]["End"] = "Werewolf"
+                    room_data_in_game["phase_transitions"]["Vote"] = "End_Day"
+                    room_data_in_game["phase_transitions"]["End_Day"] = "Werewolf"
                     """
-                    Initialize -> Werewolf -> Prophet -> Witch -> Day -> Speak_1 ->
+                    Initialize -> Werewolf -> Prophet -> Witch -> End_Night -> Day -> Speak_1 ->
                      Speak_2 -> ... -> Speak_n -> Vote 
-                     -> End -> Werewolf
+                     -> End_Day -> Werewolf
                      如果编号 n - len(room_data["players"]) > 0，则 Speak_n 为 AI 玩家发言
                     """
 

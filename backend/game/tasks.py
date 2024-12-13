@@ -559,7 +559,7 @@ def handle_phase_timed_out(room_id: str, current_phase: str):
 
             game_cache.set(f"room:{room_id}", game_data)
 
-        elif current_phase == 'End':
+        elif current_phase.startswith('End'):
             # 结算游戏胜利
             victory_result = check_victory(room_id)
             end = victory_result["end"]
