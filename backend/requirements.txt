@@ -11,3 +11,4 @@ channels-redis==4.2.1
 uvicorn[standard]==0.32.0
 celery==5.4.0
 django-jsonfield==1.4.1
+zhipuai==2.1.5.20241204
