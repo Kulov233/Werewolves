@@ -33,6 +33,7 @@ Django的数据库配置在backend/app/settings.py:105-114，redis的配置在ba
 
 完成配置并启动项目时，请使用uvicorn以获得WebSocket支持，并开启Celery以处理任务队列。  
 需要额外注意的是，如果在Windows下使用Celery，需要在环境变量中设置`FORKED_BY_MULTIPROCESSING`为`1`。  
+请自行在backend/game/ai/keys.py中配置AI Keys。
 在设置好后，可以通过以下指令启动：  
 ```shell
 # 在backend/下

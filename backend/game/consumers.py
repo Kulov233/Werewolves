@@ -119,10 +119,10 @@ class GameConsumer(AsyncWebsocketConsumer):
 
                 await self.accept()
 
-                await self.send(text_data=json.dumps({
-                    "type": "game_info",
-                    "game": game_data
-                }))
+                # await self.send(text_data=json.dumps({
+                #     "type": "game_info",
+                #     "game": game_data
+                # }))
 
                 await self.broadcast_game_update(room_id, "player_joined", game_data)
 
@@ -341,6 +341,7 @@ class GameConsumer(AsyncWebsocketConsumer):
                 }))
                 return
             game_data['victims_info'].remove(cure)
+            game_data["players"][user_id]['role_skills']['cure_count'] -= 1
 
         # 校验毒目标是否合法
         valid_targets = []
@@ -364,9 +365,12 @@ class GameConsumer(AsyncWebsocketConsumer):
                 }))
                 return
             game_data['poisoned_victims_info'].append(poison)
+            game_data["players"][user_id]['role_skills']['poison_count'] -= 1
 
         # 返回操作结果
         await self.send_witch_action_result(room_id, user_id, cure, poison)
+
+        await self.update_game_data_in_cache(room_id, game_data)
 
         index = game_data['players'][user_id]['index']
         if cure:
@@ -534,7 +538,7 @@ class GameConsumer(AsyncWebsocketConsumer):
             {
                 "type": "game_message",
                 "event": event_type,
-                "game": game_data
+                "game": public_game_data
             }
         )
         # except Exception as e:
