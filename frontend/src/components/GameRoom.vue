@@ -488,7 +488,7 @@ export default {
     const roomData = ref(store.state.currentRoom);
     const userProfile = ref(store.state.userProfile);
     const token = localStorage.getItem('access_token');
-    const { connect, sendMessage, onType, isConnected, disconnect } = useWebSocket(token);
+    const { connect, sendMessage, onType, isGameConnected, isLobbyConnected, disconnect } = useWebSocket(token);
     
 
     // 弹窗相关的状态
@@ -830,6 +830,20 @@ export default {
 
       const aiPlayerJoinedCleanup = onType('ai_player_joined', handleAIPlayerJoined);
       const aiPlayerLeftCleanup = onType('ai_player_left', handleAIPlayerLeft);
+
+      // 处理开始游戏
+      const gameStartedCleanup = onType('game_prepared', (data) => {
+        // TODO: 存储房间信息
+        // 跳转到游戏界面
+
+        // 确保是当前房间
+        if (data.room.id === currentRoom.value.id) {
+          router.push({
+            name: 'GameInterface',
+            params: { id: data.room.id }
+          });
+        }
+      });
       
       // 处理房间被移除
       const roomRemovedCleanup = onType('room_removed', (data) => {
@@ -870,6 +884,7 @@ export default {
 
       // 返回清理函数
       onUnmounted (() => {
+        gameStartedCleanup();
         playerJoinedCleanup();
         playerLeftCleanup();
         roomRemovedCleanup();
@@ -956,7 +971,7 @@ export default {
 
     onMounted(() => {
       // 只在未连接时初始化连接
-      if (!isConnected.value) {
+      if (!isLobbyConnected.value) {
         connect();
       }
       initializeRoom();
@@ -965,12 +980,7 @@ export default {
     });
 
     onUnmounted(() => {
-      if (roomData.value) {
-        sendMessage({
-          action: 'leave_room',
-          room_id: roomData.value.id
-        });
-      }
+
     });
 
     // 开始游戏方法
@@ -981,26 +991,15 @@ export default {
         action: "start_game",
         room_id: currentRoom.value.id
       });
-
-
       // TODO：可以加个弹窗，然后弹窗点确定后跳转到游戏界面
-
-      onType('game_prepared',   (data) => {
-
-        disconnect()
-        // TODO: 存储房间信息
-        // 跳转到游戏界面
-        router.push({
-          name: 'GameInterface',
-          params: { id: data.room.id }
-        });
-      });
-
 
     };
 
 
     return {
+      isLobbyConnected,
+      isGameConnected,
+      disconnect,
       currentRoom,
       hostProfile,
       members,

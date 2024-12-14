@@ -424,14 +424,17 @@ export default {
   setup() {
     // 弹窗以及websocket建立
     const store = useStore();
+    
     // const router = useRouter();
+
     const roomData = ref(store.state.currentRoom);
     // console.log(JSON.stringify(roomData, null, 2));
     const userProfile = ref(store.state.userProfile);
+
     const token = localStorage.getItem('access_token');
     // 获取当前room
     const roomId = roomData.value.id;
-    const { connect, sendMessage, onType, isConnected } = useWebSocket(token);
+    const { connectToGame, sendMessage, onType, disconnect, isLobbyConnected, isGameConnected } = useWebSocket(token);
 
 
     // 弹窗相关的状态
@@ -448,6 +451,7 @@ export default {
       role: "",
       role_skills: {},
     });
+
     // const selectedPlayerId = ref(null);
     const gameData = ref({
       id: "1c134013-3b54-4ccd-a2b9-e42ef088d9a9",
@@ -506,6 +510,8 @@ export default {
     })
 
     const syncTargets = ref({});
+
+    
     const currentPlayer = ref({
       index: "1",
       name: "apifox",
@@ -563,9 +569,6 @@ export default {
 
     // 这里的信息以后就不动了
     const initializeGameInterface = async () => {
-      // 初始化玩家信息
-      // console.log("GameInterfaceInit");
-      // console.log(gameData.value.players["1"].name);
 
       if (!initialized){
         players.value = gameData.value.players;
@@ -997,10 +1000,10 @@ export default {
     )
 
     onMounted(() => {
-      // 只在未连接时初始化连接
-      console.log("mounted");
-      if (!isConnected.value) {
-        connect(roomId);
+      // 只在未连接时初始化游戏房间连接
+      if (!isGameConnected.value) {
+        // 这里使用游戏房间的连接，而不是大厅连接
+        connectToGame(roomId);
       }
 
     });
@@ -1010,13 +1013,17 @@ export default {
         type: 'quit',
         action: 'leave_combat',
         player_id: currentPlayer.value.index,
-      });
+      }, 'game');
+      disconnect('game');
       // clearInterval(intervalId);
     });
 
 
 
     return{
+      isGameConnected,
+      isLobbyConnected,
+      connectToGame,
       gameData,
       userProfile,
       players,

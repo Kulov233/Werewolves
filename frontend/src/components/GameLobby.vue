@@ -508,11 +508,20 @@
               </div>
 
               <button 
-                class="join-button" 
-                @click.stop="joinRoom(room.id)"
-                :disabled="room.players.length + Object.keys(room.ai_players).length === room.max_players">
-                <span v-if="room.players.length + Object.keys(room.ai_players).length === room.max_players">房间已满</span>
-                <span v-else>加入房间</span>
+                class="join-button"
+                :class="{ 'return-button': isInRoom(room.id) }"
+                @click="joinRoom(room.id)"
+                :disabled="room.players.length + Object.keys(room.ai_players).length === room.max_players && !isInRoom(room.id)"
+              >
+                <span v-if="room.players.length + Object.keys(room.ai_players).length === room.max_players && !isInRoom(room.id)">
+                  房间已满
+                </span>
+                <span v-else-if="isInRoom(room.id)">
+                  返回房间
+                </span>
+                <span v-else>
+                  加入房间
+                </span>
               </button>
             </div>
           </transition-group>
@@ -856,7 +865,6 @@ export default {
 
       //userProfile: null,
 
-
       buttonPosition: {
         x: 20, // 初始X位置（右下角）
         y: 20, // 初始Y位置
@@ -879,12 +887,14 @@ export default {
 
     const selectedRoomForMatch = ref(null);
 
-    const isListening = ref(false);
+    const isListening = ref(true);
     const roomCreatedListenerCleanup = ref(null);
     const roomRemovedListenerCleanup = ref(null);
 
     const store = useStore();
     const router = useRouter();
+
+    const currentRoomID = ref(localStorage.getItem('currentRoomID'));
     
     let room_created = ref({})
     const userProfile = ref({
@@ -979,11 +989,11 @@ export default {
     };
 
     const token = localStorage.getItem('access_token');
-    const { connect, disconnect, sendMessage, onType, isConnected } = useWebSocket(token);
+    const { connect, disconnect, sendMessage, onType, isLobbyConnected } = useWebSocket(token);
 
     onMounted(() => {
       // 只在未连接时初始化连接
-      if (!isConnected.value) {
+      if (!isLobbyConnected.value) {
         connect();
       }
       fetchRoomData();
@@ -1036,6 +1046,16 @@ export default {
     const joinRoom = async (roomId) => {
   
       try {
+        
+        // 如果已经在房间中，直接跳转到房间页面
+        if (currentRoomID.value === roomId) {
+          router.push({
+            name: 'GameRoom',
+            params: { id: roomId }
+          });
+          return;
+        }
+
         // 发送加入房间的 websocket 消息
         sendMessage({
           action: 'join_room',
@@ -1044,6 +1064,10 @@ export default {
 
         // 监听加入房间响应
         const cleanup = onType('player_joined', async (data) => {
+
+          // 更新当前房间ID
+          currentRoomID.value = roomId;
+          localStorage.setItem('currentRoomID', roomId);
 
           // 存储房间数据和用户信息到 Vuex
           await store.dispatch('saveRoomData', data.room);
@@ -1307,6 +1331,8 @@ export default {
     };
 
     return {
+      joinRoom,
+      currentRoomID,
       handleDialogConfirm,
       handleDialogCancel,
       showDialog,
@@ -1318,7 +1344,6 @@ export default {
       isListening,
       handleListenChange,
       newRoom,
-      isConnected,
       sendMessage,
       Rooms,
       selectedProfile,
@@ -1330,7 +1355,6 @@ export default {
       updateSignature,
       fetchSelectedAvatar,
       initializeRoom,
-      joinRoom,
       createRoom,
       disconnect
       // 其他属性和方法
@@ -1381,6 +1405,12 @@ export default {
   mounted() {
     // 设置按钮初始位置为右下角
     
+    // 获取当前roomID
+    try {
+      this.currentRoomId = localStorage.getItem('currentRoomId');
+    } catch (error) {
+      console.error('获取当前房间ID失败:', error);
+    }
 
     this.$nextTick(() => {
       const roomList = this.$refs.roomList;
@@ -1410,6 +1440,12 @@ export default {
 
 
   methods: {
+
+  // 是当前房间
+  isInRoom(roomId) {
+    return this.currentRoomId === roomId;
+  },
+
      // 好友系统相关方法
   toggleFriendRequests() {
     this.showFriendRequests = !this.showFriendRequests;
@@ -3383,6 +3419,13 @@ export default {
   transform: none;
 }
 
+.join-button.return-button {
+  background-color: #67c23a;
+}
+
+.join-button.return-button:hover {
+  background-color: #5daf34;
+}
   
 /* 创建房间面板样式 */
 .create-room {
