@@ -262,7 +262,7 @@ def assign_roles_to_players(room_id):
             }
 
             if data["role"] == "Werewolf":
-                role_info["teammates"] = werewolves.copy().remove(data["index"])
+                role_info["teammates"] = [player for player in werewolves if player != data["index"]]
 
             async_to_sync(GameConsumer.send_role_to_player)(room_id, user_id, role_info)
 

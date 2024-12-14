@@ -134,6 +134,7 @@ class GameConsumer(AsyncWebsocketConsumer):
                 await self.broadcast_game_update(room_id, "player_joined", game_data)
 
                 # TODO: 用户全部连接后，开始游戏
+                # TODO: 重连时，发送角色信息
 
         except DenyConnection as e:
             await self.accept()
