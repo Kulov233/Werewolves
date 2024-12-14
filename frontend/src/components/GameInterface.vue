@@ -87,7 +87,7 @@
       <div class="chat-section">
         <div class="chat-box" ref="chatBox">
           <div class="chat-messages">
-            <div  v-for="message in filteredMessages" :key="message.senderid" class="message">
+            <div  v-for="message in messages" :key="message.senderid" class="message">
             <div class="message-avatar-container">
               <div class="message-avatar">
                 <img :src="message.avatar" alt="avatar" class="avatar1"/>
@@ -455,11 +455,11 @@ export default {
     // const currentDialogAction = ref('');
 
     // 消息列表
-    const messages= [
+    const messages= ref([
         { senderid: 1, sendername: "Wang", recipients: "all", avatar: require('@/assets/head.png'), text: "天亮请睁眼。昨晚，4号玩家被杀了。" },
         { senderid: 2, sendername: "Huang", recipients: "dead", avatar: require('@/assets/head.png'), text: "我只是个平民，什么也不知道，但我们绝对找出Werewolf了。" },
         { senderid: 3, sendername: "Zhao", recipients: "all", avatar: require('@/assets/head.png'), text: "他肯定有问题！" }
-      ];
+      ]);
     // 成员列表
     const players = ref({});
     const aiPlayers = ref({});
@@ -668,7 +668,9 @@ export default {
       };
 
       // 将消息推送到消息列表
-      messages.push(newMessage);
+      messages.value.push(newMessage);
+
+      console.log("message: " + JSON.stringify(newMessage))
 
       // 不滚动到底部
     }
@@ -979,7 +981,7 @@ export default {
       };
 
       // 将消息推送到消息列表
-      messages.push(newMessage);
+      messages.value.push(newMessage);
 
 
     }
