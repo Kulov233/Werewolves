@@ -18,6 +18,10 @@
         </div>
       </div>
 
+      <div class="phase_header" v-if="selectablePhaseAction">
+        {{gameData.current_phase}}
+      </div>
+
       <!-- 左侧滑出菜单 -->
       <transition name="slide-left">
         <div v-if="showMenuSidebar" class="sidebar menu-sidebar" @click.stop>
@@ -55,7 +59,7 @@
       <div class="player-list" v-if="Boolean(players && aiPlayers)">
         <!-- 使用 Object.values() 将对象的值转换为数组，并确保通过 .value 访问 ref 的值 -->
         <div v-for="(player, index) in [...Object.values(players), ...Object.values(aiPlayers)]" :key="index"
-             class="player-container">
+             :class="['player-container', { 'selected-player': index + 1 === selectedPlayer }]">
           <div :class="['player', { dead: ![...Object.values(gameData.players), ...Object.values(gameData.ai_players)][index].alive }]">
             <img
               :src="player.avatar"
@@ -65,12 +69,19 @@
               /><!-- 点击头像触发查看详情 -->
             <p>{{ index + 1 }}号{{" "}}{{ player.name }}<span v-if="player.userId === currentPlayer.index"> (你)</span></p> <!-- 如果是当前玩家，显示 "(你)" -->
           </div>
-          <!-- 添加按钮，根据 isTarget 属性决定是否显示 -->
-          <button v-if="selectableIndices.indexOf(index) !== -1" class="target-button" @click.stop="targetPlayer(index, $event)">
-            {{gameData.current_phase}}
+          <!-- 添加按钮，根据 是否是目标以及当前是否为可选择阶段 决定是否显示 -->
+          <button v-if="Boolean(selectableIndices.indexOf(index + 1) !== -1 &&
+          selectablePhaseAction !== '' )" class="target-button" @click.stop="targetPlayer(index + 1, $event)">
+            {{ selectablePhaseAction }}
           </button>
         </div>
       </div>
+
+      <!-- 确认选择按钮 -->
+      <div class="confirm-button" @click="confirmTarget">
+        确认选择
+      </div>
+
 
       <!-- 中间聊天框 -->
       <div class="chat-section">
@@ -141,19 +152,19 @@
             <span class="value">{{ victoryCondition }}</span>
         </div>
 
-<!--        这里可能不该出现这个信息，应该是被隐藏的吧-->
-<!--        <div class="role-item">-->
-<!--            <span class="label">存活队友：</span>-->
-<!--            <span class="value">{{ livingTeammates }}人</span>-->
-<!--        </div>-->
+
+        <div class="role-item" v-if="roleInfo.teammates">
+            <span class="label">存活队友：</span>
+            <span class="value">{{ roleInfo.teammates.map(number => `${number}号`).join('，') }}</span>
+        </div>
         <!-- 角色能力图标部分 -->
         <div class="role-abilities">
 
           <div class="abilities-container" v-if="roleInfo">
             <!-- 动态显示技能图标 -->
             <template v-for="ability in roleAbilitiesConfig[roleInfo.role]" :key="ability.id">
-              <!-- 如果当前技能数量为0则不显示 -->
-              <div class="ability-item" v-if="roleInfo.role_skills[ability.id + '_count']">
+              <!-- 如果当前技能数量为0，仍然继续显示 -->
+              <div class="ability-item">
                 <img 
                   :src="require(`@/assets/${ability.icon}`)" 
                   :alt="ability.name"
@@ -181,15 +192,15 @@
         @click.stop
         >
         <div class="player-details">
-          <img :src="selectedPlayer.avatar" alt="avatar" class="avatar-modal" />
-          <h4>{{ selectedPlayer.name }}</h4>
-          <p>角色：{{ selectedPlayer.role }}</p>
-          <p>阵营：{{ selectedPlayer.team }}</p>
-          <p>状态：{{ selectedPlayer.isDead ? '已死亡' : '存活' }}</p>
-          <button class="btn-report" @click="reportPlayer(selectedPlayer)">
+          <img :src="selectedShowPlayer.avatar" alt="avatar" class="avatar-modal" />
+          <h4>{{ selectedShowPlayer.name }}</h4>
+          <p>角色：{{ selectedShowPlayer.role }}</p>
+          <p>阵营：{{ selectedShowPlayer.team }}</p>
+          <p>状态：{{ selectedShowPlayer.isDead ? '已死亡' : '存活' }}</p>
+          <button class="btn-report" @click="reportPlayer(selectedShowPlayer)">
             <img class="icon" src="@/assets/report.svg" alt="举报" />
           </button>
-          <button class="btn-add-friend" @click="addFriend(selectedPlayer)">
+          <button class="btn-add-friend" @click="addFriend(selectedShowPlayer)">
             <img class="icon" src="@/assets/addFriend.svg" alt="添加好友" />
           </button>
         </div>
@@ -198,7 +209,7 @@
   </template>
   
 <script>
-import {onMounted, ref, onUnmounted, onBeforeMount} from 'vue';
+import {onMounted, ref, onUnmounted, onBeforeMount,} from 'vue';
 import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';
 import { useWebSocket } from '@/composables/useWebSocket';
@@ -386,11 +397,7 @@ export default {
       //   }
       //
       // ],
-      messages: [
-        { senderid: 1, sendername: "Wang", recipients: "all", avatar: require('@/assets/head.png'), text: "天亮请睁眼。昨晚，4号玩家被杀了。" },
-        { senderid: 2, sendername: "Huang", recipients: "dead", avatar: require('@/assets/head.png'), text: "我只是个平民，什么也不知道，但我们绝对找出Werewolf了。" },
-        { senderid: 3, sendername: "Zhao", recipients: "all", avatar: require('@/assets/head.png'), text: "他肯定有问题！" }
-      ],
+
       userMessage: "",
 
 
@@ -405,7 +412,6 @@ export default {
       showHistorySidebar: false,
 
       isDead: false, // 当前玩家是否死亡
-      selectedPlayer: null,  // 被选中的玩家
 
       playerDetailsTop: 0,  // 玩家详情框的top位置
       playerDetailsLeft: 0,  // 玩家详情框的left位置
@@ -414,9 +420,10 @@ export default {
       phase: null,
       // 其他狼人的投票
       sync_targets: [],
+      selectedShowPlayer: -1,
 
       // 日夜切换
-      isDayTime: true,  // 默认是白天
+
       sunMoonIcon: require('@/assets/sun.svg') , // 默认图标是太阳
       messageRecipient: "all", // 消息的接收者，默认为"所有人"
 
@@ -441,18 +448,25 @@ export default {
 
 
     // 弹窗相关的状态
-    const showDialog = ref(false);
-    const dialogTitle = ref('');
-    const dialogMessage = ref('');
-    const dialogShowConfirm = ref(true);
-    const currentDialogAction = ref('');
+    // const showDialog = ref(false);
+    // const dialogTitle = ref('');
+    // const dialogMessage = ref('');
+    // const dialogShowConfirm = ref(true);
+    // const currentDialogAction = ref('');
 
+    // 消息列表
+    const messages= [
+        { senderid: 1, sendername: "Wang", recipients: "all", avatar: require('@/assets/head.png'), text: "天亮请睁眼。昨晚，4号玩家被杀了。" },
+        { senderid: 2, sendername: "Huang", recipients: "dead", avatar: require('@/assets/head.png'), text: "我只是个平民，什么也不知道，但我们绝对找出Werewolf了。" },
+        { senderid: 3, sendername: "Zhao", recipients: "all", avatar: require('@/assets/head.png'), text: "他肯定有问题！" }
+      ];
     // 成员列表
     const players = ref({});
     const aiPlayers = ref({});
     const roleInfo = ref({
       role: "",
       role_skills: {},
+      teammates: [],
     });
 
     // const selectedPlayerId = ref(null);
@@ -521,8 +535,16 @@ export default {
       alive: true,
       online: true
     });
+
+    // 当前可选的角色，选中的角色，当前具体的选择阶段，是否确认选项
     const selectableIndices = ref([1, 2, 3]);
-    const selectedIndices = ref([]);
+    const selectedPlayer = ref(-1);
+    const selectablePhaseAction = ref("");
+    const confirmed = ref(false);
+    const isDayTime = ref(false);
+    // 当前为你的发言阶段
+    // TODO: 允许发言
+    const talkStart = ref(false);
 
     const fetchSelectedProfile = async (userId) => {
       try {
@@ -632,7 +654,24 @@ export default {
 
     };
 
+    // 发送系统消息
 
+
+    function sendSystemMessage(content) {
+      // 创建消息对象
+      const newMessage = {
+        senderid: 0, // 假设当前玩家是“你”
+        sendername: "系统信息",
+        avatar: require('@/assets/head.png'),
+        text: content,
+        recipients: "all" // 死亡玩家只能发送给"dead"
+      };
+
+      // 将消息推送到消息列表
+      messages.push(newMessage);
+
+      // 不滚动到底部
+    }
 
 
     // 工具函数，用于阶段转换时更新信息; 要求为GameData类型
@@ -645,7 +684,7 @@ export default {
       //   console.error('Validation errors: GameData validate failed; ' +
       //       'stopped updating game data.', result.errors);
       // }
-      if (!gameData.value){
+      if (!game){
         console.log("gameData is false");
       }
       else {
@@ -655,55 +694,74 @@ export default {
 
     }
 
+    // 等待一定时间用工具函数
+    const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
     // 投票用工具函数
-    async function selectPlayer(title, content, players, alive_as_target = false) {
+    async function select(title, content, time, players, alive_as_target = false) {
       // players: List[str], str为序号
-      selectableIndices.value = []
+      selectablePhaseAction.value = content;
+      console.log("selectedplayerbefore: " + selectedPlayer.value);
+
+      selectableIndices.value = [];
       if (alive_as_target){  // 选择所有活着的人，除了自己
         for (const player of [...Object.values(gameData.value.players), ...Object.values(gameData.value.ai_players)]){
 
           if (player.alive && player.index !== currentPlayer.value.index){
-            selectableIndices.value.push(player.index);
+            selectableIndices.value.push(Number(player.index));
           }
         }
       }
       else {  // 当前列表中的人
-        for (const number of players){
-          selectableIndices.value.push(number.toNumber());
-          console.log("choose able players: " + number)
+        for (const index of players){
+          selectableIndices.value.push(Number(index));
+          console.log("choose able players: " + index)
         }
       }
 
+
       // 显示结束按钮，显示计时器
-      console.log(selectableIndices.value.toString())
-      console.log("phase start: " + gameData.value.current_phase);
+      console.log(selectableIndices.value)
+      console.log("phase start: " + selectablePhaseAction.value + "time: " + time);
+      console.log("phase: " + selectablePhaseAction.value + "indices: " + selectableIndices.value);
+
       // 等待函数
-      const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
       // 等待此阶段对应的时间
-      await wait(1000 * gameData.value.phase_timer[gameData.value.current_phase.toString]);
+      for(let i=1; i<=time; i++){
+        await wait(1000);
+        if (confirmed.value){
+          selectableIndices.value = [];
+          confirmed.value = false;
+          console.log("selectedplayerafter: " + selectedPlayer.value);
+          let tmp = selectedPlayer.value;
+          selectedPlayer.value = -1
+          selectablePhaseAction.value = ""
+          return tmp;
+        }
+      }
+
       console.log("phase end: " + gameData.value.current_phase);
-      // 不能再选了，同时要移除提交按钮
+      // 不能再选了
+
+      // 如果没选中，返回-1
+
       selectableIndices.value = [];
-
-      // 弹窗消失的逻辑可以放在这里
-
-
-      // 返回选中的玩家或者其他逻辑
-      // 这里返回0作为示例，您可以根据实际情况返回相应的值
-      return selectedIndices.value;
+      let tmp = selectedPlayer.value;
+      selectedPlayer.value = -1
+      selectablePhaseAction.value = ""
+      return tmp;
     }
 
     // 展示信息用工具函数
-    function showInfo(title, content){
-      // TODO: 依据players列表展示相应的玩家，让玩家选中一个后弹窗消失
-      dialogTitle.value = title;
-      dialogMessage.value = content;
-      currentDialogAction.value = "showInfo";
-      dialogShowConfirm.value = true;
-      showDialog.value= true;
-      return 0;
-    }
+    // function showInfo(title, content){
+    //   dialogTitle.value = title;
+    //   dialogMessage.value = content;
+    //   currentDialogAction.value = "showInfo";
+    //   dialogShowConfirm.value = true;
+    //   showDialog.value= true;
+    //   return 0;
+    // }
 
     // // 狼人投票方法
     // function handleKillVote(seq_num){
@@ -714,26 +772,33 @@ export default {
     //       }
     //   )
     // }
-
-    // // 预言家查人
+    //
+    // 预言家查人
     // function handleCheck(seq_num){
     //   sendMessage(
     //       {
     //         type: "check",
     //         target: seq_num,
-    //       }
+    //       },
+    //       "game"
     //   )
     // }
 
     // 女巫操作
     function handleWitchAction(cure_num, poison_num){
-      sendMessage(
-          {
+      console.log(JSON.stringify({
             type: "witch_action",
-            cure: cure_num,
-            poison: poison_num,
-          }
-      )
+            cure: String(cure_num),
+            poison: String(poison_num),
+          }));
+      sendMessage(
+        {
+          type: "witch_action",
+          cure: String(cure_num),
+          poison: String(poison_num),
+        },
+        "game"
+      );
     }
 
     // // 聊天说话
@@ -769,7 +834,7 @@ export default {
     /* WebSocket实时监听部分*/
     function handlePlayerJoined(message){
       // 有人加入，更新内容
-      console.log("handle player join");
+      sendSystemMessage("玩家加入游戏");
       updateGame(message.game);
       // 进行初始化（如果还没有初始化过）
       initializeGameInterface();
@@ -778,18 +843,24 @@ export default {
 
     function handleRoleInfo(message) {
       // 处理分配角色信息
+
       console.log("role_info received");
       roleInfo.value = message.role_info;
+      sendSystemMessage("收到角色信息，你的角色为：" + roleInfo.value.role);
       console.log("role_info: " + JSON.stringify(roleInfo.value));
+
     }
 
     function handleNightPhase(message) {
       // 处理夜晚阶段
+      sendSystemMessage("天黑请闭眼");
+      isDayTime.value = false;
       updateGame(message.game);
     }
 
     function handleKillPhase(message) {
       // 处理Werewolf投票阶段
+      sendSystemMessage("狼人请投票杀人");
       gameData.value = message.game;
     }
 
@@ -800,37 +871,58 @@ export default {
 
     function handleKillResult(message) {
       // 处理刀人结果
+      if (message.kill_result){
+        sendSystemMessage(message.kill_result + "号玩家被你们杀死");
+      }
+
       updateGame(message.game)
     }
 
     function handleKillPhaseEnd(message) {
       // 刀人阶段结束的同步。这里其实不应同步游戏信息，因为到第二天早上人才会死。
+      sendSystemMessage("狼人阶段结束");
       updateGame(message.game);
     }
 
     function handleCheckPhase(message) {
       // 处理Prophet查人阶段, 不能告诉他谁死了
+      sendSystemMessage("预言家请选择要查验的玩家");
+      // 然后点击一个选中，消掉弹窗
       gameData.value.current_phase = message.game.current_phase;
+      // const check_target = select("选择要查验的目标", "查验",
+      // )
+
     }
 
     function handleCheckResult(message) {
       // 处理查人结果
-      // TODO: 弹窗？需要改进，弹一个包含所有角色的窗出来
-      // 然后点击一个选中，消掉弹窗
-      selectPlayer("查验结果", String(message.target) + "号的身份: " + message.role, this.players);
+      sendSystemMessage(message.target + "号玩家的身份为" + message.role);
     }
 
     function handleWitchPhase(message) {
       // 处理Witch阶段, 同样，不能真让人死了，否则就选不了了
+      sendSystemMessage("女巫阶段开始");
       gameData.value.current_phase = message.game.current_phase;
     }
 
-    function handleWitchInfo(message) {
+    async function handleWitchInfo(message) {
       // 处理Witch信息
+      roleInfo.value.role_skills = message.role_skills;
+      sendSystemMessage("女巫请选择使用解药和毒药");
+      // console.log("phase: " + selectablePhase.value + "indices: " + selectableIndices.value);
+      let cure_target = -1, poison_target = -1;
 
-      const cure_target = selectPlayer("解药选择", "请选择你要使用解药救的角色", message.cure_target);
-      const poison_target = selectPlayer("毒药选择", "请选择你要使用毒药杀死的角色", null, true);
-      console.log("cure: " + cure_target.toString());
+      if (roleInfo.value.role_skills.cure_count){
+        cure_target = await select("解药选择", "解救",
+            gameData.value.phase_timer.Witch / 2, message.cure_target, false);
+
+      }
+      if (roleInfo.value.role_skills.cure_count){
+         poison_target = await select("毒药选择", "毒杀",
+            gameData.value.phase_timer.Witch / 2, null, true);
+      }
+      console.log("cure: " + cure_target);
+
       handleWitchAction(cure_target, poison_target);
     }
 
@@ -844,7 +936,8 @@ export default {
 
     function handleDayPhase(message) {
       // 处理白天阶段
-      this.isDayTime = true;
+      isDayTime.value = true;
+      sendSystemMessage("天亮了，请睁眼");
       updateGame(message.game);
     }
 
@@ -860,12 +953,13 @@ export default {
       else {
         line = "昨晚" + line + "玩家被杀害了";
       }
-      showInfo("夜晚报告", line)
+      sendSystemMessage(line);
     }
 
-    function handleTalkPhase() {
+    function handleTalkPhase(message) {
       // 处理发言阶段
-      this.phase = "talk";
+      gameData.value = message.game;
+      sendSystemMessage("发言阶段开始");
     }
 
     function handleTalkUpdate(message) {
@@ -875,46 +969,51 @@ export default {
       // if (!message.source){
       //   return;
       // }
+      const speaker = [...Object.values(players), ...Object.values(aiPlayers)].find(player=>player.index === message.source)
       const newMessage = {
-        senderid: message.source, // 假设当前玩家是“你”
-        sendername: this.players[Number(message.source)].name,
-        avatar: this.players[Number(message.source)].avatar,
+        senderid: Number(message.source),
+        sendername: speaker.name,
+        avatar: speaker.avatar,
         text: message.message,
-        recipients: this.isDead ? "dead" : this.messageRecipient // 死亡玩家只能发送给"dead"
+        recipients: "all" // 死亡玩家只能发送给"dead"
       };
 
       // 将消息推送到消息列表
-      this.messages.push(newMessage);
+      messages.push(newMessage);
 
-      // 滚动到底部
-      this.scrollToBottom();
 
     }
 
     function handleTalkStart() {
       // 处理聊天到你
-      // TODO: 检测用户按下发消息案件；之前应该一直是灰的，只有这时候才能按。
+      // TODO: 想办法强制发个消息
+      // 等待计时时间，然后自动发送聊天框中的信息
+      talkStart.value = true;
+      wait(gameData.value.phase_timer[gameData.value.current_phase]);
+
+
     }
 
     function handleTalkEndByServer() {
       // 处理服务器发过来的聊天结束
-      this.scrollToBottom();
       // this.userMessage = "";  // 没必要直接清空
       // TODO: 消息按钮重新变成灰的
+      talkStart.value = false;
     }
 
-    function handleVotePhase() {
+    function handleVotePhase(message) {
       // 处理投票阶段
-      this.phase = "vote";
+      gameData.value = message.game;
+      sendSystemMessage("投票阶段开始，请选择你要放逐的玩家");
     }
 
     function handleVoteResult(message) {
       // 处理投票结果
       if (message.result === null){
-        showInfo("投票结果", "由于出现平票，没有人被放逐");
+        sendSystemMessage("投票结果: 由于出现平票，没有人被放逐");
       }
       else {
-        showInfo("投票结果", message.result + "号玩家被放逐");
+        sendSystemMessage("投票结果: "+ message.result + "号玩家被放逐");
       }
 
     }
@@ -931,17 +1030,17 @@ export default {
       else {
         line = "白天" + line + "玩家出局了";
       }
-      showInfo("白天报告", line)
+      sendSystemMessage(line)
     }
 
     function handleGameEnd(message) {
       // 处理游戏结束
       if (message.end){
         if (message.victory[this.role]){
-          showInfo("游戏结束！", "你的阵营获胜！");
+          sendSystemMessage("游戏结束！", "你的阵营获胜！");
         }
         else {
-          showInfo("游戏结束！", "你的阵营失败了……再接再厉！");
+          sendSystemMessage("游戏结束！", "你的阵营失败了……再接再厉！");
         }
       }
       // TODO: 展示所有人的角色并留两分钟复盘
@@ -1027,9 +1126,11 @@ export default {
 
 
     return{
+      messages,
       isGameConnected,
       isLobbyConnected,
       connectToGame,
+      sendMessage,
       gameData,
       userProfile,
       players,
@@ -1037,8 +1138,11 @@ export default {
       roleInfo,
       syncTargets,
       currentPlayer,
-      selectedIndices,
+      selectablePhaseAction: selectablePhaseAction,
+      selectedPlayer,
       selectableIndices,
+      confirmed,
+      isDaytime: isDayTime,
       // ...
     }
   },
@@ -1064,14 +1168,20 @@ export default {
 
     targetPlayer(index, event) {
       // 投票选中目标玩家的逻辑
-      this.selectedIndices.push(index);
-      this.selectableIndices = this.selectableIndices.filter(function(item) {
-        return item !== index
-      });
-      console.log("selectables: " + this.selectableIndices); // ["apple", "orange", "grape"]
+      this.selectedPlayer = index;
+      console.log("selectables: " + this.selectableIndices);
 
-      console.log("selected number " + index);
-      console.log(event.toString() - event.toString());
+      console.log("selected number " + this.selectedPlayer);
+      console.log(event.toString() - event.toString());  // event可能以后要用
+
+    },
+
+    confirmTarget(){
+      // 确认选择
+      if (this.selectedPlayer !== -1){
+        this.confirmed = true;
+        console.log("confirm selected player: " + this.selectedPlayer)
+      }
     },
 
     // 使用技能的方法
@@ -1141,7 +1251,8 @@ export default {
     },
     closePlayerDetails() {
       this.showDetails = false;
-      this.selectedPlayer = null;
+      // TODO: 这是什么？
+      this.selectedShowPlayer = null;
     },
 
 
@@ -1149,6 +1260,8 @@ export default {
     stopClick(event) {
       event.stopPropagation();
     },
+
+
 
     sendChatMessage() {
 
@@ -1164,6 +1277,10 @@ export default {
 
         // 将消息推送到消息列表
         this.messages.push(newMessage);
+        this.sendMessage({
+          type: "talk_content",
+          content: this.userMessage,
+        }, "game")
 
         // 清空输入框
         this.userMessage = "";
@@ -1184,7 +1301,7 @@ export default {
       alert("退出游戏");
     },
     showPlayerDetails(player, event) {
-      this.selectedPlayer = player;
+      this.selectedShowPlayer = player;
       this.showDetails = true;
 
       // 获取头像的位置
@@ -1292,6 +1409,14 @@ p {
   background: var(--background-color);
 }
 
+.phase_header {
+  background-color: #f8f8f8;
+  padding: 20px;
+  text-align: center;
+  font-size: 48px;
+  font-weight: bold;
+}
+
 .player-list {
   width: 18%;
   display: flex;
@@ -1304,6 +1429,11 @@ p {
   align-items: center; /* 垂直居中对齐 */
   justify-content: space-between; /* 水平分布元素 */
 }
+
+.selected-player {
+  background-color: rgba(56, 73, 204, 0.55); /* 替换 #your-color 为您想要的颜色 */
+}
+
 
 .currentPlayer {
   border: 3px solid #f39c12; /* 为当前玩家头像添加黄色边框 */
@@ -1895,4 +2025,24 @@ p {
 .sun-moon-icon:hover .sun-moon-icon-img {
   transform: scale(1.1);
 }
+
+/* 确认按钮样式 */
+.confirm-button {
+  position: absolute;
+  bottom: 80px; /* 调整到底部20px处 */
+  left: 30px; /* 调整到左边20px处 */
+  height: 50px;
+  width: 100px;
+  background-color: rgba(110, 110, 218, 0.87); /* 设置背景颜色为蓝色 */
+  border: crimson;
+  cursor: pointer;
+  transition: transform 0.3s ease;
+}
+
+/* 鼠标悬停时的效果 */
+.confirm-button:hover .confirm-icon {
+  transform: scale(1.05);
+}
+
+
 </style>
