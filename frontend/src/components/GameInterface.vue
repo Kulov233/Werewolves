@@ -66,8 +66,8 @@
             <p>{{ index + 1 }}号{{" "}}{{ player.name }}<span v-if="player.userId === currentPlayer.index"> (你)</span></p> <!-- 如果是当前玩家，显示 "(你)" -->
           </div>
           <!-- 添加按钮，根据 isTarget 属性决定是否显示 -->
-          <button v-if="player.isTarget" class="target-button" @click.stop="targetPlayer(index, $event)">
-            Target
+          <button v-if="selectableIndices.indexOf(index) !== -1" class="target-button" @click.stop="targetPlayer(index, $event)">
+            {{gameData.current_phase}}
           </button>
         </div>
       </div>
@@ -521,6 +521,7 @@ export default {
       alive: true,
       online: true
     });
+    const selectableIndices = ref([1, 2, 3]);
     const selectedIndices = ref([]);
 
     const fetchSelectedProfile = async (userId) => {
@@ -656,41 +657,41 @@ export default {
 
     // 投票用工具函数
     async function selectPlayer(title, content, players, alive_as_target = false) {
-
+      // players: List[str], str为序号
+      selectableIndices.value = []
       if (alive_as_target){  // 选择所有活着的人，除了自己
-        players = []
         for (const player of [...Object.values(gameData.value.players), ...Object.values(gameData.value.ai_players)]){
+
           if (player.alive && player.index !== currentPlayer.value.index){
-            players.push(player.index);
+            selectableIndices.value.push(player.index);
           }
         }
       }
-
-      // 设置对话框标题和内容
-      dialogTitle.value = title;
-      dialogMessage.value = content;
-      currentDialogAction.value = "selectPlayer";
-      dialogShowConfirm.value = true;
-      showDialog.value = true;
-
-      // 显示所有玩家
-      for (const player of players) {
-        player.show();
+      else {  // 当前列表中的人
+        for (const number of players){
+          selectableIndices.value.push(number.toNumber());
+          console.log("choose able players: " + number)
+        }
       }
 
+      // 显示结束按钮，显示计时器
+      console.log(selectableIndices.value.toString())
+      console.log("phase start: " + gameData.value.current_phase);
       // 等待函数
       const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
       // 等待此阶段对应的时间
       await wait(1000 * gameData.value.phase_timer[gameData.value.current_phase.toString]);
+      console.log("phase end: " + gameData.value.current_phase);
+      // 不能再选了，同时要移除提交按钮
+      selectableIndices.value = [];
 
       // 弹窗消失的逻辑可以放在这里
-      // 例如：关闭对话框
-      showDialog.value = false;
+
 
       // 返回选中的玩家或者其他逻辑
       // 这里返回0作为示例，您可以根据实际情况返回相应的值
-      return 0;
+      return selectedIndices.value;
     }
 
     // 展示信息用工具函数
@@ -829,6 +830,7 @@ export default {
 
       const cure_target = selectPlayer("解药选择", "请选择你要使用解药救的角色", message.cure_target);
       const poison_target = selectPlayer("毒药选择", "请选择你要使用毒药杀死的角色", null, true);
+      console.log("cure: " + cure_target.toString());
       handleWitchAction(cure_target, poison_target);
     }
 
@@ -1036,6 +1038,7 @@ export default {
       syncTargets,
       currentPlayer,
       selectedIndices,
+      selectableIndices,
       // ...
     }
   },
@@ -1062,7 +1065,13 @@ export default {
     targetPlayer(index, event) {
       // 投票选中目标玩家的逻辑
       this.selectedIndices.push(index);
+      this.selectableIndices = this.selectableIndices.filter(function(item) {
+        return item !== index
+      });
+      console.log("selectables: " + this.selectableIndices); // ["apple", "orange", "grape"]
+
       console.log("selected number " + index);
+      console.log(event.toString() - event.toString());
     },
 
     // 使用技能的方法
@@ -1284,10 +1293,16 @@ p {
 }
 
 .player-list {
-  width: 20%;
+  width: 18%;
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.player-container {
+  display: flex; /* 使用flex布局 */
+  align-items: center; /* 垂直居中对齐 */
+  justify-content: space-between; /* 水平分布元素 */
 }
 
 .currentPlayer {
@@ -1343,7 +1358,7 @@ p {
   border-radius: 50%; /* 设置边框半径为50%，使按钮成为圆形 */
   cursor: pointer; /* 鼠标悬停时显示指针 */
   outline: none; /* 移除点击时的轮廓线 */
-  font-size: 16px; /* 设置按钮文字大小 */
+  font-size: 8px; /* 设置按钮文字大小 */
   transition: background-color 0.3s; /* 添加背景颜色变化的过渡效果 */
 }
 
