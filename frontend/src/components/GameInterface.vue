@@ -54,9 +54,9 @@
       <!-- 左侧玩家列表 -->
       <div class="player-list" v-if="Boolean(players && aiPlayers)">
         <!-- 使用 Object.values() 将对象的值转换为数组，并确保通过 .value 访问 ref 的值 -->
-
-          <div v-for="(player, index) in [...Object.values(players), ...Object.values(aiPlayers)]" :key="index"
-               :class="['player', { dead: ![...Object.values(gameData.players), ...Object.values(gameData.ai_players)][index].alive }]">
+        <div v-for="(player, index) in [...Object.values(players), ...Object.values(aiPlayers)]" :key="index"
+             class="player-container">
+          <div :class="['player', { dead: ![...Object.values(gameData.players), ...Object.values(gameData.ai_players)][index].alive }]">
             <img
               :src="player.avatar"
               alt="avatar"
@@ -65,9 +65,12 @@
               /><!-- 点击头像触发查看详情 -->
             <p>{{ index + 1 }}号{{" "}}{{ player.name }}<span v-if="player.userId === currentPlayer.index"> (你)</span></p> <!-- 如果是当前玩家，显示 "(你)" -->
           </div>
+          <!-- 添加按钮，根据 isTarget 属性决定是否显示 -->
+          <button v-if="player.isTarget" class="target-button" @click.stop="targetPlayer(index, $event)">
+            Target
+          </button>
+        </div>
       </div>
-
-
 
       <!-- 中间聊天框 -->
       <div class="chat-section">
@@ -517,7 +520,8 @@ export default {
       name: "apifox",
       alive: true,
       online: true
-    })
+    });
+    const selectedIndices = ref([]);
 
     const fetchSelectedProfile = async (userId) => {
       try {
@@ -1031,6 +1035,7 @@ export default {
       roleInfo,
       syncTargets,
       currentPlayer,
+      selectedIndices,
       // ...
     }
   },
@@ -1053,6 +1058,12 @@ export default {
   },
 
   methods: {
+
+    targetPlayer(index, event) {
+      // 投票选中目标玩家的逻辑
+      this.selectedIndices.push(index);
+      console.log("selected number " + index);
+    },
 
     // 使用技能的方法
     useAbility(ability) {
@@ -1319,6 +1330,28 @@ p {
   font-weight: bold;
   color: var(--name-color);
 }
+
+.target-button {
+  padding: 10px; /* 内边距可以根据需要调整 */
+  width: 50px; /* 设置按钮的宽度 */
+  height: 50px; /* 设置按钮的高度 */
+  border: none; /* 移除边框 */
+  background-color: #3586bb; /* 设置按钮的背景颜色 */
+  color: white; /* 设置按钮文字颜色 */
+  text-align: center; /* 文字居中 */
+  line-height: 30px; /* 调整行高以适应按钮的高度 */
+  border-radius: 50%; /* 设置边框半径为50%，使按钮成为圆形 */
+  cursor: pointer; /* 鼠标悬停时显示指针 */
+  outline: none; /* 移除点击时的轮廓线 */
+  font-size: 16px; /* 设置按钮文字大小 */
+  transition: background-color 0.3s; /* 添加背景颜色变化的过渡效果 */
+}
+
+/* 鼠标悬停时的按钮样式 */
+.target-button:hover {
+  background-color: #1150b9; /* 鼠标悬停时改变背景颜色 */
+}
+
 
 .player span {
   font-size: 12px;
