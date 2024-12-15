@@ -207,7 +207,16 @@
           </button>
         </div>
       </div>
+      <!--  弹出查验结果   -->
+      <ConfirmDialog
+      :show="showDialog"
+      :title="dialogTitle"
+      :message="dialogMessage"
+      :showConfirm="dialogShowConfirm"
+      @confirm="handleDialogConfirm"
+    />
     </div>
+
   </template>
   
 <script>
@@ -217,6 +226,7 @@ import { useRouter } from 'vue-router';
 import { useWebSocket } from '@/composables/useWebSocket';
 // import { validateGame } from '@/schemas/schemas.js';
 import axios from 'axios';
+import ConfirmDialog from "@/components/shared_components/ConfirmDialog.vue";
 
 
 const router = useRouter();
@@ -285,6 +295,7 @@ api.interceptors.response.use(
 
 
 export default {
+  components: {ConfirmDialog},
   data() {
     return {
       // 计时方式
@@ -452,11 +463,13 @@ export default {
 
 
     // 弹窗相关的状态
-    // const showDialog = ref(false);
-    // const dialogTitle = ref('');
-    // const dialogMessage = ref('');
-    // const dialogShowConfirm = ref(true);
-    // const currentDialogAction = ref('');
+    const showDialog = ref(false);
+    const dialogTitle = ref('');
+    const dialogMessage = ref('');
+    const dialogShowConfirm = ref(true);
+    const currentDialogAction = ref('');
+
+    const handleDialogConfirm = () => { showDialog.value = false; }
 
     // 消息列表
     const messages= ref([
@@ -767,35 +780,41 @@ export default {
     }
 
     // 展示信息用工具函数
-    // function showInfo(title, content){
-    //   dialogTitle.value = title;
-    //   dialogMessage.value = content;
-    //   currentDialogAction.value = "showInfo";
-    //   dialogShowConfirm.value = true;
-    //   showDialog.value= true;
-    //   return 0;
-    // }
+    function showInfo(title, content){
+      // TODO: 美化，按网易的做？
+      dialogTitle.value = title;
+      dialogMessage.value = content;
+      currentDialogAction.value = "showInfo";
+      dialogShowConfirm.value = true;
+      showDialog.value= true;
+      return 0;
+    }
 
-    // // 狼人投票方法
-    // function handleKillVote(seq_num){
-    //   sendMessage(
-    //       {
-    //         type: "kill_vote",
-    //         target: seq_num,  // TODO: 需要把这里改为真实投票。弹窗？
-    //       }
-    //   )
-    // }
-    //
+    // 狼人投票方法
+    function handleKillVote(seq_num){
+      const actionToSend = {
+        type: "kill_vote",
+        target: String(seq_num)
+      }
+      if (seq_num === -1){
+        actionToSend.target = null
+      }
+      sendMessage(actionToSend,
+        "game")
+    }
+
     // 预言家查人
-    // function handleCheck(seq_num){
-    //   sendMessage(
-    //       {
-    //         type: "check",
-    //         target: seq_num,
-    //       },
-    //       "game"
-    //   )
-    // }
+    function handleCheck(seq_num){
+      const actionToSend = {
+        type: "check",
+        target: String(seq_num)
+      }
+      if (seq_num === -1){
+        actionToSend.target = null
+      }
+      sendMessage(actionToSend,
+        "game")
+    }
 
     // 女巫操作
     function handleWitchAction(cure_num, poison_num){
@@ -878,11 +897,16 @@ export default {
       updateGame(message.game);
     }
 
-    function handleKillPhase(message) {
+    async function handleKillPhase(message) {
       // 处理Werewolf投票阶段
 
       sendSystemMessage("狼人请投票杀人");
       gameData.value = message.game;
+      if (roleInfo.value.role === "Werewolf") {
+        const killVoteTarget = await select("选择要杀死的目标", "杀死",
+            gameData.value.phase_timer[gameData.value.current_phase], null, true);
+        handleKillVote(killVoteTarget)
+      }
     }
 
     function handleWolfSync(message) {
@@ -905,22 +929,28 @@ export default {
       updateGame(message.game);
     }
 
-    function handleCheckPhase(message) {
+    async function handleCheckPhase(message) {
       // 处理Prophet查人阶段, 不能告诉他谁死了
       sendSystemMessage("预言家请选择要查验的玩家");
       updateGame(message.game);
-      // const check_target = select("选择要查验的目标", "查验",
-      // )
+      if (roleInfo.value.role === "Prophet"){
+
+        const checkTarget = await select("选择要查验的目标", "查验",
+            gameData.value.phase_timer[gameData.value.current_phase], null, true);
+
+        handleCheck(checkTarget)
+      }
 
     }
 
     function handleCheckResult(message) {
       // 处理查人结果
       sendSystemMessage(message.target + "号玩家的身份为" + message.role);
+      showInfo("查验结果", message.target + "号玩家的身份为" + message.role);
     }
 
     function handleWitchPhase(message) {
-      // 处理Witch阶段,
+      // 处理Witch阶段
       updateGame(message.game);
       sendSystemMessage("女巫阶段开始");
       gameData.value.current_phase = message.game.current_phase;
@@ -928,34 +958,42 @@ export default {
 
     async function handleWitchInfo(message) {
       // 处理Witch信息
+      if(roleInfo.value.role === "Witch"){
+        roleInfo.value.role_skills = message.role_skills;
+        sendSystemMessage("女巫请选择使用解药和毒药");
+        // console.log("phase: " + selectablePhase.value + "indices: " + selectableIndices.value);
+        let cure_target = -1, poison_target = -1;
 
-      roleInfo.value.role_skills = message.role_skills;
-      sendSystemMessage("女巫请选择使用解药和毒药");
-      // console.log("phase: " + selectablePhase.value + "indices: " + selectableIndices.value);
-      let cure_target = -1, poison_target = -1;
+        if (roleInfo.value.role_skills.cure_count){
+          cure_target = await select("解药选择", "解救",
+              gameData.value.phase_timer.Witch / 2, message.cure_target, false);
 
-      if (roleInfo.value.role_skills.cure_count){
-        cure_target = await select("解药选择", "解救",
-            gameData.value.phase_timer.Witch / 2, message.cure_target, false);
+        }
+        if (roleInfo.value.role_skills.poison_count){
+           poison_target = await select("毒药选择", "毒杀",
+              gameData.value.phase_timer.Witch / 2, null, true);
+        }
+        timerSeconds.value = 0;
 
+
+        handleWitchAction(cure_target, poison_target);
       }
-      if (roleInfo.value.role_skills.poison_count){
-         poison_target = await select("毒药选择", "毒杀",
-            gameData.value.phase_timer.Witch / 2, null, true);
-      }
-      timerSeconds.value = 0;
 
-
-      handleWitchAction(cure_target, poison_target);
     }
 
     function handleWitchActionResult(message) {
       // 处理Witch操作结果
+      let line = ""
       if (message.cure){
         roleInfo.value.cure_count -= 1;
+        line += "你选择对" + message.cure + "号玩家使用解药";
       }
       if (message.poison){
         roleInfo.value.poison_count -= 1;
+        line += "你选择对" + message.poison + "号玩家使用毒药";
+      }
+      if (line !== ""){
+        showInfo("女巫行动", line);
       }
       // TODO: 其实这个信息没有必要提示给玩家，本来也是不知道的。理论上完全不会出现非法情况。
     }
@@ -970,6 +1008,9 @@ export default {
     function handleNightDeathInfo(message) {
       // 处理晚上死掉的人
       let line = message.victims.join("号，");
+      if (line.length <= 3){
+        line += "号";  // 如果只有一个死者，末尾需要加一个
+      }
       if (line === ""){
         sendSystemMessage("昨晚是平安夜");
       }
@@ -981,6 +1022,7 @@ export default {
     function handleTalkPhase(message) {
       // 处理发言阶段
       gameData.value = message.game;
+
       sendSystemMessage("发言阶段开始");
     }
 
@@ -1047,6 +1089,9 @@ export default {
     function handleDayDeathInfo(message) {
       // 处理白天死掉的人
       let line = message.victims.join("号，");
+      if (line.length <= 3){
+        line += "号";  // 如果只有一个死者，末尾需要加一个
+      }
       if (line === ""){
         sendSystemMessage("今天白天没有人出局");
       }
@@ -1168,6 +1213,13 @@ export default {
       confirmed,
       isDayTime,
       timerSeconds,
+
+      // 对话框相关
+      handleDialogConfirm,
+      showDialog,
+      dialogTitle,
+      dialogMessage,
+      dialogShowConfirm,
       // ...
     }
   },
