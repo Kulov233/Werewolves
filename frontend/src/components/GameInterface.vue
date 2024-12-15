@@ -70,10 +70,13 @@
               @click.stop="showPlayerDetails(player, $event)"
               /><!-- 点击头像触发查看详情 -->
             <p>{{ index + 1 }}号{{" "}}{{ player.name }}<span v-if="player.userId === currentPlayer.index"> (你)</span></p> <!-- 如果是当前玩家，显示 "(你)" -->
+            <div class="sync-targets" v-if="syncTargets[String(index + 1)]">
+              {{ '队友' + syncTargets[String(index + 1)].join('号, ') + '号已选择此目标' }}
+            </div>
           </div>
           <!-- 添加按钮，根据 是否是目标以及当前是否为可选择阶段 决定是否显示 -->
           <button v-if="Boolean(selectableIndices.indexOf(index + 1) !== -1 &&
-          selectablePhaseAction !== '' )" class="target-button" @click.stop="targetPlayer(index + 1, $event)">
+          selectablePhaseAction !== '' )" class="target-button" @click.stop="targetPlayer(index + 1)">
             {{ selectablePhaseAction }}
           </button>
         </div>
@@ -364,55 +367,6 @@ export default {
         ]
         // ... 可以继续添加其他角色的技能配置
       },
-      // players: [
-      //   {
-      //     id: 1,
-      //     name: "Wang",
-      //     avatar: require('@/assets/head.png'),
-      //     isDead: false,
-      //     role: "Werewolf",
-      //     team: "Werewolf阵营",
-      //     victoryCondition: "淘汰所有人类"
-      //   },
-      //   {
-      //     id: 2,
-      //     name: "Huang",
-      //     avatar: require('@/assets/head.png'),
-      //     isDead: true,
-      //     role: "平民",
-      //     team: "人类阵营",
-      //     victoryCondition: "找出所有Werewolf"
-      //   },
-      //   {
-      //     id: 3,
-      //     name: "Zhao",
-      //     avatar: require('@/assets/head.png'),
-      //     isDead: false,
-      //     role: "Werewolf",
-      //     team: "Werewolf阵营",
-      //     victoryCondition: "淘汰所有人类"
-      //   },
-      //   {
-      //     id: 4,
-      //     name: "Li",
-      //     avatar: require('@/assets/head.png'),
-      //     isDead: true,
-      //     role: "平民",
-      //     team: "人类阵营",
-      //     victoryCondition: "找出所有Werewolf"
-      //   },
-      //   {
-      //     id: 5,
-      //     name: "Liu",
-      //     avatar: require('@/assets/head.png'),
-      //     isDead: true,
-      //     role: "平民",
-      //     team: "人类阵营",
-      //     victoryCondition: "找出所有Werewolf"
-      //   }
-      //
-      // ],
-
       userMessage: "",
 
 
@@ -433,8 +387,7 @@ export default {
 
       // （小）阶段标记
       phase: null,
-      // 其他狼人的投票
-      sync_targets: [],
+
       selectedShowPlayer: -1,
 
       // 日夜切换
@@ -453,7 +406,7 @@ export default {
     // const router = useRouter();
 
     const roomData = ref(store.state.currentRoom);
-    // console.log(JSON.stringify(roomData, null, 2));
+
     const userProfile = ref(store.state.userProfile);
 
     const token = localStorage.getItem('access_token');
@@ -472,11 +425,7 @@ export default {
     const handleDialogConfirm = () => { showDialog.value = false; }
 
     // 消息列表
-    const messages= ref([
-        { senderid: 1, sendername: "Wang", recipients: "all", avatar: require('@/assets/head.png'), text: "天亮请睁眼。昨晚，4号玩家被杀了。" },
-        { senderid: 2, sendername: "Huang", recipients: "dead", avatar: require('@/assets/head.png'), text: "我只是个平民，什么也不知道，但我们绝对找出Werewolf了。" },
-        { senderid: 3, sendername: "Zhao", recipients: "all", avatar: require('@/assets/head.png'), text: "他肯定有问题！" }
-      ]);
+    const messages= ref([]);
     // 成员列表
     const players = ref({});
     const aiPlayers = ref({});
@@ -543,11 +492,12 @@ export default {
       }
     })
 
+    // 其他狼人的投票
     const syncTargets = ref({});
 
     
     const currentPlayer = ref({
-      index: "1",
+      index: "6",
       name: "apifox",
       alive: true,
       online: true
@@ -555,6 +505,8 @@ export default {
 
     // 计时器
     const timerSeconds = ref(10);
+    // 一个用于管理select里面时间长度的变量，如果到时间结束会变成0（重置），点击结束则是会变成剩余时间
+    const timeElapsed = ref(0);
 
     // 当前可选的角色，选中的角色，当前具体的选择阶段，是否确认选项
     const selectableIndices = ref([1, 2, 3]);
@@ -624,21 +576,33 @@ export default {
         // 获取并设置所有玩家信息
         const playerProfiles = {};
         for (const playerId of Object.keys(gameData.value.players)) {
-        // console.log(playerId);
-        const profile = await fetchSelectedProfile(playerId);
-        playerProfiles[playerId] = {
-          index: gameData.value.players[playerId].index,
-          name: profile.name,
-          avatar: profile.avatar,
-          isAI: false,
-          userId: playerId,
-          isOnline: profile.isOnline,
-          isFriend: profile.isFriend,
-          stats: profile.stats,
-          recentGames: profile.recentGames
-          };
+          // console.log(playerId);
+          const profile = await fetchSelectedProfile(playerId);
+          playerProfiles[playerId] = {
+            index: gameData.value.players[playerId].index,
+            name: profile.name,
+            avatar: profile.avatar,
+            isAI: false,
+            userId: playerId,
+            isOnline: profile.isOnline,
+            isFriend: profile.isFriend,
+            stats: profile.stats,
+            recentGames: profile.recentGames
+            };
 
+          if (String(userProfile.value.userId) === String(playerId)){
+            currentPlayer.value = {
+              index: gameData.value.players[playerId].index,
+              name: profile.name,
+              alive: true,
+              online: true,
+            }
+            console.log("profile id: " + userProfile.value.userId);
+            console.log("player id: " + playerId);
+            console.log("index: " + gameData.value.players[playerId].index);
+          }
         }
+
 
 
         // 添加AI玩家信息
@@ -763,6 +727,8 @@ export default {
           let tmp = selectedPlayer.value;
           selectedPlayer.value = -1
           selectablePhaseAction.value = ""
+          // 将已经度过的时间提升
+          timeElapsed.value += i;
           return tmp;
         }
       }
@@ -771,7 +737,7 @@ export default {
       // 不能再选了
 
       // 如果没选中，返回-1
-
+      timeElapsed.value = 0;
       selectableIndices.value = [];
       let tmp = selectedPlayer.value;
       selectedPlayer.value = -1
@@ -801,6 +767,22 @@ export default {
       }
       sendMessage(actionToSend,
         "game")
+      if (gameData.value.current_phase === "Werewolf"){
+        handleMultipleKillVotes();
+      }
+      else {
+        syncTargets.value = {};
+        timeElapsed.value = 0;
+      }
+    }
+
+    async function handleMultipleKillVotes(){
+      if (roleInfo.value.role === "Werewolf") {
+        // 这里可能会被执行多次，所以要保证时间不会过长
+        const killVoteTarget = await select("选择要杀死的目标", "杀死",
+            gameData.value.phase_timer[gameData.value.current_phase] - timeElapsed.value, null, true);
+        handleKillVote(killVoteTarget);
+      }
     }
 
     // 预言家查人
@@ -902,16 +884,29 @@ export default {
 
       sendSystemMessage("狼人请投票杀人");
       gameData.value = message.game;
-      if (roleInfo.value.role === "Werewolf") {
-        const killVoteTarget = await select("选择要杀死的目标", "杀死",
-            gameData.value.phase_timer[gameData.value.current_phase], null, true);
-        handleKillVote(killVoteTarget)
-      }
+
+      await handleMultipleKillVotes();
     }
 
     function handleWolfSync(message) {
       // 处理Werewolf投票同步
-      syncTargets.value = message.targets
+      const targetDict = {}
+      for (const vote of Object.values(message.targets)){
+        if (vote){
+          // 对于每个存在的目标，建立一个列表
+          targetDict[vote] = [];
+        }
+      }
+      for (const wolf of Object.keys(message.targets)){
+        if (message.targets[wolf]){  // 如果这只狼已经投票
+          // 那么将这个狼人加入目标对应的列表中
+          targetDict[message.targets[wolf]].push(wolf);
+        }
+      }
+      console.log("syncTargets" + JSON.stringify(message.targets));
+      console.log("syncTargetsProcessed" + JSON.stringify(targetDict));
+      syncTargets.value = targetDict;
+
     }
 
     function handleKillResult(message) {
@@ -1008,14 +1003,11 @@ export default {
     function handleNightDeathInfo(message) {
       // 处理晚上死掉的人
       let line = message.victims.join("号，");
-      if (line.length <= 3){
-        line += "号";  // 如果只有一个死者，末尾需要加一个
-      }
       if (line === ""){
         sendSystemMessage("昨晚是平安夜");
       }
       else {
-        sendSystemMessage("昨晚" + line + "玩家被杀害了");
+        sendSystemMessage("昨晚" + line + "号玩家被杀害了");
       }
     }
 
@@ -1054,8 +1046,10 @@ export default {
       // 处理聊天到你
       // TODO: 想办法强制发个消息
       // 等待计时时间，然后自动发送聊天框中的信息
+      sendSystemMessage(currentPlayer.value.index + "号玩家，你的发言时间开始。")
       talkStart.value = true;
-      wait(gameData.value.phase_timer[gameData.value.current_phase]);
+      gameData.value.current_phase = "Speak"
+      timerSeconds.value = gameData.value.phase_timer[gameData.value.current_phase];
 
     }
 
@@ -1063,6 +1057,7 @@ export default {
       // 处理服务器发过来的聊天结束
       // this.userMessage = "";  // 没必要直接清空
       // TODO: 消息按钮重新变成灰的
+      sendSystemMessage(currentPlayer.value.index + "号玩家，你的发言时间结束。")
       talkStart.value = false;
     }
 
@@ -1089,14 +1084,11 @@ export default {
     function handleDayDeathInfo(message) {
       // 处理白天死掉的人
       let line = message.victims.join("号，");
-      if (line.length <= 3){
-        line += "号";  // 如果只有一个死者，末尾需要加一个
-      }
       if (line === ""){
         sendSystemMessage("今天白天没有人出局");
       }
       else {
-        sendSystemMessage("白天" + line + "玩家出局了");
+        sendSystemMessage("白天" + line + "号玩家出局了");
       }
       console.log("line: " + line);
 
@@ -1256,20 +1248,19 @@ export default {
       }, 1000);
     },
 
-    targetPlayer(index, event) {
+    targetPlayer(index) {
       // 投票选中目标玩家的逻辑
       this.selectedPlayer = index;
-      console.log("selectables: " + this.selectableIndices);
-
-      console.log("selected number " + this.selectedPlayer);
-      console.log(event.toString() - event.toString());  // event可能以后要用
+      // console.log("selectables: " + this.selectableIndices);
+      //
+      // console.log("selected number " + this.selectedPlayer);
 
     },
 
     confirmTarget(){
       // 确认选择
       this.confirmed = true;
-      console.log("confirm selected player: " + this.selectedPlayer)
+      // console.log("confirm selected player: " + this.selectedPlayer)
     },
 
     // 使用技能的方法
@@ -1339,7 +1330,6 @@ export default {
     },
     closePlayerDetails() {
       this.showDetails = false;
-      // TODO: 这是什么？
       this.selectedShowPlayer = null;
     },
 
@@ -1591,6 +1581,16 @@ p {
   background-color: #1150b9; /* 鼠标悬停时改变背景颜色 */
 }
 
+/* 狼人的同步目标 */
+.player .sync-targets {
+  color: red; /* 设置文字颜色为红色 */
+  font-size: 12px; /* 设置文字大小 */
+  white-space: nowrap; /* 防止文字换行 */
+  overflow: hidden; /* 隐藏超出容器的部分 */
+  text-overflow: ellipsis; /* 超出部分显示省略号 */
+  max-width: 100%; /* 限制最大宽度 */
+  margin-top: 5px; /* 添加顶部外边距 */
+}
 
 .player span {
   font-size: 12px;
