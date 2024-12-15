@@ -18,8 +18,10 @@
         </div>
       </div>
 
-      <div class="phase_header" v-if="selectablePhaseAction">
-        {{gameData.current_phase}}
+
+      <div class="phase_header" v-if="gameData.current_phase">
+        当前阶段：{{gameData.current_phase}}
+        剩余时间：{{ formattedTime }}
       </div>
 
       <!-- 左侧滑出菜单 -->
@@ -285,6 +287,8 @@ api.interceptors.response.use(
 export default {
   data() {
     return {
+      // 计时方式
+      timer: null,
       // 角色能力配置
       roleAbilitiesConfig: {
         // Werewolf技能配置
@@ -536,6 +540,9 @@ export default {
       online: true
     });
 
+    // 计时器
+    const timerSeconds = ref(10);
+
     // 当前可选的角色，选中的角色，当前具体的选择阶段，是否确认选项
     const selectableIndices = ref([1, 2, 3]);
     const selectedPlayer = ref(-1);
@@ -669,8 +676,8 @@ export default {
 
       // 将消息推送到消息列表
       messages.value.push(newMessage);
-
-      console.log("message: " + JSON.stringify(newMessage))
+      //
+      // console.log("message: " + JSON.stringify(newMessage))
 
       // 不滚动到底部
     }
@@ -690,8 +697,12 @@ export default {
         console.log("gameData is false");
       }
       else {
+        const prev_phase = gameData.value.current_phase;
         gameData.value = game
-        // console.log(JSON.stringify({data: [...Object.values(gameData.value.players), ...Object.values(gameData.value.ai_players)]}))
+        console.log(prev_phase+  " " + gameData.value.current_phase)
+        if (prev_phase !== gameData.value.current_phase){
+          timerSeconds.value = gameData.value.phase_timer[gameData.value.current_phase]
+        }
       }
 
     }
@@ -788,17 +799,19 @@ export default {
 
     // 女巫操作
     function handleWitchAction(cure_num, poison_num){
-      console.log(JSON.stringify({
-            type: "witch_action",
-            cure: String(cure_num),
-            poison: String(poison_num),
-          }));
-      sendMessage(
-        {
-          type: "witch_action",
-          cure: String(cure_num),
-          poison: String(poison_num),
-        },
+      const actionToSend = {
+        type: "witch_action",
+        cure: String(cure_num),
+        poison: String(poison_num),
+      }
+      if (cure_num === -1){
+        actionToSend.cure = null;
+      }
+      if (poison_num === -1){
+        actionToSend.poison = null;
+      }
+      console.log(JSON.stringify(actionToSend));
+      sendMessage(actionToSend,
         "game"
       );
     }
@@ -824,14 +837,19 @@ export default {
     // }
     //
     // // 白天投票
-    // function handleVote(seq_num){
-    //   sendMessage(
-    //       {
-    //         type: "vote",
-    //         target: seq_num,
-    //       }
-    //   )
-    // }
+    function handleVote(seq_num){
+      const actionToSend = {
+        type: "vote",
+        target: String(seq_num),
+      }
+      if (seq_num === -1){
+        actionToSend.target = null;
+      }
+      sendMessage(
+          actionToSend,
+          "game"
+      )
+    }
 
     /* WebSocket实时监听部分*/
     function handlePlayerJoined(message){
@@ -862,6 +880,7 @@ export default {
 
     function handleKillPhase(message) {
       // 处理Werewolf投票阶段
+
       sendSystemMessage("狼人请投票杀人");
       gameData.value = message.game;
     }
@@ -889,8 +908,7 @@ export default {
     function handleCheckPhase(message) {
       // 处理Prophet查人阶段, 不能告诉他谁死了
       sendSystemMessage("预言家请选择要查验的玩家");
-      // 然后点击一个选中，消掉弹窗
-      gameData.value.current_phase = message.game.current_phase;
+      updateGame(message.game);
       // const check_target = select("选择要查验的目标", "查验",
       // )
 
@@ -902,13 +920,15 @@ export default {
     }
 
     function handleWitchPhase(message) {
-      // 处理Witch阶段, 同样，不能真让人死了，否则就选不了了
+      // 处理Witch阶段,
+      updateGame(message.game);
       sendSystemMessage("女巫阶段开始");
       gameData.value.current_phase = message.game.current_phase;
     }
 
     async function handleWitchInfo(message) {
       // 处理Witch信息
+
       roleInfo.value.role_skills = message.role_skills;
       sendSystemMessage("女巫请选择使用解药和毒药");
       // console.log("phase: " + selectablePhase.value + "indices: " + selectableIndices.value);
@@ -919,20 +939,24 @@ export default {
             gameData.value.phase_timer.Witch / 2, message.cure_target, false);
 
       }
-      if (roleInfo.value.role_skills.cure_count){
+      if (roleInfo.value.role_skills.poison_count){
          poison_target = await select("毒药选择", "毒杀",
             gameData.value.phase_timer.Witch / 2, null, true);
       }
-      console.log("cure: " + cure_target);
+      timerSeconds.value = 0;
+
 
       handleWitchAction(cure_target, poison_target);
     }
 
-    function handleWitchActionResult() {
+    function handleWitchActionResult(message) {
       // 处理Witch操作结果
-      // let result1 , result2;
-      // result1 = message.cure;
-      // result2 = message.poison;
+      if (message.cure){
+        roleInfo.value.cure_count -= 1;
+      }
+      if (message.poison){
+        roleInfo.value.poison_count -= 1;
+      }
       // TODO: 其实这个信息没有必要提示给玩家，本来也是不知道的。理论上完全不会出现非法情况。
     }
 
@@ -945,17 +969,13 @@ export default {
 
     function handleNightDeathInfo(message) {
       // 处理晚上死掉的人
-      let line = "";
-      for (const num of message.victims){
-        line += String(num) + "号，";
-      }
-      if (message.victims === []){
-        line = "昨晚是平安夜";
+      let line = message.victims.join("号，");
+      if (line === ""){
+        sendSystemMessage("昨晚是平安夜");
       }
       else {
-        line = "昨晚" + line + "玩家被杀害了";
+        sendSystemMessage("昨晚" + line + "玩家被杀害了");
       }
-      sendSystemMessage(line);
     }
 
     function handleTalkPhase(message) {
@@ -971,7 +991,9 @@ export default {
       // if (!message.source){
       //   return;
       // }
-      const speaker = [...Object.values(players), ...Object.values(aiPlayers)].find(player=>player.index === message.source)
+      const speaker = [...Object.values(players), ...Object.values(aiPlayers)][Number(message.source)]
+      // console.log("source: " + message.source);
+      // console.log("speaker: " + speaker);
       const newMessage = {
         senderid: Number(message.source),
         sendername: speaker.name,
@@ -993,7 +1015,6 @@ export default {
       talkStart.value = true;
       wait(gameData.value.phase_timer[gameData.value.current_phase]);
 
-
     }
 
     function handleTalkEndByServer() {
@@ -1003,10 +1024,13 @@ export default {
       talkStart.value = false;
     }
 
-    function handleVotePhase(message) {
+    async function handleVotePhase(message) {
       // 处理投票阶段
-      gameData.value = message.game;
+      updateGame(message.game)
       sendSystemMessage("投票阶段开始，请选择你要放逐的玩家");
+      const target = await select("投票放逐", "放逐", gameData.value.phase_timer[gameData.value.current_phase],
+          null, true);
+      handleVote(target);
     }
 
     function handleVoteResult(message) {
@@ -1022,27 +1046,25 @@ export default {
 
     function handleDayDeathInfo(message) {
       // 处理白天死掉的人
-      let line = "";
-      for (const num of message.victims){
-        line += String(num) + "号，";
-      }
-      if (message.victims === []){
-        line = "今天白天没有人出局";
+      let line = message.victims.join("号，");
+      if (line === ""){
+        sendSystemMessage("今天白天没有人出局");
       }
       else {
-        line = "白天" + line + "玩家出局了";
+        sendSystemMessage("白天" + line + "玩家出局了");
       }
-      sendSystemMessage(line)
+      console.log("line: " + line);
+
     }
 
     function handleGameEnd(message) {
       // 处理游戏结束
       if (message.end){
-        if (message.victory[this.role]){
-          sendSystemMessage("游戏结束！", "你的阵营获胜！");
+        if (message.victory[roleInfo.value.role]){
+          sendSystemMessage("游戏结束！"+ "你的阵营获胜！");
         }
         else {
-          sendSystemMessage("游戏结束！", "你的阵营失败了……再接再厉！");
+          sendSystemMessage("游戏结束！"+ "你的阵营失败了……再接再厉！");
         }
       }
       // TODO: 展示所有人的角色并留两分钟复盘
@@ -1140,17 +1162,19 @@ export default {
       roleInfo,
       syncTargets,
       currentPlayer,
-      selectablePhaseAction: selectablePhaseAction,
+      selectablePhaseAction,
       selectedPlayer,
       selectableIndices,
       confirmed,
-      isDaytime: isDayTime,
+      isDayTime,
+      timerSeconds,
       // ...
     }
   },
   created() {
     // 初始化数据
     this.initializeMessages();
+    this.startTimer();
   },
 
   computed: {
@@ -1162,11 +1186,23 @@ export default {
       }
       return this.messages.filter(msg => msg.recipients !== 'dead');
     },
-
+    formattedTime() {
+      const minutes = Math.floor(this.timerSeconds / 60);
+      const seconds = this.timerSeconds % 60;
+      return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+    }
 
   },
 
   methods: {
+
+    startTimer() {  // 计时器
+      this.timer = setInterval(() => {
+        if (this.timerSeconds > 0) {
+          this.timerSeconds--;
+        }
+      }, 1000);
+    },
 
     targetPlayer(index, event) {
       // 投票选中目标玩家的逻辑
@@ -1180,10 +1216,8 @@ export default {
 
     confirmTarget(){
       // 确认选择
-      if (this.selectedPlayer !== -1){
-        this.confirmed = true;
-        console.log("confirm selected player: " + this.selectedPlayer)
-      }
+      this.confirmed = true;
+      console.log("confirm selected player: " + this.selectedPlayer)
     },
 
     // 使用技能的方法
@@ -1269,16 +1303,17 @@ export default {
 
       if (this.userMessage.trim()) {
         // 创建消息对象
-        const newMessage = {
-          senderid: this.currentPlayer.index, // 假设当前玩家是“你”
-          sendername: this.currentPlayer.name,
-          avatar: require('@/assets/head.png'),
-          text: this.userMessage,
-          recipients: this.isDead ? "dead" : this.messageRecipient // 死亡玩家只能发送给"dead"
-        };
+        // const newMessage = {
+        //   senderid: this.currentPlayer.index, // 假设当前玩家是“你”
+        //   sendername: this.currentPlayer.name,
+        //   avatar: require('@/assets/head.png'),
+        //   text: this.userMessage,
+        //   recipients: this.isDead ? "dead" : this.messageRecipient // 死亡玩家只能发送给"dead"
+        // };
 
         // 将消息推送到消息列表
-        this.messages.push(newMessage);
+        // 这里先不推了，等到服务器正常返回更新的时候再推上去
+        // this.messages.push(newMessage);
         this.sendMessage({
           type: "talk_content",
           content: this.userMessage,
@@ -1417,6 +1452,11 @@ p {
   text-align: center;
   font-size: 48px;
   font-weight: bold;
+  position: absolute;
+  top: 100px; /* 距离顶部100px */
+  left: 50%; /* 水平方向上居中 */
+  transform: translateX(-50%); /* 使用 transform 来精确水平居中 */
+  width: 100%; /* 确保元素宽度占满整个容器 */
 }
 
 .player-list {
