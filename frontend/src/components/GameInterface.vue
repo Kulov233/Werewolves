@@ -90,29 +90,48 @@
 
       <!-- 中间聊天框 -->
       <div class="chat-section">
-        <div class="chat-box" ref="chatBox">
+        <div class="chat-box" ref="chatBox" @scroll="handleScroll">
           <div class="chat-messages">
-            <div  v-for="message in messages" :key="message.senderid" class="message">
-            <div class="message-avatar-container">
-              <div class="message-avatar">
-                <img :src="message.avatar" alt="avatar" class="avatar1"/>
-              </div>
-              <span class="recipient-label">
-                 <div class="message-sender">
-                    <p>
-                      {{ message.senderid }}号{{" "}}{{ message.sendername }}
-                      <span v-if="message.senderid === currentPlayer.index"> (你)</span>
-                    </p>
+            <div  v-for="message in messages" :key="message.senderid"
+                   :class="['message', { 'system-message': message.senderid === 0 }]">
+                <!-- 系统消息使用不同的样式 -->
+                <template v-if="message.senderid === 0">
+                  <div class="system-message-content">
+                    <div class="system-message-text">{{ message.text }}</div>
                   </div>
-              </span>
-            </div>
-            <div class="message-content">
-
-              <div class="message-text">{{ message.text }}</div>
+                </template>
+                <!-- 玩家消息保持原有样式 -->
+                <template v-else>
+                  <div class="message-avatar-container">
+                    <div class="message-avatar">
+                      <img :src="message.avatar" alt="avatar" class="avatar1"/>
+                    </div>
+                    <span class="recipient-label">
+                      <div class="message-sender">
+                        <p>
+                          {{ message.senderid }}号{{" "}}{{ message.sendername }}
+                          <span v-if="message.senderid === currentPlayer.index"> (你)</span>
+                        </p>
+                      </div>
+                    </span>
+                  </div>
+                  <div class="message-content">
+                    <div class="message-text">{{ message.text }}</div>
+                  </div>
+                </template>
             </div>
           </div>
+
+          <!-- 滚动到底部按钮 -->
+          <div class="scroll-bottom-wrapper">
+            <div v-if="showScrollButton" class="scroll-bottom-button" @click="scrollToBottom">
+              <img src="@/assets/toBottom.svg" alt="滚动到底部" class="scroll-bottom-icon" />
+              <div v-if="hasUnreadMessages" class="unread-indicator"></div>
+            </div>
           </div>
         </div>
+
+
         <!-- 输入框和发送按钮在聊天框外部 -->
         <div class="message-input-section">
           <select v-model="messageRecipient" class="recipient-select">
@@ -312,6 +331,7 @@ export default {
   },
   data() {
     return {
+      showScrollButton: false,
       // 计时方式
       timer: null,
       // 角色能力配置
@@ -411,6 +431,8 @@ export default {
 
 
   setup() {
+
+    const hasUnreadMessages = ref(false);
     // 弹窗以及websocket建立
     const store = useStore();
     
@@ -1107,6 +1129,11 @@ export default {
       // 将消息推送到消息列表
       messages.value.push(newMessage);
 
+      // 检查是否需要显示未读消息提示
+      const chatBox = this.$refs.chatBox;
+      if (chatBox && (chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight > 100)) {
+        hasUnreadMessages.value = true;
+      }
 
     }
 
@@ -1287,6 +1314,7 @@ export default {
       dialogTitle,
       dialogMessage,
       dialogShowConfirm,
+      hasUnreadMessages,
       // ...
     }
   },
@@ -1313,6 +1341,25 @@ export default {
   },
 
   methods: {
+
+    handleScroll() {
+      const chatBox = this.$refs.chatBox;
+      const isNearBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight <= 100;
+
+      // 当距离底部超过100px时显示滚动按钮
+      this.showScrollButton = !isNearBottom;
+
+      // 如果用户将聊天框滚动到底部，清除未读消息提示
+      if (isNearBottom) {
+        this.hasUnreadMessages = false;
+      }
+    },
+    scrollToBottom() {
+      const chatBox = this.$refs.chatBox;
+      chatBox.scrollTop = chatBox.scrollHeight;
+      this.showScrollButton = false;
+      this.hasUnreadMessages = false; // 清除未读消息提示
+    },
 
     startTimer() {  // 计时器
       this.timer = setInterval(() => {
@@ -1431,18 +1478,9 @@ export default {
         // 清空输入框
         this.userMessage = "";
 
-        // 滚动到底部
-        this.scrollToBottom();
       }
     },
 
-    scrollToBottom() {
-      // 滚动聊天框到底部
-      this.$nextTick(() => {
-        const chatBox = this.$refs.chatBox;
-        chatBox.scrollTop = chatBox.scrollHeight;
-      });
-    },
     exitGame() {
       alert("退出游戏");
     },
@@ -1476,9 +1514,7 @@ export default {
 
   },
   watch: {
-    messages() {
-      this.scrollToBottom();
-    },
+
     showDetails(newVal) {
       // 如果玩家信息框被打开，页面滚动到顶部
       if (newVal) {
@@ -1664,20 +1700,18 @@ p {
   color: var(--name-color);
 }
 .chat-section {
-  width: 50%;
+  width: 60%;
   display: flex;
   flex-direction: column;
   align-items: center;
-/*border-radius: 50px;*/
 }
 
 .chat-box {
   width: 100%;
-  height: 500px; /* 设置初始高度为 500px */
+  height: 500px;
   border: 1px solid #3d3d3d;
   padding: 10px;
   margin-bottom: 10px;
-  max-height: 300px;
   overflow-y: auto;
   border-radius: 15px;
 }
@@ -1704,12 +1738,98 @@ p {
 }
 
 /* 聊天消息 */
+
+/* 系统消息样式 */
+.system-message {
+  display: flex;
+  justify-content: center;
+  margin: 10px 0;
+  background-color: transparent !important;
+  padding: 0 !important;
+}
+
+.system-message-content {
+  display: inline-block;
+  text-align: center;
+  max-width: 80%;
+}
+
+.system-message-text {
+  display: inline-block;
+  background-color: rgba(0, 0, 0, 0.1);
+  color: #666;
+  padding: 8px 16px;
+  border-radius: 15px;
+  font-size: 0.9em;
+}
+
+/* 滚动到底部按钮样式 */
+.scroll-bottom-wrapper {
+  position: sticky;
+  bottom: 20px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.scroll-bottom-button {
+  pointer-events: auto;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+}
+
+.scroll-bottom-button:hover {
+  transform: scale(1.1);
+}
+
+.scroll-bottom-icon {
+  width: 24px;
+  height: 24px;
+}
+
 .message {
   background-color: #f8f9fa;
   border-radius: 8px;
   padding: 12px;
   margin-bottom: 10px;
   transition: transform 0.3s ease;
+}
+
+/* 未读消息提示红点 */
+.unread-indicator {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 12px;
+  height: 12px;
+  background-color: #ff4444;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .message:hover {
@@ -2045,7 +2165,16 @@ p {
   font-size: 24px;
   color: #888;
 }
+/* 响应式样式 */
+@media (max-width: 768px) {
+  .chat-section {
+    width: 100%;
+  }
 
+  .message-input {
+    font-size: 0.9em;
+  }
+}
 @media (max-width: 768px) {
   .game-container {
     flex-direction: column;
@@ -2058,7 +2187,11 @@ p {
   }
 
   .chat-section {
-    width: 100%;
+    position: relative;
+    width: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
   }
 
   .message-input {
