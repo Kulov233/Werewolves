@@ -1,10 +1,12 @@
 <template>
-  <div v-if="visible" class="modal-overlay" @click.self="handleClose">
+  <div v-if="visible" class="modal-overlay" @click.self="handleClose"
+       :class="{ 'modal-leaving': leaving }">
     <!-- 主内容卡片 -->
     <div :class="[
       'modal-card',
       `card-${type}`,
-      getBgColor()
+      getBgColor(),
+      { 'card-leaving': leaving },
     ]">
       <!-- 主题装饰元素 -->
       <div :class="['theme-effects', `effects-${type}`]"></div>
@@ -53,7 +55,7 @@
 
 <script>
 import { ref, onMounted, onBeforeUnmount } from 'vue';
-import { Moon, Sun, Skull, AlertCircle, UserCheck, MessageCircle } from 'lucide-vue-next';
+import { Moon, Sun, Skull, AlertCircle, UserCheck, MessageCircle, Info, Vote } from 'lucide-vue-next';
 
 export default {
   props: {
@@ -91,8 +93,10 @@ export default {
       death: Skull,
       role: UserCheck,
       action: AlertCircle,
-      speak: MessageCircle
-    }[props.type] || AlertCircle);
+      speak: MessageCircle,
+      info: Info,
+      vote: Vote,
+    }[props.type] || Info);
 
     const getIconColor = () => ({
       night: 'text-indigo-100',
@@ -100,7 +104,9 @@ export default {
       death: 'text-red-100',
       role: 'text-purple-100',
       action: 'text-blue-100',
-      speak: 'text-green-100'
+      speak: 'text-green-100',
+      info: 'text-gray-100',
+      vote: 'text-orange-100',
     }[props.type] || 'text-gray-100');
 
     const getIconBgGradient = () => ({
@@ -109,7 +115,9 @@ export default {
       death: 'bg-gradient-to-br from-red-500 to-red-700',
       role: 'bg-gradient-to-br from-purple-500 to-purple-700',
       action: 'bg-gradient-to-br from-blue-500 to-blue-700',
-      speak: 'bg-gradient-to-br from-green-500 to-green-700'
+      speak: 'bg-gradient-to-br from-green-500 to-green-700',
+      info: 'bg-gradient-to-br from-gray-500 to-gray-700',
+      vote: 'bg-gradient-to-br from-orange-500 to-orange-700',
     }[props.type] || 'bg-gradient-to-br from-gray-500 to-gray-700');
 
     const getBgColor = () => ({
@@ -118,7 +126,9 @@ export default {
       death: 'bg-red-50/95',
       role: 'bg-purple-50/95',
       action: 'bg-blue-50/95',
-      speak: 'bg-green-50/95'
+      speak: 'bg-green-50/95',
+      info: 'bg-gray-50/95',
+      vote: 'bg-orange-50/95',
     }[props.type] || 'bg-gray-50/95');
 
     const getTextColor = () => ({
@@ -127,7 +137,9 @@ export default {
       death: 'text-red-900',
       role: 'text-purple-900',
       action: 'text-blue-900',
-      speak: 'text-green-900'
+      speak: 'text-green-900',
+      info: 'text-gray-900',
+      vote: 'text-orange-900',
     }[props.type] || 'text-gray-900');
 
     return {
@@ -154,6 +166,13 @@ export default {
   justify-content: center;
   z-index: 1000;
   pointer-events: all;
+  background: rgba(0, 0, 0, 0.2);
+  opacity: 0;
+  animation: overlayAppear 0.3s ease forwards;
+}
+
+.modal-leaving {
+  animation: overlayDisappear 0.3s ease forwards;
 }
 
 .modal-card {
@@ -520,4 +539,152 @@ export default {
     transform: scale(1.2);
   }
 }
+
+/* Info 主题样式 */
+.card-info {
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(8px);
+}
+
+.effects-info::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(75, 85, 99, 0.1) 0%, transparent 70%),
+    linear-gradient(45deg, transparent 45%, rgba(75, 85, 99, 0.05) 50%, transparent 55%);
+  animation: infoEffect 4s infinite;
+}
+
+/*
+.icon-effect-info {
+  background: linear-gradient(135deg, rgba(75, 85, 99, 0.8), rgba(107, 114, 128, 0.8));
+  box-shadow:
+    0 0 20px rgba(75, 85, 99, 0.2),
+    0 0 40px rgba(107, 114, 128, 0.1);
+}*/
+
+.icon-animate-info {
+  animation: infoIconPulse 2s infinite alternate;
+}
+
+.avatar-info {
+  border: 2px solid rgba(75, 85, 99, 0.4);
+  box-shadow: 0 0 15px rgba(107, 114, 128, 0.2);
+}
+
+/* 新增动画关键帧 */
+@keyframes overlayAppear {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes overlayDisappear {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes cardDisappear {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+}
+
+@keyframes infoEffect {
+  0%, 100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes infoIconPulse {
+  from {
+    filter: drop-shadow(0 0 8px rgba(75, 85, 99, 0.4));
+  }
+  to {
+    filter: drop-shadow(0 0 12px rgba(107, 114, 128, 0.6));
+  }
+}
+/* Vote 主题样式 */
+.card-vote {
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(8px);
+}
+
+.effects-vote::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(251, 146, 60, 0.1) 0%, transparent 70%),
+    repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 10px,
+      rgba(251, 146, 60, 0.05) 10px,
+      rgba(251, 146, 60, 0.05) 20px
+    );
+  animation: voteEffect 3s infinite;
+}
+
+/*
+.icon-effect-vote {
+  background: linear-gradient(135deg, rgba(251, 146, 60, 0.8), rgba(234, 88, 12, 0.8));
+  box-shadow:
+    0 0 20px rgba(251, 146, 60, 0.2),
+    0 0 40px rgba(234, 88, 12, 0.1);
+}*/
+
+.icon-animate-vote {
+  animation: voteIconPulse 1.5s infinite alternate;
+}
+
+.avatar-vote {
+  border: 2px solid rgba(251, 146, 60, 0.4);
+  box-shadow: 0 0 15px rgba(234, 88, 12, 0.2);
+}
+
+@keyframes voteEffect {
+  0% {
+    background-position: 0% 50%, 0 0;
+    opacity: 0.5;
+  }
+  50% {
+    background-position: 100% 50%, 20px 20px;
+    opacity: 0.8;
+  }
+  100% {
+    background-position: 0% 50%, 0 0;
+    opacity: 0.5;
+  }
+}
+
+@keyframes voteIconPulse {
+  from {
+    transform: scale(1);
+    filter: drop-shadow(0 0 8px rgba(251, 146, 60, 0.4));
+  }
+  to {
+    transform: scale(1.1);
+    filter: drop-shadow(0 0 12px rgba(234, 88, 12, 0.6));
+  }
+}
+
 </style>

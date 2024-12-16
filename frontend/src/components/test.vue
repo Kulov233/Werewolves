@@ -83,7 +83,21 @@ const notificationConfigs = [
     message: "轮到你发言了",
     subMessage: "请简要陈述你的观点",
     players: []
-  }
+  },
+  {
+    label: "通知",
+    type: "info",
+    message: "玩家的身份为",
+    subMessage: "好人",
+    players: []
+  },
+    {
+    label: "投票通知",
+    type: "vote",
+    message: "投票阶段",
+    subMessage: "请进行投票",
+    players: []
+  },
 ];
 
 // 显示通知的方法
