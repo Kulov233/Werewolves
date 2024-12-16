@@ -365,7 +365,7 @@ def get_vote_result(room_id):
 
     # 如果有多个玩家最高票数，则不放逐
     # TODO: 计算比例？
-    if len(players_with_max_votes) > 1:
+    if len(players_with_max_votes) > 1 or len(players_with_max_votes) == 0:
         pass
     else:
         if max_votes > game_data["max_players"] / 2:
