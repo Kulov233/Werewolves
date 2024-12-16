@@ -18,12 +18,6 @@
         </div>
       </div>
 
-
-      <div class="phase_header" v-if="gameData.current_phase">
-        当前阶段：{{gameData.current_phase}}
-        剩余时间：{{ formattedTime }}
-      </div>
-
       <!-- 左侧滑出菜单 -->
       <transition name="slide-left">
         <div v-if="showMenuSidebar" class="sidebar menu-sidebar" @click.stop>
@@ -88,8 +82,11 @@
       </div>
 
 
+
       <!-- 中间聊天框 -->
       <div class="chat-section">
+        <!-- 当前阶段显示 -->
+      <GamePhase :phase="gameData.current_phase" />
         <div class="chat-box" ref="chatBox" @scroll="handleScroll">
           <div class="chat-messages">
             <div  v-for="message in messages" :key="message.senderid"
@@ -156,7 +153,15 @@
       <div class="sun-moon-icon" @click="toggleDayNight">
         <img :src="sunMoonIcon" alt="Day Night Toggle" class="sun-moon-icon-img" />
       </div>
-      
+
+
+      <!-- 右侧信息区域容器 -->
+      <div class="right-info-container">
+        <!-- 倒计时器 -->
+        <CountdownTimer
+          :seconds="timerSeconds"
+          :initial-seconds="gameData.phase_timer[gameData.current_phase]"
+        />
       <!-- 右侧角色信息 -->
       <div class="role-info">
         <div class="role-item">
@@ -205,7 +210,7 @@
           </div>
         </div>
     </div>
-
+      </div>
       <!-- 玩家详细信息弹出框 -->
       
        <div 
@@ -254,6 +259,8 @@ import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';
 import { useWebSocket } from '@/composables/useWebSocket';
 import SystemNotice from './shared_components/SystemNotice.vue';
+import GamePhase from './shared_components/GamePhase.vue';
+import CountdownTimer from './shared_components/CountdownTimer.vue';
 // import { validateGame } from '@/schemas/schemas.js';
 import axios from 'axios';
 import ConfirmDialog from "@/components/shared_components/ConfirmDialog.vue";
@@ -328,6 +335,8 @@ export default {
   components: {
     ConfirmDialog,
     SystemNotice,
+    GamePhase,
+    CountdownTimer,
   },
   data() {
     return {
@@ -1975,7 +1984,13 @@ p {
 }
 /*TODO:改悬浮样式*/
 
-
+.right-info-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 400px; /* 与role-info相同的宽度 */
+}
 
 .role-info {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
@@ -1989,6 +2004,7 @@ p {
     max-width: 400px;
     margin: 20px auto; 
 }
+
 
 .role-item {
     display: flex; 
