@@ -98,17 +98,16 @@
                 <img :src="message.avatar" alt="avatar" class="avatar1"/>
               </div>
               <span class="recipient-label">
-                 <!-- 根据接收者判断是否是“所有人”、“团队”或“死亡者” -->
-                ({{ getRecipientLabel(message.recipients) }})
+                 <div class="message-sender">
+                    <p>
+                      {{ message.senderid }}号{{" "}}{{ message.sendername }}
+                      <span v-if="message.senderid === currentPlayer.index"> (你)</span>
+                    </p>
+                  </div>
               </span>
             </div>
             <div class="message-content">
-              <div class="message-sender">
-                <p>
-                  {{ message.senderid }}号{{" "}}{{ message.sendername }}
-                  <span v-if="message.senderid === currentPlayer.index"> (你)</span>
-                </p>
-              </div>
+
               <div class="message-text">{{ message.text }}</div>
             </div>
           </div>
@@ -219,14 +218,11 @@
       @confirm="handleDialogConfirm"
     />
       <!-- 系统通知组件 -->
-      <div class="system-notices-container">
-        <template v-for="notification in notifications" :key="notification.id">
-          <SystemNotice
-            v-bind="notification"
-            @close="removeNotification(notification.id)"
-          />
-        </template>
-      </div>
+      <SystemNotice
+        v-if="currentNotification"
+        v-bind="currentNotification"
+        @close="closeNotification"
+      />
 
 
     </div>
@@ -533,12 +529,11 @@ export default {
     // TODO: 允许发言
     const talkStart = ref(false);
 
-    const notifications = ref([]);
-    let notificationId = 0;
+    const currentNotification = ref(null);  // 当前显示的通知
 
-    // 发送系统消息的方法
-    function sendSystemMessage(content, type = 'info', players = []) {
-      // 创建消息对象用于聊天框
+    // 添加处理通知的方法
+    function sendSystemMessage(content, type = 'info', subMessage = '', players = [] ) {
+      // 创建聊天消息
       const chatMessage = {
         senderid: 0,
         sendername: "系统信息",
@@ -546,26 +541,22 @@ export default {
         text: content,
         recipients: "all"
       };
-
-      // 添加到聊天消息
       messages.value.push(chatMessage);
 
-      // 创建通知
-      const notification = {
-        id: notificationId++,
-        type,
+      // 创建新通知
+      currentNotification.value = {
+        type: type,
         message: content,
-        players
+        subMessage: subMessage,
+        players: players,
       };
 
-      // 添加到通知列表
-      notifications.value.push(notification);
     }
 
-    // 移除通知的方法
-    function removeNotification(id) {
-      notifications.value = notifications.value.filter(n => n.id !== id);
-    }
+    // 关闭通知的方法
+    const closeNotification = () => {
+      currentNotification.value = null;
+    };
 
     // 通知玩家角色
     function handleRoleInfo(message) {
@@ -596,8 +587,8 @@ export default {
       sendSystemMessage(
         `你的角色是：${roleName}`,
         'role',
-        [],
-        description
+        description,
+          [],
       );
     }
     // 修改原有的系统消息处理方法
@@ -616,7 +607,7 @@ export default {
     function handleNightDeathInfo(message) {
       const victims = message.victims;
       if (victims.length === 0) {
-        sendSystemMessage("昨晚是平安夜", "info");
+        sendSystemMessage("昨晚是平安夜", "death");
       } else {
         // 获取死亡玩家的信息
         const deadPlayers = victims.map(index => {
@@ -631,6 +622,7 @@ export default {
         sendSystemMessage(
           "昨晚以下玩家被杀害：",
           "death",
+          "",
           deadPlayers
         );
       }
@@ -641,8 +633,9 @@ export default {
       sendSystemMessage(
         `${currentPlayer.value.index}号玩家，轮到你发言`,
         "speak",
+          "请在规定时间内发表意见",
         [],
-        "请在规定时间内发表意见"
+
       );
       talkStart.value = true;
       gameData.value.current_phase = "Speak"
@@ -974,7 +967,7 @@ export default {
     async function handleKillPhase(message) {
       // 处理Werewolf投票阶段
 
-      sendSystemMessage("狼人请投票杀人");
+      sendSystemMessage("狼人请行动", "action", "请选择要杀害的对象");
       gameData.value = message.game;
 
       await handleMultipleKillVotes();
@@ -1018,7 +1011,7 @@ export default {
 
     async function handleCheckPhase(message) {
       // 处理Prophet查人阶段, 不能告诉他谁死了
-      sendSystemMessage("预言家请选择要查验的玩家");
+      sendSystemMessage("预言家请行动", "action", "请选择要查验的玩家");
       updateGame(message.game);
       if (roleInfo.value.role === "Prophet"){
 
@@ -1032,8 +1025,8 @@ export default {
 
     function handleCheckResult(message) {
       // 处理查人结果
-      sendSystemMessage(message.target + "号玩家的身份为" + message.role);
-      showInfo("查验结果", message.target + "号玩家的身份为" + message.role);
+      sendSystemMessage(message.target + "号玩家的身份为" + message.role );
+
     }
 
     function handleWitchPhase(message) {
@@ -1047,7 +1040,7 @@ export default {
       // 处理Witch信息
       if(roleInfo.value.role === "Witch"){
         roleInfo.value.role_skills = message.role_skills;
-        sendSystemMessage("女巫请选择使用解药和毒药");
+        sendSystemMessage("女巫请行动", "action", "请选择使用解药和毒药");
         // console.log("phase: " + selectablePhase.value + "indices: " + selectableIndices.value);
         let cure_target = -1, poison_target = -1;
 
@@ -1287,8 +1280,8 @@ export default {
       timerSeconds,
 
       // 对话框相关
-      notifications,
-      removeNotification,
+      currentNotification,
+      closeNotification,
       handleDialogConfirm,
       showDialog,
       dialogTitle,
@@ -1299,7 +1292,6 @@ export default {
   },
   created() {
     // 初始化数据
-    this.initializeMessages();
     this.startTimer();
   },
 
@@ -1355,13 +1347,6 @@ export default {
         // 无限次数技能的使用逻辑
         console.log(`使用技能: ${ability.name}`);
       }
-    },
-    initializeMessages() {
-      this.messages = [
-        { senderid: 1, sendername: "Wang", recipients: "all", avatar: require('@/assets/head.png'), text: "天亮请睁眼。昨晚，4号玩家被杀了。" },
-        { senderid: 2, sendername: "Huang", recipients: "dead", avatar: require('@/assets/head.png'), text: "我只是个平民，什么也不知道，但我们绝对找出Werewolf了。" },
-        { senderid: 3, sendername: "Zhao", recipients: "all", avatar: require('@/assets/head.png'), text: "他肯定有问题！" }
-      ];
     },
     // 可以设置一个动态方法来更新当前玩家名字,后续优化接口
     getRecipientLabel(recipients) {
@@ -1762,7 +1747,7 @@ p {
 }
 .message-sender {
 	display: flex;
-  background-color: #ffffff;
+  background-color: transparent;
   padding: 5px;
   border-radius: 5px;
   font-weight: bold;
@@ -2219,15 +2204,4 @@ p {
 .confirm-button:hover .confirm-icon {
   transform: scale(1.05);
 }
-
-.system-notices-container {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 9999;
-}
-
 </style>

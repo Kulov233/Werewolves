@@ -6,7 +6,7 @@ const Login = () => import('@/components/Login.vue');
 const Register = () => import('@/components/Register.vue');
 const Search = () => import('@/components/GameLobby.vue');
 const Room = () => import('@/components/GameRoom.vue');
-
+const test = () => import('@/components/test.vue');
 // 路由配置
 const routes = [
   {
@@ -31,6 +31,12 @@ const routes = [
     path: '/GameLobby',
     name: 'GameLobby',
     component: Search,
+    meta: { requiresAuth: false }
+  },
+  {
+    path: '/test',
+    name: 'test',
+    component: test,
     meta: { requiresAuth: false }
   },
   {

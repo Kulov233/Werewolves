@@ -513,15 +513,7 @@
                 @click="joinRoom(room.id)"
                 :disabled="room.players.length + Object.keys(room.ai_players).length === room.max_players && !isInRoom(room.id)"
               >
-                <span v-if="room.players.length + Object.keys(room.ai_players).length === room.max_players && !isInRoom(room.id)">
-                  房间已满
-                </span>
-                <span v-else-if="isInRoom(room.id)">
-                  返回房间
-                </span>
-                <span v-else>
-                  加入房间
-                </span>
+                <span>{{ getJoinButtonText(room) }}</span>
               </button>
             </div>
           </transition-group>
@@ -1443,7 +1435,26 @@ export default {
 
   // 是当前房间
   isInRoom(roomId) {
-    return this.currentRoomId === roomId;
+    const room = this.Rooms.find(r => r.id === roomId);
+    if (!room) return false;
+
+    // 检查玩家是否在普通玩家列表中
+    if (Object.keys(room.players).includes(this.userProfile.userId)) {
+      return true;
+    }
+
+    return false;
+  },
+
+  // 修改加入房间按钮的渲染逻辑
+  getJoinButtonText(room) {
+    if (this.isInRoom(room.id)) {
+      return '返回房间';
+    }
+    if (room.players.length + Object.keys(room.ai_players).length === room.max_players) {
+      return '房间已满';
+    }
+    return '加入房间';
   },
 
      // 好友系统相关方法
