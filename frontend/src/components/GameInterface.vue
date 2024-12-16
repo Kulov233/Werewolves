@@ -218,6 +218,17 @@
       :showConfirm="dialogShowConfirm"
       @confirm="handleDialogConfirm"
     />
+      <!-- 系统通知组件 -->
+      <div class="system-notices-container">
+        <template v-for="notification in notifications" :key="notification.id">
+          <SystemNotice
+            v-bind="notification"
+            @close="removeNotification(notification.id)"
+          />
+        </template>
+      </div>
+
+
     </div>
 
   </template>
@@ -227,6 +238,7 @@ import {onMounted, ref, onUnmounted, onBeforeMount,} from 'vue';
 import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';
 import { useWebSocket } from '@/composables/useWebSocket';
+import SystemNotice from './shared_components/SystemNotice.vue';
 // import { validateGame } from '@/schemas/schemas.js';
 import axios from 'axios';
 import ConfirmDialog from "@/components/shared_components/ConfirmDialog.vue";
@@ -298,7 +310,10 @@ api.interceptors.response.use(
 
 
 export default {
-  components: {ConfirmDialog},
+  components: {
+    ConfirmDialog,
+    SystemNotice,
+  },
   data() {
     return {
       // 计时方式
@@ -518,6 +533,122 @@ export default {
     // TODO: 允许发言
     const talkStart = ref(false);
 
+    const notifications = ref([]);
+    let notificationId = 0;
+
+    // 发送系统消息的方法
+    function sendSystemMessage(content, type = 'info', players = []) {
+      // 创建消息对象用于聊天框
+      const chatMessage = {
+        senderid: 0,
+        sendername: "系统信息",
+        avatar: require('@/assets/head.png'),
+        text: content,
+        recipients: "all"
+      };
+
+      // 添加到聊天消息
+      messages.value.push(chatMessage);
+
+      // 创建通知
+      const notification = {
+        id: notificationId++,
+        type,
+        message: content,
+        players
+      };
+
+      // 添加到通知列表
+      notifications.value.push(notification);
+    }
+
+    // 移除通知的方法
+    function removeNotification(id) {
+      notifications.value = notifications.value.filter(n => n.id !== id);
+    }
+
+    // 通知玩家角色
+    function handleRoleInfo(message) {
+      // 获取角色中文名
+      const roleNames = {
+        'Werewolf': '狼人',
+        'Witch': '女巫',
+        'Prophet': '预言家',
+        'Guard': '守卫',
+        'Hunter': '猎人',
+        'Villager': '村民'
+      };
+
+      // 获取角色技能说明
+      const roleDescriptions = {
+        'Werewolf': '每晚可以杀害一名玩家',
+        'Witch': '拥有一瓶解药和一瓶毒药',
+        'Prophet': '每晚可以查验一名玩家的身份',
+        'Guard': '每晚可以守护一名玩家',
+        'Hunter': '死亡时可以开枪带走一名玩家',
+        'Villager': '没有特殊技能，靠推理找出狼人'
+      };
+
+      roleInfo.value = message.role_info;
+      const roleName = roleNames[roleInfo.value.role] || roleInfo.value.role;
+      const description = roleDescriptions[roleInfo.value.role] || '';
+
+      sendSystemMessage(
+        `你的角色是：${roleName}`,
+        'role',
+        [],
+        description
+      );
+    }
+    // 修改原有的系统消息处理方法
+    function handleNightPhase(message) {
+      sendSystemMessage("天黑请闭眼", "night");
+      isDayTime.value = false;
+      updateGame(message.game);
+    }
+
+    function handleDayPhase(message) {
+      sendSystemMessage("天亮请睁眼", "day");
+      isDayTime.value = true;
+      updateGame(message.game);
+    }
+
+    function handleNightDeathInfo(message) {
+      const victims = message.victims;
+      if (victims.length === 0) {
+        sendSystemMessage("昨晚是平安夜", "info");
+      } else {
+        // 获取死亡玩家的信息
+        const deadPlayers = victims.map(index => {
+          const player = [...Object.values(players.value), ...Object.values(aiPlayers.value)]
+            .find(p => p.index === index);
+          return {
+            name: `${index}号 ${player.name}`,
+            avatar: player.avatar
+          };
+        });
+
+        sendSystemMessage(
+          "昨晚以下玩家被杀害：",
+          "death",
+          deadPlayers
+        );
+      }
+    }
+
+    //
+    function handleTalkStart() {
+      sendSystemMessage(
+        `${currentPlayer.value.index}号玩家，轮到你发言`,
+        "speak",
+        [],
+        "请在规定时间内发表意见"
+      );
+      talkStart.value = true;
+      gameData.value.current_phase = "Speak"
+      timerSeconds.value = gameData.value.phase_timer[gameData.value.current_phase];
+    }
+
     const fetchSelectedProfile = async (userId) => {
       try {
         const avatarResponse = await api.get(`/api/accounts/avatar/${userId}/`);
@@ -637,28 +768,6 @@ export default {
 
 
     };
-
-    // 发送系统消息
-
-
-    function sendSystemMessage(content) {
-      // 创建消息对象
-      const newMessage = {
-        senderid: 0, // 假设当前玩家是“你”
-        sendername: "系统信息",
-        avatar: require('@/assets/head.png'),
-        text: content,
-        recipients: "all" // 死亡玩家只能发送给"dead"
-      };
-
-      // 将消息推送到消息列表
-      messages.value.push(newMessage);
-      //
-      // console.log("message: " + JSON.stringify(newMessage))
-
-      // 不滚动到底部
-    }
-
 
     // 工具函数，用于阶段转换时更新信息; 要求为GameData类型
     function updateGame(game){
@@ -862,23 +971,6 @@ export default {
     }
 
 
-    function handleRoleInfo(message) {
-      // 处理分配角色信息
-
-      console.log("role_info received");
-      roleInfo.value = message.role_info;
-      sendSystemMessage("收到角色信息，你的角色为：" + roleInfo.value.role);
-      console.log("role_info: " + JSON.stringify(roleInfo.value));
-
-    }
-
-    function handleNightPhase(message) {
-      // 处理夜晚阶段
-      sendSystemMessage("天黑请闭眼");
-      isDayTime.value = false;
-      updateGame(message.game);
-    }
-
     async function handleKillPhase(message) {
       // 处理Werewolf投票阶段
 
@@ -993,23 +1085,6 @@ export default {
       // TODO: 其实这个信息没有必要提示给玩家，本来也是不知道的。理论上完全不会出现非法情况。
     }
 
-    function handleDayPhase(message) {
-      // 处理白天阶段
-      isDayTime.value = true;
-      sendSystemMessage("天亮了，请睁眼");
-      updateGame(message.game);
-    }
-
-    function handleNightDeathInfo(message) {
-      // 处理晚上死掉的人
-      let line = message.victims.join("号，");
-      if (line === ""){
-        sendSystemMessage("昨晚是平安夜");
-      }
-      else {
-        sendSystemMessage("昨晚" + line + "号玩家被杀害了");
-      }
-    }
 
     function handleTalkPhase(message) {
       // 处理发言阶段
@@ -1039,17 +1114,6 @@ export default {
       // 将消息推送到消息列表
       messages.value.push(newMessage);
 
-
-    }
-
-    function handleTalkStart() {
-      // 处理聊天到你
-      // TODO: 想办法强制发个消息
-      // 等待计时时间，然后自动发送聊天框中的信息
-      sendSystemMessage(currentPlayer.value.index + "号玩家，你的发言时间开始。")
-      talkStart.value = true;
-      gameData.value.current_phase = "Speak"
-      timerSeconds.value = gameData.value.phase_timer[gameData.value.current_phase];
 
     }
 
@@ -1098,10 +1162,26 @@ export default {
       // 处理游戏结束
       if (message.end){
         if (message.victory[roleInfo.value.role]){
-          sendSystemMessage("游戏结束！"+ "你的阵营获胜！");
-        }
-        else {
-          sendSystemMessage("游戏结束！"+ "你的阵营失败了……再接再厉！");
+          if (roleInfo.value.role === "Werewolf") {
+            sendSystemMessage("游戏结束！狼人获胜！");
+          } else if (roleInfo.value.role === "Idiot") {
+            sendSystemMessage("游戏结束！白痴获胜！");
+          } else {
+            sendSystemMessage("游戏结束！好人阵营获胜！");
+          }
+        } else {
+          if (roleInfo.value.role === "Werewolf") {
+            sendSystemMessage("游戏结束！好人阵营获胜！你的阵营失败了……再接再厉！");
+          } else if (roleInfo.value.role === "Idiot") {
+            // If Idiot loses, either werewolf or villagers won
+            if (message.victory["Werewolf"]) {
+              sendSystemMessage("游戏结束！狼人获胜！你的阵营失败了……再接再厉！");
+            } else {
+              sendSystemMessage("游戏结束！好人阵营获胜！你的阵营失败了……再接再厉！");
+            }
+          } else {
+            sendSystemMessage("游戏结束！狼人获胜！你的阵营失败了……再接再厉！");
+          }
         }
       }
       // TODO: 展示所有人的角色并留两分钟复盘
@@ -1207,6 +1287,8 @@ export default {
       timerSeconds,
 
       // 对话框相关
+      notifications,
+      removeNotification,
       handleDialogConfirm,
       showDialog,
       dialogTitle,
@@ -2138,5 +2220,14 @@ p {
   transform: scale(1.05);
 }
 
+.system-notices-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9999;
+}
 
 </style>
