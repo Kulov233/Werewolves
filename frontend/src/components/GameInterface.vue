@@ -1,5 +1,6 @@
 <template>
-    <div class="game-container" @click="closeALL" >
+    <div class="game-container"
+         @click="closeALL">
 
   
       <!-- 顶部菜单栏 -->
@@ -176,8 +177,10 @@
       </div>
 
       <!-- 大图标，显示在右上角 -->
-      <div class="sun-moon-icon" @click="toggleDayNight">
-        <img :src="sunMoonIcon" alt="Day Night Toggle" class="sun-moon-icon-img" />
+      <div class="sun-moon-icon">
+        <img :src="currentIcon"
+             :alt="isDayTime ? 'Day Time' : 'Night Time'"
+             class="sun-moon-icon-img" />
       </div>
 
 
@@ -458,7 +461,6 @@ export default {
 
       // 日夜切换
 
-      sunMoonIcon: require('@/assets/sun.svg') , // 默认图标是太阳
       messageRecipient: "all", // 消息的接收者，默认为"所有人"
 
     };
@@ -581,7 +583,7 @@ export default {
     const selectedPlayer = ref(-1);
     const selectablePhaseAction = ref("");
     const confirmed = ref(false);
-    const isDayTime = ref(false);
+    const isDayTime = ref(true);
     // 当前为你的发言阶段
     // TODO: 允许发言
     const talkStart = ref(false);
@@ -1359,6 +1361,12 @@ export default {
   },
 
   computed: {
+
+    currentIcon() {
+      return this.isDayTime
+        ? require('@/assets/sun.svg')
+        : require('@/assets/night.svg');
+    },
      // 过滤消息，确保死亡玩家可以看到所有消息，活着的玩家不能看到死亡者的消息
     filteredMessages() {
       console.log('filteredMessages 被计算');
@@ -1539,13 +1547,6 @@ export default {
       alert(`已向 ${player.name} 发送好友请求！`);
     },
 
-     // 切换日夜模式
-    toggleDayNight() {
-      this.isDayTime = !this.isDayTime;
-      this.sunMoonIcon = this.isDayTime
-        ? require('@/assets/sun.svg')  // 白天显示太阳图标
-        : require('@/assets/night.svg');  // 晚上显示月亮图标
-    },
 
   },
   watch: {
@@ -2161,7 +2162,10 @@ p {
 /* 遮罩层（点击其他地方关闭信息框） */
 .game-container {
   position: relative;
+  transition: filter 0.5s ease;
 }
+
+
 
 /* 关闭按钮 */
 .close {
@@ -2310,7 +2314,7 @@ p {
   position: absolute;
   top: 100px;
   right: 20px;
-  left: 80%;  /* 将其水平居中 */
+  left: 85%;  /* 将其水平居中 */
   background-color: transparent;
   border: none;
   cursor: pointer;

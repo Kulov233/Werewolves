@@ -310,6 +310,78 @@
                 </div>
                 </div>
 
+                <!-- 角色配置展示区域 -->
+                <div class="role-config-section">
+                  <h3 class="section-title">
+                    <img src="@/assets/roles.svg" alt="角色" class="section-icon"/>
+                    角色配置
+                  </h3>
+
+                  <!-- 当前配置展示 -->
+                  <div class="role-display">
+                    <div class="role-count-grid">
+                      <template v-if="editRoomForm.roleConfig?.roles">
+                        <div
+                          v-for="(count, role) in roleCountMap"
+                          :key="role"
+                          v-memo="[role, count]"
+                          class="role-count-item"
+                          :class="ROLE_COLOR_MAP[role]"
+                        >
+                          <span class="role-name">{{ ROLE_NAME_MAP[role] }}</span>
+                          <span class="role-number">× {{ count }}</span>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+
+                  <!-- 角色优先选择设置 -->
+                  <div class="priority-settings">
+                    <div class="priority-header">
+                      <h4>角色优先分配</h4>
+                      <label class="switch">
+                        <input
+                          type="checkbox"
+                          v-model="enableRolePriority"
+                        >
+                        <span class="slider round"></span>
+                      </label>
+                    </div>
+
+                    <div v-if="enableRolePriority" class="priority-selection">
+                      <div class="priority-roles">
+                        <template v-for="role in getAvailableRoles()" :key="role">
+                          <label class="role-checkbox" :class="getRoleColorClass(role)">
+                            <input
+                              type="checkbox"
+                              v-model="selectedPriorityRoles"
+                              :value="role"
+                            >
+                            <span class="role-label">{{ getRoleDisplayName(role) }}</span>
+                          </label>
+                        </template>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 女巫道具信息 -->
+                  <div class="witch-items-section" v-if="editRoomForm.roleConfig?.witchItems">
+                    <h4>女巫道具配置</h4>
+                    <div class="witch-items-grid">
+                      <div class="witch-item">
+                        <img src="@/assets/cure.svg" alt="解药" class="item-icon"/>
+                        <span class="item-name">解药</span>
+                        <span class="item-count">× {{ editRoomForm.roleConfig.witchItems.cure_count }}</span>
+                      </div>
+                      <div class="witch-item">
+                        <img src="@/assets/medicine.svg" alt="毒药" class="item-icon"/>
+                        <span class="item-name">毒药</span>
+                        <span class="item-count">× {{ editRoomForm.roleConfig.witchItems.poison_count }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <!-- 可修改的设置部分 -->
                 <div class="settings-section">
                 <h3>房间设置</h3>
@@ -405,10 +477,10 @@
   
 <script>
 import ConfirmDialog from './shared_components/ConfirmDialog.vue'
-import { onMounted, ref , onUnmounted} from 'vue';
+import { onMounted, ref , onUnmounted, watch, computed } from 'vue';
 import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';
-import { useWebSocket } from '@/composables/useWebSocket'; 
+import { useWebSocket } from '@/composables/useWebSocket';
 import axios from 'axios';
 
 const router = useRouter();
@@ -474,6 +546,54 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+const ROLE_CONFIGS = {
+  4: {
+    roles: {
+      Werewolf: 1,
+      Villager: 3
+    },
+    witchItems: { cure: 1, poison: 1 }
+  },
+  6: {
+    roles: {
+      Werewolf: 2,
+      Prophet: 1,
+      Witch: 1,
+      Villager: 2
+    },
+    witchItems: { cure: 1, poison: 1 },
+    priorityRoles: ["Witch", "Prophet"]
+  },
+  8: {
+    roles: {
+      Werewolf: 2,
+      Prophet: 1,
+      Witch: 1,
+      Idiot: 1,
+      Villager: 3
+    },
+    witchItems: { cure: 1, poison: 1 },
+    priorityRoles: ["Witch", "Idiot"]
+  },
+  12: {
+    roles: {
+      Werewolf: 3,
+      Prophet: 1,
+      Witch: 1,
+      Villager: 7
+    },
+    witchItems: { cure: 2, poison: 2 }
+  },
+  16: {
+    roles: {
+      Werewolf: 4,
+      Prophet: 1,
+      Witch: 1,
+      Villager: 10
+    },
+    witchItems: { cure: 2, poison: 2 }
+  }
+};
 
 export default {
   components: {
@@ -481,6 +601,10 @@ export default {
   },
 
   setup() {
+
+    const enableRolePriority = ref(true); // 控制是否启用角色优先选择
+    const selectedPriorityRoles = ref([]); // 存储已选择的优先角色
+
     const aiCounter = ref(1);
 
     const store = useStore();
@@ -514,7 +638,43 @@ export default {
     });
 
     // 编辑房间的表单数据
-    const editRoomForm = ref({"title": "", "description": "", "max_players": 6, "allowAI": "无AI"});
+    const editRoomForm = ref({
+      title: "",
+      description: "",
+      max_players: 6,
+      allowAI: "无AI",
+      roleConfig: ROLE_CONFIGS[6],
+    });
+
+    // 角色颜色映射表改为静态常量
+    const ROLE_COLOR_MAP = {
+      'Werewolf': 'role-werewolf',
+      'Villager': 'role-villager',
+      'Prophet': 'role-prophet',
+      'Witch': 'role-witch',
+      'Idiot': 'role-idiot'
+    };
+
+    const ROLE_NAME_MAP = {
+      'Werewolf': '狼人',
+      'Villager': '村民',
+      'Prophet': '预言家',
+      'Witch': '女巫',
+      'Idiot': '白痴'
+    };
+
+    // 简化的roleCountMap计算属性
+    const roleCountMap = computed(() => {
+      const config = ROLE_CONFIGS[currentRoom.value.max_players];
+      if (!config?.roles) return {};
+      return config.roles; // 直接返回角色配置对象
+    });
+
+
+    // 修改监听玩家数量变化
+    watch(() => currentRoom.value.max_players, (newValue) => {
+      editRoomForm.value.roleConfig = ROLE_CONFIGS[newValue];
+    });
 
     // 控制创建房间面板的显示
     const showCreateRoomPanel=ref(false);
@@ -543,6 +703,7 @@ export default {
         description: roomData.value.description,
         max_players: roomData.value.max_players,
         allowAI: roomData.value.allow_ai_players ? "有AI" : "无AI",
+        roleConfig: { ...ROLE_CONFIGS[roomData.value.max_players] }
       };
 
       // 设置房间基本信息
@@ -994,9 +1155,52 @@ export default {
       // TODO：可以加个弹窗，然后弹窗点确定后跳转到游戏界面
 
     };
+    const getRoleCountMap = (roles) => {
+      return roles.reduce((acc, role) => {
+        acc[role] = (acc[role] || 0) + 1;
+        return acc;
+      }, {});
+    };
+
+    const getRoleColorClass = (role) => {
+      const roleClassMap = {
+        'Werewolf': 'role-werewolf',
+        'Villager': 'role-villager',
+        'Prophet': 'role-prophet',
+        'Witch': 'role-witch',
+        'Idiot': 'role-idiot'
+      };
+      return roleClassMap[role] || '';
+    };
+
+    const getRoleDisplayName = (role) => {
+      const roleNameMap = {
+        'Werewolf': '狼人',
+        'Villager': '村民',
+        'Prophet': '预言家',
+        'Witch': '女巫',
+        'Idiot': '白痴'
+      };
+      return roleNameMap[role] || role;
+    };
+
+    const getAvailableRoles = () => {
+      const config = ROLE_CONFIGS[currentRoom.value.max_players];
+      if (!config?.roles) return [];
+      return Object.keys(config.roles); // 返回角色配置对象的键数组
+    };
 
 
     return {
+      ROLE_COLOR_MAP,
+      ROLE_NAME_MAP,
+      roleCountMap,
+      enableRolePriority,
+      selectedPriorityRoles,
+      getRoleCountMap,
+      getRoleColorClass,
+      getRoleDisplayName,
+      getAvailableRoles,
       isLobbyConnected,
       isGameConnected,
       disconnect,
@@ -1162,6 +1366,7 @@ export default {
       return this.currentRoom.max_players - this.currentRoom.currentPeople;
     }
   },
+
   methods: {
     // 显示玩家资料
     showProfile(playerId) {
@@ -2191,6 +2396,210 @@ textarea.setting-control {
   filter: brightness(0) invert(1);
 }
 
+.role-config-section {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+  border: 1px solid #e2e8f0;
+}
 
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #2c3e50;
+  font-size: 1.2em;
+  margin-bottom: 16px;
+}
+
+.section-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.role-display {
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.role-count-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+.role-count-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 0.9em;
+}
+
+/* 角色颜色类 */
+.role-werewolf {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.role-villager {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.role-prophet {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.role-witch {
+  background: #f3e8ff;
+  color: #6b21a8;
+}
+
+.role-idiot {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.priority-settings {
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.priority-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.priority-header h4 {
+  margin: 0;
+  color: #2c3e50;
+}
+
+/* 开关样式 */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 24px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #cbd5e1;
+  transition: .4s;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  transition: .4s;
+}
+
+.switch input:checked + .slider {
+  background-color: #3b82f6;
+}
+
+.switch input:checked + .slider:before {
+  transform: translateX(24px);
+}
+
+.slider.round {
+  border-radius: 24px;
+}
+
+.slider.round:before {
+  border-radius: 50%;
+}
+
+.priority-selection {
+  margin-top: 12px;
+}
+
+.priority-roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.role-checkbox {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.role-checkbox input {
+  margin-right: 6px;
+}
+
+.witch-items-section {
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.witch-items-section h4 {
+  margin: 0 0 16px 0;
+  color: #2c3e50;
+}
+
+.witch-items-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.witch-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: white;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.item-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.item-name {
+  color: #4b5563;
+}
+
+.item-count {
+  margin-left: auto;
+  color: #2563eb;
+  font-weight: 500;
+}
   </style>
   
