@@ -56,28 +56,54 @@
         <!-- 使用 Object.values() 将对象的值转换为数组，并确保通过 .value 访问 ref 的值 -->
         <div v-for="(player, index) in [...Object.values(players), ...Object.values(aiPlayers)]" :key="index"
              :class="['player-container', { 'selected-player': index + 1 === selectedPlayer }]">
-          <div :class="['player', { dead: ![...Object.values(gameData.players), ...Object.values(gameData.ai_players)][index].alive }]">
-            <img
-              :src="player.avatar"
-              alt="avatar"
-              class="avatar0"
-              @click.stop="showPlayerDetails(player, $event)"
-              /><!-- 点击头像触发查看详情 -->
-            <p>{{ index + 1 }}号{{" "}}{{ player.name }}<span v-if="player.userId === currentPlayer.index"> (你)</span></p> <!-- 如果是当前玩家，显示 "(你)" -->
-            <div class="sync-targets" v-if="syncTargets[String(index + 1)]">
-              {{ '队友' + syncTargets[String(index + 1)].join('号, ') + '号已选择此目标' }}
+            <div class="player" :class="{ 'dead': ![...Object.values(gameData.players), ...Object.values(gameData.ai_players)][index].alive }">
+              <img
+                :src="player.avatar"
+                alt="avatar"
+                class="avatar0"
+                @click.stop="showPlayerDetails(player, $event)"
+              />
+              <p>{{ index + 1 }}号{{" "}}{{ player.name }}<span v-if="player.userId === currentPlayer.index"> (你)</span></p>
+
+              <!-- 同步目标显示 -->
+              <div class="sync-targets-wrapper" v-if="syncTargets[String(index + 1)]">
+                <div class="sync-targets-content">
+                  <!-- 头像组 -->
+                  <div class="teammate-avatars">
+                    <div v-for="(teamMate, idx) in syncTargets[String(index + 1)]"
+                         :key="idx"
+                         class="teammate-number">
+                      {{ teamMate }}
+                    </div>
+                  </div>
+                  <!-- 提示文本 -->
+                  <div class="sync-targets-tooltip">
+                    {{ '队友' + syncTargets[String(index + 1)].join('号, ') + '号已选择此目标' }}
+                  </div>
+                </div>
+              </div>
             </div>
+
+            <!-- 操作按钮 -->
+            <button
+              v-if="Boolean(selectableIndices.indexOf(index + 1) !== -1 && selectablePhaseAction !== '')"
+              class="target-button"
+              @click.stop="targetPlayer(index + 1)"
+            >
+              <span class="button-content">
+                <span class="button-text">{{ selectablePhaseAction }}</span>
+                <span class="button-arrow">→</span>
+              </span>
+            </button>
           </div>
-          <!-- 添加按钮，根据 是否是目标以及当前是否为可选择阶段 决定是否显示 -->
-          <button v-if="Boolean(selectableIndices.indexOf(index + 1) !== -1 &&
-          selectablePhaseAction !== '' )" class="target-button" @click.stop="targetPlayer(index + 1)">
-            {{ selectablePhaseAction }}
-          </button>
-        </div>
       </div>
 
       <!-- 确认选择按钮 -->
-      <div class="confirm-button" @click="confirmTarget">
+      <div
+        class="confirm-button"
+        v-if="selectablePhaseAction !== ''"
+        @click="confirmTarget"
+      >
         确认选择
       </div>
 
@@ -1620,35 +1646,21 @@ p {
   gap: 10px;
 }
 
-.player-container {
-  display: flex; /* 使用flex布局 */
-  align-items: center; /* 垂直居中对齐 */
-  justify-content: space-between; /* 水平分布元素 */
-}
-
-.selected-player {
-  background-color: rgba(56, 73, 204, 0.55); /* 替换 #your-color 为您想要的颜色 */
-}
-
-
-.currentPlayer {
-  border: 3px solid #f39c12; /* 为当前玩家头像添加黄色边框 */
-  box-shadow: 0px 0px 10px rgba(255, 165, 0, 0.8); /* 添加一个光辉效果 */
-}
-
 .player {
   display: flex;
   align-items: center;
   gap: 10px;
   transition: all 0.3s ease;
-
+  flex: 1; /* 让玩家信息占据剩余空间 */
+  margin-right: 20px; /* 与按钮保持距离 */
 }
 
 .player.dead {
   text-decoration: line-through;
   background-color: #e0e0e0; 
   color: #b0b0b0;
-  opacity: 0.6; 
+  opacity: 0.6;
+  width: 100%;
 }
 
 .avatar0 {
@@ -1670,27 +1682,6 @@ p {
   font-size: 14px;
   font-weight: bold;
   color: var(--name-color);
-}
-
-.target-button {
-  padding: 10px; /* 内边距可以根据需要调整 */
-  width: 50px; /* 设置按钮的宽度 */
-  height: 50px; /* 设置按钮的高度 */
-  border: none; /* 移除边框 */
-  background-color: #3586bb; /* 设置按钮的背景颜色 */
-  color: white; /* 设置按钮文字颜色 */
-  text-align: center; /* 文字居中 */
-  line-height: 30px; /* 调整行高以适应按钮的高度 */
-  border-radius: 50%; /* 设置边框半径为50%，使按钮成为圆形 */
-  cursor: pointer; /* 鼠标悬停时显示指针 */
-  outline: none; /* 移除点击时的轮廓线 */
-  font-size: 8px; /* 设置按钮文字大小 */
-  transition: background-color 0.3s; /* 添加背景颜色变化的过渡效果 */
-}
-
-/* 鼠标悬停时的按钮样式 */
-.target-button:hover {
-  background-color: #1150b9; /* 鼠标悬停时改变背景颜色 */
 }
 
 /* 狼人的同步目标 */
@@ -2352,5 +2343,197 @@ p {
 /* 鼠标悬停时的效果 */
 .confirm-button:hover .confirm-icon {
   transform: scale(1.05);
+}
+/* 玩家容器样式优化 */
+.player-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+  width: 100%;
+}
+
+/* 同步目标包装器 */
+.sync-targets-wrapper {
+  position: absolute;
+  top: -30px;
+  left: 60px;
+  z-index: 5;
+}
+
+.sync-targets-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: 20px;
+  padding: 4px 12px;
+  transition: all 0.3s ease;
+}
+
+/* 队友头像组 */
+.teammate-avatars {
+  display: flex;
+  margin-right: 8px;
+}
+
+.teammate-number {
+  width: 24px;
+  height: 24px;
+  background: #3B82F6;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  margin-left: -8px;
+  border: 2px solid white;
+}
+
+/* 提示文本 */
+.sync-targets-tooltip {
+  font-size: 12px;
+  color: #3B82F6;
+  white-space: nowrap;
+}
+
+.target-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  background: transparent;
+  border: 2px solid rgba(59, 130, 246, 0.5);
+  color: #3B82F6;
+  border-radius: 20px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 80px;
+  position: relative;
+  overflow: hidden;
+  margin-left: auto;
+}
+
+.button-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  z-index: 2;
+}
+
+.button-text {
+  font-weight: 500;
+  transition: transform 0.2s ease;
+}
+
+.button-arrow {
+  font-size: 16px;
+  transition: transform 0.2s ease;
+  opacity: 0.8;
+}
+
+/* 悬浮效果 */
+.target-button:hover {
+  border-color: #3B82F6;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.2);
+  transform: translateY(-1px);
+}
+
+.target-button:hover .button-arrow {
+  transform: translateX(4px);
+}
+
+/* 点击效果 */
+.target-button:active {
+  transform: translateY(1px);
+}
+
+/* 为选中状态添加样式 */
+.selected-player .target-button {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: #3B82F6;
+}
+
+.selected-player {
+  background-color: rgba(56, 73, 204, 0.55);
+  width: 100%;
+}
+/* 确保死亡玩家状态不影响同步目标显示 */
+.player.dead + .sync-targets-wrapper {
+  opacity: 1;
+  filter: none;
+}
+
+.player.dead + .target-button {
+  opacity: 0.7;
+  pointer-events: none;
+}
+/* 确认按钮的基础样式 */
+.confirm-button {
+  position: absolute;
+  bottom: 80px;
+  left: 30px;
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 0 4px 6px rgba(99, 102, 241, 0.25);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 140px;
+  text-align: center;
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+/* 鼠标悬停效果 */
+.confirm-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(99, 102, 241, 0.3);
+  background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+}
+
+/* 点击效果 */
+.confirm-button:active {
+  transform: translateY(1px);
+  box-shadow: 0 2px 4px rgba(99, 102, 241, 0.2);
+}
+
+/* 禁用状态 */
+.confirm-button:disabled {
+  background: #cbd5e1;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* 添加脉冲动画效果 */
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(99, 102, 241, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0);
+  }
+}
+
+.confirm-button:not(:disabled) {
+  animation: pulse 2s infinite;
 }
 </style>
