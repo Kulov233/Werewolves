@@ -158,11 +158,6 @@
 
         <!-- 输入框和发送按钮在聊天框外部 -->
         <div class="message-input-section">
-          <select v-model="messageRecipient" class="recipient-select">
-            <option value="all">所有人</option>
-            <option value="team">团队</option>
-            <option value="dead" v-if="isDead">死亡</option> <!-- 死亡玩家只能选择死亡 -->
-          </select>
           <input
             v-model="userMessage"
             @keyup.enter="sendChatMessage"
@@ -170,7 +165,7 @@
             class="message-input"
           />
           <!-- 图标按钮 -->
-          <button @click="sendChatMessage" class="send-button">
+          <button @click="sendChatMessage" class="send-button" :disabled="!talkStart">
             <img class="send-icon" src="@/assets/send.svg" alt="发送图标" /> <!-- 或者使用一个自定义图标图片 -->
           </button>
         </div>
@@ -1324,6 +1319,7 @@ export default {
 
 
     return{
+      talkStart,
       messages,
       isGameConnected,
       isLobbyConnected,
@@ -1892,52 +1888,6 @@ p {
   gap: 10px; 
 }
 
-.recipient-select {
-  padding: 8px 30px 8px 12px;  /* 左边内边距用于文本，右边留出空间给箭头 */
-  font-size: 14px;
-  border: 1px solid #ccc;
-  border-radius: 25px; /* 更圆的边角 */
-  background-color: var(--background-color);
-  color: #333;
-  outline: none; /* 去除默认的聚焦边框 */
-  cursor: pointer;
-  transition: border-color 0.3s ease, background-color 0.3s ease; /* 平滑过渡效果 */
-}
-
-.recipient-select:focus {
-  border-color: #007bff; /* 聚焦时改变边框颜色 */
-  background-color: #fff; /* 聚焦时改变背景颜色 */
-}
-
-.recipient-select option {
-  background-color: var(--background-color);
-  color: #333;
-  padding: 10px;
-}
-
-.recipient-select::-ms-expand {
-  display: none; /* 隐藏 IE 下拉箭头 */
-}
-
-.recipient-select::after {
-  content: '\f078'; /* 使用Font Awesome的下拉箭头图标 */
-  font-family: 'FontAwesome';
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  pointer-events: none; /* 确保箭头不可点击 */
-}
-
-/* 自定义下拉箭头 */
-.recipient-select {
-  position: relative;
-}
-
-.recipient-select option:hover {
-  background-color: #f1f1f1; /* 选项悬停时改变背景 */
-}
-
 /* 输入框 */
 .message-input {
   border: 1px solid #ccc;
@@ -1968,6 +1918,28 @@ p {
   width: 40px;  /* 设置图标的宽度 */
   height: 40px; /* 设置图标的高度 */
   transition: transform 0.3s ease;
+  filter: brightness(0); /* 将图标变为黑色 */
+}
+
+.send-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: #f0f0f0;
+  transform: none;
+  transition: all 0.3s ease;
+  border: 1px solid #ddd;
+}
+
+.send-button:disabled img {
+  filter: grayscale(100%);
+  opacity: 0.6;
+  transform: none;
+}
+
+.send-button:disabled:hover {
+  background-color: #f0f0f0;
+  transform: none;
+  box-shadow: none;
 }
 .send-button:hover{
   background-color: #aaa;
