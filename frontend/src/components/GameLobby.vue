@@ -75,10 +75,6 @@
                     <img src="@/assets/history.svg" alt="History" />
                     游戏记录
                   </button>
-                  <button class="menu-button" @click="goToAchievements">
-                    <img src="@/assets/wolf.svg" alt="Achievements" />
-                    我的成就
-                  </button>
                 </div>
               </div>
 
@@ -93,10 +89,6 @@
                     <img src="@/assets/wolf.svg" alt="Friend List" />
                     好友列表
                   </button>
-                  <button class="menu-button" @click="goToInvites">
-                    <img src="@/assets/wolf.svg" alt="Invites" />
-                    邀请管理
-                  </button>
                 </div>
               </div>
 
@@ -110,10 +102,6 @@
                   <button class="menu-button" @click="goToProfile">
                     <img src="@/assets/wolf.svg" alt="Profile" />
                     资料设置
-                  </button>
-                  <button class="menu-button" @click="goToPreferences">
-                    <img src="@/assets/wolf.svg" alt="Preferences" />
-                    偏好设置
                   </button>
                 </div>
               </div>
@@ -254,17 +242,18 @@
           <!-- 数据统计 -->
           <div class="stats-cards">
             <div class="stat-card">
-              <span class="stat-number">{{totalGames}}</span>
+              <span class="stat-number">{{userProfile.stats[0].value}}</span>
               <span class="stat-label">总场次</span>
             </div>
             <div class="stat-card">
-              <span class="stat-number">{{winRate}}%</span>
+              <span class="stat-number">{{userProfile.stats[1].value}}</span>
               <span class="stat-label">胜率</span>
             </div>
             <div class="stat-card">
               <span class="stat-number">{{avgRating}}</span>
               <span class="stat-label">平均评分</span>
             </div>
+
           </div>
 
           <!-- 筛选器 -->
@@ -294,35 +283,13 @@
               </div>
               <div class="game-details">
                 <div class="role-info">
-                  <img :src="game.roleIcon" alt="Role" class="role-icon"/>
+                  <img :src="getRoleIcon(game.role)" alt="Role" class="role-icon"/>
                   <span class="role-name">{{game.role}}</span>
                 </div>
                 <div class="game-stats">
                   <div class="stat">
-                    <span class="label">评分</span>
-                    <span class="value">{{game.rating}}</span>
-                  </div>
-                  <div class="stat">
                     <span class="label">场次时长</span>
                     <span class="value">{{game.duration}}</span>
-                  </div>
-                </div>
-              </div>
-              <div class="game-players">
-                <div class="team good-team">
-                  <div v-for="player in game.goodTeam" 
-                      :key="player.id" 
-                      class="player">
-                    <img :src="player.avatar" alt="Avatar" class="player-avatar"/>
-                    <span class="player-name">{{player.name}}</span>
-                  </div>
-                </div>
-                <div class="team bad-team">
-                  <div v-for="player in game.badTeam" 
-                      :key="player.id" 
-                      class="player">
-                    <img :src="player.avatar" alt="Avatar" class="player-avatar"/>
-                    <span class="player-name">{{player.name}}</span>
                   </div>
                 </div>
               </div>
@@ -509,7 +476,7 @@
 
               <button 
                 class="join-button"
-                :class="{ 'return-button': isInRoom(room.id) }"
+                :class="{ 'return-button': isInRoom(room?.id) }"
                 @click="joinRoom(room.id)"
                 :disabled="room.players.length + Object.keys(room.ai_players).length === room.max_players && !isInRoom(room.id)"
               >
@@ -638,6 +605,15 @@
         </div>
       </transition>
 
+      <ProfileDialog
+        :show="showProfileDialog"
+        :userProfile="userProfile"
+        @close="showProfileDialog = false"
+        @update-avatar="handleAvatarChange"
+        @update-signature="saveSignature"
+        @update-password="handlePasswordUpdate"
+      />
+
       <ConfirmDialog
         :show="showDialog"
         :title="dialogTitle"
@@ -653,11 +629,13 @@
 import { useWebSocket } from '@/composables/useWebSocket';
 import ModernToggle  from './shared_components/ModernToggle.vue'
 import ConfirmDialog from './shared_components/ConfirmDialog.vue';
+import ProfileDialog from './shared_components/ProfileDialog.vue';
 import { onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useStore } from 'vuex';
 import { ref } from 'vue';
 import axios from 'axios';
+
 
 
 const router = useRouter();
@@ -728,10 +706,18 @@ export default {
   components: {
     ModernToggle,
     ConfirmDialog,
-
+    ProfileDialog,
   },
   data() {
     return {
+
+      roleIcons: {
+        //: require('@/assets/witch.svg'),
+        '狼人': require('@/assets/wolf.svg'),
+        '村民': require('@/assets/villager.svg'),
+        //'预言家': require('@/assets/prophet.svg'),
+        //'白痴': require('@/assets/idiot.svg')
+      },
       friendRequests: [
         {
           id: 1,
@@ -871,6 +857,7 @@ export default {
   },
   setup() {
     // 弹窗相关的状态
+    const showProfileDialog  = ref(false);
     const showDialog = ref(false);
     const dialogTitle = ref('');
     const dialogMessage = ref('');
@@ -992,6 +979,7 @@ export default {
       fetchUserInfo();
     });
 
+
     const handleDialogConfirm = async () => {
       if (currentDialogAction.value === 'deleteFriend') {
         // 处理删除好友的逻辑
@@ -1015,6 +1003,21 @@ export default {
       else if(currentDialogAction.value === 'quickMatchSuccess'){
         // 处理快速匹配成功的逻辑
         joinRoom(selectedRoomForMatch.value.id);
+      }
+      else if (currentDialogAction.value === 'logout') {
+        try {
+          // 断连websocket
+          disconnect();
+
+          // 清空 localStorage
+          localStorage.clear();
+
+          // 回到登录界面
+          router.push('/login');
+        } catch (error) {
+          console.error('Logout failed:', error);
+          alert('退出登录失败，请重试');
+        }
       }
       showDialog.value = false;
     };
@@ -1040,7 +1043,7 @@ export default {
       try {
         
         // 如果已经在房间中，直接跳转到房间页面
-        if (currentRoomID.value === roomId) {
+        if (isInRoom(roomId)) {
           router.push({
             name: 'GameRoom',
             params: { id: roomId }
@@ -1142,7 +1145,7 @@ export default {
         // 添加监听器
         roomCreatedListenerCleanup.value = onType('room_created', handleRoomCreated)
         roomRemovedListenerCleanup.value = onType('room_removed', handleRoomRemoved);
-        
+
       } else {
         // 移除监听器
         if (roomCreatedListenerCleanup.value) {
@@ -1212,7 +1215,7 @@ export default {
           stats: [
             { label: '游戏场数', value: data.profile.games.length },
             { label: '胜率', value: calculateWinRate(data.profile.games) },
-            { label: '评分', value: calculateRating(data.profile.games) }
+            // { label: '评分', value: calculateRating(data.profile.games) }
           ]
         };
       } catch (error) {
@@ -1316,13 +1319,28 @@ export default {
     };
 
     // 辅助函数：计算平均评分
-    const calculateRating = (games) => {
-      if (!games || games.length === 0) return 0;
-      const totalRating = games.reduce((sum, game) => sum + (game.rating || 0), 0);
-      return (totalRating / games.length).toFixed(1);
+    // const calculateRating = (games) => {
+    //   if (!games || games.length === 0) return 0;
+    //   const totalRating = games.reduce((sum, game) => sum + (game.rating || 0), 0);
+    //   return (totalRating / games.length).toFixed(1);
+    // };
+
+    // 是当前房间
+    const isInRoom = (roomId) => {
+      const room = Rooms.value.find(r => r.id === roomId);
+      if (!room) return false;
+
+      // 检查玩家是否在普通玩家列表中
+      if (room.players.includes(userProfile.value.userId)) {
+        return true;
+      }
+
+      return false;
     };
 
     return {
+      isInRoom,
+      showProfileDialog,
       joinRoom,
       currentRoomID,
       handleDialogConfirm,
@@ -1432,19 +1450,35 @@ export default {
 
 
   methods: {
+    // 需要复制
+    async handleLogout() {
+      // Show confirmation dialog
+      this.dialogTitle = '退出确认';
+      this.dialogMessage = '确定要退出登录吗？';
+      this.dialogShowConfirm = true;
+      this.currentDialogAction = 'logout';
+      this.showDialog = true;
+    },
 
-  // 是当前房间
-  isInRoom(roomId) {
-    const room = this.Rooms.find(r => r.id === roomId);
-    if (!room) return false;
+    getRoleIcon(roleName) {
+      return this.roleIcons[roleName] || require('@/assets/wolf.svg'); // Provide a default icon
+    },
 
-    // 检查玩家是否在普通玩家列表中
-    if (Object.keys(room.players).includes(this.userProfile.userId)) {
-      return true;
-    }
+    goToHistory() {
+      this.showHistorySidebar = true;
+      this.showMenuSidebar = false;
+    },
 
-    return false;
-  },
+    goToFriends() {
+      this.showFriendsSidebar = true;
+      this.showMenuSidebar = false;
+    },
+
+    goToProfile() {
+      this.showProfileDialog = true;
+    },
+
+
 
   // 修改加入房间按钮的渲染逻辑
   getJoinButtonText(room) {

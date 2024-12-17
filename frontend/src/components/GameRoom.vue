@@ -1017,19 +1017,23 @@ export default {
       const roomUpdatedCleanup = onType('room_updated', (data) => {
         console.log('Room updated:', data);
         if (data.room.id === currentRoom.value.id) {
+
+          const currentConfig = ROLE_CONFIGS[currentRoom.value.max_players];
           currentRoom.value = {
             ...currentRoom.value,
             title: data.room.title,
             description: data.room.description,
             max_players: data.room.max_players,
-            type: data.room.allow_ai_players ? "有AI" : "无AI"
+            type: data.room.allow_ai_players ? "有AI" : "无AI",
+            roleConfig: currentConfig,
           };
           // 同步更新编辑表单数据
           editRoomForm.value = {
             title: data.room.title,
             description: data.room.description,
             max_players: data.room.max_players,
-            allowAI: data.room.allow_ai_players ? "有AI" : "无AI"
+            allowAI: data.room.allow_ai_players ? "有AI" : "无AI",
+            roleConfig: currentConfig
           };
 
           // 如果设置为无AI，清除所有AI玩家
