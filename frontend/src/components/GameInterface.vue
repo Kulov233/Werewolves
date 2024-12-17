@@ -586,17 +586,21 @@ export default {
     const currentNotification = ref(null);  // 当前显示的通知
 
     // 添加处理通知的方法
-    function sendSystemMessage(content, type = 'info', subMessage = '', players = [] ) {
+    function sendSystemMessage(content) {
       // 创建聊天消息
       const chatMessage = {
         senderid: 0,
-        sendername: "系统信息",
+        sendername: "系统信息: ",
         avatar: require('@/assets/head.png'),
         text: content,
         recipients: "all"
       };
       messages.value.push(chatMessage);
 
+
+
+    }
+    function sendNotification(content, type = 'info', subMessage = '', players = []){
       // 创建新通知
       currentNotification.value = {
         type: type,
@@ -604,7 +608,6 @@ export default {
         subMessage: subMessage,
         players: players,
       };
-
     }
 
     // 关闭通知的方法
@@ -638,22 +641,23 @@ export default {
       const roleName = roleNames[roleInfo.value.role] || roleInfo.value.role;
       const description = roleDescriptions[roleInfo.value.role] || '';
 
-      sendSystemMessage(
-        `你的角色是：${roleName}`,
-        'role',
-        description,
-          [],
-      );
+      sendSystemMessage(`你的角色是：${roleName}`);
+      sendNotification(
+          '你的角色是：${roleName}',
+          'info',
+          description,
+      )
     }
     // 修改原有的系统消息处理方法
     function handleNightPhase(message) {
-      sendSystemMessage("天黑请闭眼", "night");
+      // sendSystemMessage("天黑请闭眼");
+      sendNotification("天黑请闭眼", "night")
       isDayTime.value = false;
       updateGame(message.game);
     }
 
     function handleDayPhase(message) {
-      sendSystemMessage("天亮请睁眼", "day");
+      sendNotification("天亮请睁眼", "day");
       isDayTime.value = true;
       updateGame(message.game);
     }
@@ -661,7 +665,7 @@ export default {
     function handleNightDeathInfo(message) {
       const victims = message.victims;
       if (victims.length === 0) {
-        sendSystemMessage("昨晚是平安夜", "death");
+        sendNotification("昨晚是平安夜", "death");
       } else {
         // 获取死亡玩家的信息
         const deadPlayers = victims.map(index => {
@@ -673,7 +677,7 @@ export default {
           };
         });
 
-        sendSystemMessage(
+        sendNotification(
           "昨晚以下玩家被杀害：",
           "death",
           "",
@@ -684,12 +688,11 @@ export default {
 
     //
     function handleTalkStart() {
-      sendSystemMessage(
+      sendNotification(
         `${currentPlayer.value.index}号玩家，轮到你发言`,
         "speak",
           "请在规定时间内发表意见",
         [],
-
       );
       talkStart.value = true;
       gameData.value.current_phase = "Speak"
@@ -923,7 +926,7 @@ export default {
       }
       sendMessage(actionToSend,
         "game")
-      if (gameData.value.current_phase === "Werewolf"){
+      if (gameData.value.current_phase === "Werewolf" && roleInfo.value.role === "Werewolf"){
         handleMultipleKillVotes();
       }
       else {
@@ -933,7 +936,7 @@ export default {
     }
 
     async function handleMultipleKillVotes(){
-      if (roleInfo.value.role === "Werewolf") {
+      if (gameData.value.current_phase === "Werewolf" && roleInfo.value.role === "Werewolf") {
         // 这里可能会被执行多次，所以要保证时间不会过长
         const killVoteTarget = await select("选择要杀死的目标", "杀死",
             gameData.value.phase_timer[gameData.value.current_phase] - timeElapsed.value, null, true);
@@ -973,26 +976,7 @@ export default {
       );
     }
 
-    // // 聊天说话
-    // function handleTalk(content){
-    //   sendMessage(
-    //       {
-    //         type: "talk_content",
-    //         content: content
-    //       }
-    //   )
-    // }
 
-    // // 主动结束发言
-    // function handleTalkEnd(){
-    //   sendMessage(
-    //       {
-    //         type: "talk_end",
-    //         player: this.currentPlayerId
-    //       }
-    //   )
-    // }
-    //
     // // 白天投票
     function handleVote(seq_num){
       const actionToSend = {
@@ -1020,11 +1004,11 @@ export default {
 
     async function handleKillPhase(message) {
       // 处理Werewolf投票阶段
-
-      sendSystemMessage("狼人请行动", "action", "请选择要杀害的对象");
       gameData.value = message.game;
-
-      await handleMultipleKillVotes();
+      if (roleInfo.value.role === "Werewolf") {
+        sendNotification("狼人请行动", "action", "请选择要杀害的对象");
+        await handleMultipleKillVotes();
+      }
     }
 
     function handleWolfSync(message) {
@@ -1051,24 +1035,24 @@ export default {
     function handleKillResult(message) {
       // 处理刀人结果
       if (message.kill_result){
-        sendSystemMessage(message.kill_result + "号玩家被你们杀死");
+        sendNotification(message.kill_result + "号玩家被你们杀死");
+        // TODO: 是否要换个说法？因为不一定真死
       }
 
       updateGame(message.game)
     }
 
     function handleKillPhaseEnd(message) {
-      // 刀人阶段结束的同步。这里其实不应同步游戏信息，因为到第二天早上人才会死。
-      sendSystemMessage("狼人阶段结束");
+      // 刀人阶段结束的同步。
       updateGame(message.game);
     }
 
     async function handleCheckPhase(message) {
       // 处理Prophet查人阶段, 不能告诉他谁死了
-      sendSystemMessage("预言家请行动", "action", "请选择要查验的玩家");
+
       updateGame(message.game);
       if (roleInfo.value.role === "Prophet"){
-
+        sendNotification("预言家请行动", "action", "请选择要查验的玩家");
         const checkTarget = await select("选择要查验的目标", "查验",
             gameData.value.phase_timer[gameData.value.current_phase], null, true);
 
@@ -1079,14 +1063,13 @@ export default {
 
     function handleCheckResult(message) {
       // 处理查人结果
-      sendSystemMessage(message.target + "号玩家的身份为" + message.role );
+      sendNotification(message.target + "号玩家的身份为" + message.role );
 
     }
 
     function handleWitchPhase(message) {
       // 处理Witch阶段
       updateGame(message.game);
-      sendSystemMessage("女巫阶段开始");
       gameData.value.current_phase = message.game.current_phase;
     }
 
@@ -1094,7 +1077,7 @@ export default {
       // 处理Witch信息
       if(roleInfo.value.role === "Witch"){
         roleInfo.value.role_skills = message.role_skills;
-        sendSystemMessage("女巫请行动", "action", "请选择使用解药和毒药");
+        sendNotification("女巫请行动", "action", "请选择使用解药和毒药");
         // console.log("phase: " + selectablePhase.value + "indices: " + selectableIndices.value);
         let cure_target = -1, poison_target = -1;
 
@@ -1137,7 +1120,7 @@ export default {
       // 处理发言阶段
       gameData.value = message.game;
 
-      sendSystemMessage("发言阶段开始");
+      sendNotification("发言阶段开始", "speak");
     }
 
     function handleTalkUpdate(message) {
@@ -1148,6 +1131,7 @@ export default {
       //   return;
       // }
       const speaker = [...Object.values(players), ...Object.values(aiPlayers)][Number(message.source)]
+      console.log(JSON.stringify(speaker));
       // console.log("source: " + message.source);
       // console.log("speaker: " + speaker);
       const newMessage = {
@@ -1173,14 +1157,14 @@ export default {
       // 处理服务器发过来的聊天结束
       // this.userMessage = "";  // 没必要直接清空
       // TODO: 消息按钮重新变成灰的
-      sendSystemMessage(currentPlayer.value.index + "号玩家，你的发言时间结束。")
+      sendNotification("你的发言时间结束。", "speak")
       talkStart.value = false;
     }
 
     async function handleVotePhase(message) {
       // 处理投票阶段
       updateGame(message.game)
-      sendSystemMessage("投票阶段开始，请选择你要放逐的玩家");
+      sendNotification("投票阶段开始，请选择你要放逐的玩家", "vote");
       const target = await select("投票放逐", "放逐", gameData.value.phase_timer[gameData.value.current_phase],
           null, true);
       handleVote(target);
@@ -1189,50 +1173,58 @@ export default {
     function handleVoteResult(message) {
       // 处理投票结果
       if (message.result === null){
-        sendSystemMessage("投票结果: 由于出现平票，没有人被放逐");
+        sendNotification("投票结果: 由于出现平票，没有人被放逐", "vote");
       }
       else {
-        sendSystemMessage("投票结果: "+ message.result + "号玩家被放逐");
+        sendNotification("投票结果: "+ message.result + "号玩家被放逐", "death");
       }
 
     }
 
-    function handleDayDeathInfo(message) {
+    function handleDayDeathInfo() {
       // 处理白天死掉的人
-      let line = message.victims.join("号，");
-      if (line === ""){
-        sendSystemMessage("今天白天没有人出局");
-      }
-      else {
-        sendSystemMessage("白天" + line + "号玩家出局了");
-      }
-      console.log("line: " + line);
+      // let line = message.victims.join("号，");
+      // if (line === ""){
+      //   sendSystemMessage("今天白天没有人出局");
+      // }
+      // else {
+      //   sendSystemMessage("白天" + line + "号玩家出局了");
+      // }
+      // console.log("line: " + line);
 
     }
 
     function handleGameEnd(message) {
       // 处理游戏结束
+      // TODO: 有空可以再改个胜利/失败界面
       if (message.end){
         if (message.victory[roleInfo.value.role]){
           if (roleInfo.value.role === "Werewolf") {
-            sendSystemMessage("游戏结束！狼人获胜！");
+            sendNotification("游戏结束，狼人获胜！", "Night",
+                "狼人们成功杀死村民与守护者，占领了村庄……从此屈膝于血月之下。");
           } else if (roleInfo.value.role === "Idiot") {
-            sendSystemMessage("游戏结束！白痴获胜！");
+            sendNotification("游戏结束，白痴获胜！", "Day",
+              "愚者看似游于争斗之外，但博弈中棋子们却均投出如此无用之票，命运是否在向他们展示，生命不过一场游戏？");
           } else {
-            sendSystemMessage("游戏结束！好人阵营获胜！");
+            sendNotification("游戏结束，好人阵营获胜！", "Day",
+              "恭喜，您成功地守护了村庄免受狼人威胁！……继往圣之绝学，为万世开太平。");
           }
         } else {
           if (roleInfo.value.role === "Werewolf") {
-            sendSystemMessage("游戏结束！好人阵营获胜！你的阵营失败了……再接再厉！");
+            sendNotification("游戏结束，好人阵营获胜。你的阵营失败了……再接再厉！", "day",
+            "狼人们一一被发现后被驱逐，亦或是被女巫的毒药杀害。但复仇的时刻会来的……总有一天。");
           } else if (roleInfo.value.role === "Idiot") {
             // If Idiot loses, either werewolf or villagers won
             if (message.victory["Werewolf"]) {
-              sendSystemMessage("游戏结束！狼人获胜！你的阵营失败了……再接再厉！");
+              sendNotification("游戏结束，狼人获胜。你失败了……再接再厉！", "night",
+              "可惜的是，愚者还没来得及展示所有人的愚蠢，就被狼人杀害了。毕竟，人死了又能说出什么来呢？");
             } else {
-              sendSystemMessage("游戏结束！好人阵营获胜！你的阵营失败了……再接再厉！");
+              sendNotification("游戏结束，好人阵营获胜。你失败了……再接再厉！", "day",
+              "你看着村民的狂欢，他们似乎已不在意你的存在。也罢，也罢。如此得过且过，也算一幸事。");
             }
           } else {
-            sendSystemMessage("游戏结束！狼人获胜！你的阵营失败了……再接再厉！");
+            sendNotification("游戏结束，狼人获胜！你的阵营失败了……再接再厉！", "night",
+            "狼人将村民与守护者们屠戮殆尽，村庄沦为怪物们的巢穴。但我们仍相信人类的勇气、胆识与正义，邪不压正，它们总有被消灭的一天。");
           }
         }
       }
