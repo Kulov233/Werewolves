@@ -114,6 +114,13 @@ class GameConsumer(AsyncWebsocketConsumer):
                     self.channel_name
                 )
 
+                # 如果是狼人，加入狼人私聊频道
+                if game_data['players'][user_id]['role'] == "Werewolf":
+                    await self.channel_layer.group_add(
+                        f"room_{room_id}_werewolves",
+                        self.channel_name
+                    )
+
                 game_data['players'][user_id]['online'] = True
                 await self.update_game_data_in_cache(room_id, game_data)
 
@@ -127,6 +134,7 @@ class GameConsumer(AsyncWebsocketConsumer):
                 await self.broadcast_game_update(room_id, "player_joined", game_data)
 
                 # TODO: 用户全部连接后，开始游戏
+                # TODO: 重连时，发送角色信息
 
         except DenyConnection as e:
             await self.accept()
@@ -148,6 +156,10 @@ class GameConsumer(AsyncWebsocketConsumer):
         game_data = await self.get_game_data_from_cache(room_id)
         if game_data is None:
             return
+
+        if game_data['players'][user_id]['role'] == "Werewolf":
+            await self.channel_layer.group_discard(f"room_{room_id}_werewolves", self.channel_name)
+
         game_data['players'][user_id]['online'] = False
         await self.update_game_data_in_cache(room_id, game_data)
         await self.broadcast_game_update(room_id, "player_left", game_data)
@@ -555,7 +567,8 @@ class GameConsumer(AsyncWebsocketConsumer):
                 "role_skills": { // 若非女巫则为null
                     "cure_count": 1,
                     "poison_count": 1
-                }
+                },
+                "teammates": null | ["1" ,"2" ]
             }
         }
         """
@@ -709,16 +722,20 @@ class GameConsumer(AsyncWebsocketConsumer):
         """
         {
           "type": "witch_info",
-          "cure_count": 1,
-          "poison_count": 0,
+          "role_skills": {
+              "cure_count": 0,
+              "poison_count": 1
+          },
           "cure_target": ["6", "8"], // 今晚死掉的玩家序号列表，玩家序号为字符串
         }
         """
 
         await self.send(text_data=json.dumps({
             "type": "witch_info",
-            "cure_count": cure_count,
-            "poison_count": poison_count,
+            "role_skills": {
+                "cure_count": cure_count,
+                "poison_count": poison_count
+            },
             "cure_target": cure_target
         }))
 
@@ -1036,6 +1053,24 @@ class GameConsumer(AsyncWebsocketConsumer):
             )
         except Exception as e:
             print(f"广播消息时出错：{e}")
+
+    async def should_disconnect(self, event):
+        await self.close()
+
+    @classmethod
+    async def handle_should_disconnect(cls, room_id, user_id):
+        try:
+            channel_layer = get_channel_layer()
+
+            await channel_layer.group_send(
+                f"room_{room_id}",
+                {
+                    "type": "should_disconnect"
+                }
+            )
+
+        except Exception as e:
+            print(f"发送退出房间指示时出错：{e}")
 
 
     # 从缓存中获取房间信息

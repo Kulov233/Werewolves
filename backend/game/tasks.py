@@ -242,12 +242,6 @@ def assign_roles_to_players(room_id):
             if data["role"] == "Werewolf":
                 werewolves.append(data["index"])
 
-            role_info = {
-                "role": data["role"],
-                "role_skills": data["role_skills"]
-            }
-            async_to_sync(GameConsumer.send_role_to_player)(room_id, user_id, role_info)
-
         for uuid, data in game_data["ai_players"].items():
             if data["role"] == "Werewolf":
                 werewolves.append(data["index"])
@@ -259,6 +253,18 @@ def assign_roles_to_players(room_id):
             game_data["action_history"].append({
                 f"{data['index']}": message
             })
+
+        for user_id, data in game_data["players"].items():
+            role_info = {
+                "role": data["role"],
+                "role_skills": data["role_skills"],
+                "teammates": None
+            }
+
+            if data["role"] == "Werewolf":
+                role_info["teammates"] = [player for player in werewolves if player != data["index"]]
+
+            async_to_sync(GameConsumer.send_role_to_player)(room_id, user_id, role_info)
 
         # TODO: 通知狼人他们的队友
         message = "狼人玩家的编号分别是："
@@ -359,7 +365,7 @@ def get_vote_result(room_id):
 
     # 如果有多个玩家最高票数，则不放逐
     # TODO: 计算比例？
-    if len(players_with_max_votes) > 1:
+    if len(players_with_max_votes) > 1 or len(players_with_max_votes) == 0:
         pass
     else:
         if max_votes > game_data["max_players"] / 2:
@@ -569,8 +575,13 @@ def handle_phase_timed_out(room_id: str, current_phase: str):
             async_to_sync(GameConsumer.broadcast_game_end)(room_id, end, victory, victory_side, reveal_role)
             if end:
                 print(f"{room_id}游戏结束。")
+                # TODO: 通知前端游戏结束，并断开连接
+                # 应该先发通知，再清理数据
+                game_cache.delete(f"room_{room_id}_current_task")
+                game_cache.delete(f"room:{room_id}")
                 return
                 # TODO: 清理房间数据，留一个阶段以供复盘？
+                # TODO: 添加玩家战绩
 
         # 3. 开始下一个阶段
         next_phase_task = start_phase.delay(room_id, next_phase)
@@ -619,7 +630,7 @@ def handle_ai_action(room_id: str, ai_id: str, phase: str, action: dict):
                 print(f"AI在刀人时选择的目标不合法：{result}")
                 return
 
-            game_data['werewolves_targets'][ai_id] = result
+            game_data['werewolves_targets'][game_data["ai_players"][ai_id]["index"]] = result
             game_data['action_history'].append({
                 game_data["ai_players"][ai_id]["index"]: f"我选择杀死 {result} 号玩家。"
             })
