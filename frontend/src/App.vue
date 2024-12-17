@@ -29,9 +29,10 @@ export default {
     const navigationRoutes = [
       { path: '/login', label: '登录' },
       { path: '/registre', label: '注册' },
-      { path: '/search', label: '大厅' },
-      { path: '/Room', label: '房间内部' },
+      { path: '/GameLobby', label: '大厅' },
+      { path: '/GameRoom', label: '房间内部' },
       { path: '/GameInterface', label: '对战房间' },
+      { path: '/test', label: '测试页面' },
       
     ];
 

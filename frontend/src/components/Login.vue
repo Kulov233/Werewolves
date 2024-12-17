@@ -276,7 +276,7 @@ const onFinish = async (values) => {
     localStorage.setItem("refresh_token", refresh);
 
     alert("登录成功！");
-    router.push("/search");
+    router.push("/GameLobby");
   } catch (error) {
     if (error.response && error.response.status === 401) {
       const errors = error.response.data;

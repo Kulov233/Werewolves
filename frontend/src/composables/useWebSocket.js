@@ -1,34 +1,40 @@
-import { onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { useStore } from 'vuex';
 
-export function useWebSocket(token) {
+export const useWebSocket = (token) => {
   const store = useStore();
+  const isLobbyConnected = ref(false);
+  const isGameConnected = ref(false);
 
+
+  // 连接 WebSocket
   const connect = () => {
-    store.dispatch('initializeWebSocket', token);
+    store.dispatch('initializeLobbyWebSocket', token);
   };
 
-  const disconnect = () => {
-    store.dispatch('clearWebSocket');
+  // 连接游戏房间
+  const connectToGame = (roomId) => {
+    store.dispatch('initializeGameWebSocket', { token, roomId });
   };
 
-  const sendMessage = (message) => {
-    store.dispatch('sendWSMessage', message);
+  // 断开连接
+  const disconnect = (type = 'all') => {
+    store.dispatch('clearWebSocket', type);
   };
 
+  // 发送消息
+  const sendMessage = (message, type = 'lobby') => {
+    store.dispatch('sendWSMessage', { message, type });
+  };
+
+  // 监听消息类型
   const onType = (type, handler) => {
     store.dispatch('addMessageHandler', { type, handler });
-    
-    // 返回一个清理函数
-    return () => {
-      store.dispatch('removeMessageHandler', { type, handler });
-    };
+    return () => store.dispatch('removeMessageHandler', { type, handler });
   };
 
   onMounted(() => {
-    if (!store.state.isConnected) {
-      connect();
-    }
+
   });
 
   onUnmounted(() => {
@@ -38,9 +44,11 @@ export function useWebSocket(token) {
 
   return {
     connect,
+    connectToGame,
     disconnect,
     sendMessage,
     onType,
-    isConnected: store.state.isConnected
+    isLobbyConnected,
+    isGameConnected,
   };
 }
