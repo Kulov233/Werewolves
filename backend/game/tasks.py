@@ -89,7 +89,7 @@ def check_is_game_ready(room_id):
         return {"room_id": room_id, "status": "success", "message": "游戏开始"}
     else:
         # 未全部连接，发送通知
-        # TODO: 检查是谁未连接
+        # 检查是谁未连接
         offline_players = [player['name'] for player in game_data['players'].values() if not player['online']]
         return {
             "room_id": room_id,
@@ -118,17 +118,21 @@ def handle_game_readiness(room_id, result):
         # game_data['status'] = "debug_start"
         # game_cache.set(f"room:{room_id}", game_data)
         # async_to_sync(GameConsumer.broadcast_game_update)(room_id, "game_start", game_data)
-        # TODO: 跳转到游戏逻辑
+        # 跳转到游戏逻辑
         start_phase_task = start_phase.delay(room_id, 'Initialize')
         # 保存task_id
         game_cache.set(f"room_{room_id}_current_task", start_phase_task.id, timeout=3600)
 
     else:
-        # TODO: 返回未连接玩家列表
-        pass
-        #async_to_sync(GameConsumer.handle_not_connected)(room_id, result['status'], result['message'],
-                                                         # result['offline_players'])
+        # 返回未连接玩家列表
+        async_to_sync(GameConsumer.handle_not_connected)(room_id, result['status'], result['message'], result['offline_players'])
         # TODO: 前端应该在此时返回大厅。处理channel和cache中的残留？
+        game_cache = caches['game_cache']
+        game_data = game_cache.get(f"room:{room_id}")
+        for user_id, _ in game_data["players"].items():
+            async_to_sync(GameConsumer.handle_should_disconnect)(room_id, user_id)
+        game_cache.delete(f"room_{room_id}_current_task")
+        game_cache.delete(f"room:{room_id}")
 
 def initialize(room_id):
     try:
@@ -162,7 +166,7 @@ def initialize(room_id):
         game_data["victory_conditions"] = game_config["victory_conditions"]
         game_data["witch_config"] = game_config.get('witch_items', {'cure_count': 1, 'poison_count': 1})
 
-        # TODO: 所有角色名都是字符串
+        # 所有角色名都是字符串
         try:
             game_data["roles_for_humans_first"] = game_config["roles_for_humans_first"]
         except:
@@ -173,6 +177,12 @@ def initialize(room_id):
     except Exception as e:
         # TODO: 前端应该在此时返回大厅。处理channel和cache中的残留？
         print(f"初始化游戏失败：{str(e)}")
+        game_cache = caches['game_cache']
+        game_data = game_cache.get(f"room:{room_id}")
+        for user_id, _ in game_data["players"].items():
+            async_to_sync(GameConsumer.handle_should_disconnect)(room_id, user_id)
+        game_cache.delete(f"room_{room_id}_current_task")
+        game_cache.delete(f"room:{room_id}")
         return {"room_id": room_id, "status": "error", "message": "初始化游戏失败。", "error": str(e)}
 
 
@@ -237,7 +247,7 @@ def assign_roles_to_players(room_id):
 
         werewolves = []
 
-        # TODO: 完成分配角色后，发送消息
+        # 完成分配角色后，发送消息
         for user_id, data in game_data["players"].items():
             if data["role"] == "Werewolf":
                 werewolves.append(data["index"])
@@ -246,13 +256,13 @@ def assign_roles_to_players(room_id):
             if data["role"] == "Werewolf":
                 werewolves.append(data["index"])
 
-            message = f"你的角色是{data['role']}"
-            if data["role"] == "Witch":
-                message += f"，解药{data['role_skills']['cure_count']}瓶，毒药{data['role_skills']['poison_count']}瓶"
-            message += "。"
-            game_data["action_history"].append({
-                f"{data['index']}": message
-            })
+            # message = f"你的角色是{data['role']}"
+            # if data["role"] == "Witch":
+            #     message += f"，解药{data['role_skills']['cure_count']}瓶，毒药{data['role_skills']['poison_count']}瓶"
+            # message += "。"
+            # game_data["action_history"].append({
+            #     f"{data['index']}": message
+            # })
 
         for user_id, data in game_data["players"].items():
             role_info = {
@@ -576,6 +586,8 @@ def handle_phase_timed_out(room_id: str, current_phase: str):
             if end:
                 print(f"{room_id}游戏结束。")
                 # TODO: 通知前端游戏结束，并断开连接
+                for user_id, _ in game_data["players"].items():
+                    async_to_sync(GameConsumer.handle_should_disconnect)(room_id, user_id)
                 # 应该先发通知，再清理数据
                 game_cache.delete(f"room_{room_id}_current_task")
                 game_cache.delete(f"room:{room_id}")
@@ -730,8 +742,16 @@ def start_phase(room_id: str, phase: str):
     # try:
     game_cache = caches['game_cache']
     game_data = game_cache.get(f"room:{room_id}")
-    phase_timer = game_data["phase_timer"]
 
+    # 如果房间中没有真人玩家，直接结束游戏
+    if not any(player['online'] for player in game_data['players'].values()):
+        # async_to_sync(GameConsumer.handle_should_disconnect)(room_id, None)
+        print(f"{room_id}中没有真人玩家，游戏结束。")
+        game_cache.delete(f"room_{room_id}_current_task")
+        game_cache.delete(f"room:{room_id}")
+        return
+
+    phase_timer = game_data["phase_timer"]
     game_data["current_phase"] = phase
 
     # 1. 通知阶段开始

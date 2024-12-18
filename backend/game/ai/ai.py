@@ -89,13 +89,9 @@ class AIPlayer():
 
     def vote(self, alive_players: List[str]) -> str:
         # 投票
-        # vote_message = []
-        # for mes_type, mes in self.messages:
-        #     if mes_type != "vote": # TODO
-        #         vote_message.append(mes)
         alive_indices = []
         for player_index in alive_players:
-            if player_index != self.index: # TODO
+            if player_index != self.index:
                 alive_indices.append(player_index)
         random.shuffle(alive_indices)
         prompt = self.prompt_generator.vote_prompt(self.messages)

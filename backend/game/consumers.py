@@ -520,41 +520,40 @@ class GameConsumer(AsyncWebsocketConsumer):
 
     @classmethod
     async def broadcast_game_update(cls, room_id, event_type, game_data):
-        # TODO: 去掉注释
-        # try:
-        channel_layer = get_channel_layer()
+        try:
+            channel_layer = get_channel_layer()
 
-        public_game_data = copy.deepcopy(game_data)
+            public_game_data = copy.deepcopy(game_data)
 
-        # TODO: 去掉敏感信息
-        keys_to_remove = ["roles_for_humans_first", "victory_conditions", "game_specified_prompt", "victims_info",
-                          "poisoned_victims_info", "voted_victims_info", "werewolves_targets", "votes", "action_history", "phase_transitions"]
+            # 去掉敏感信息
+            keys_to_remove = ["roles_for_humans_first", "victory_conditions", "game_specified_prompt", "victims_info",
+                              "poisoned_victims_info", "voted_victims_info", "werewolves_targets", "votes", "action_history", "phase_transitions"]
 
-        for key in keys_to_remove:
-            public_game_data.pop(key, None)
+            for key in keys_to_remove:
+                public_game_data.pop(key, None)
 
-        keys_to_remove_in_players = ["role", "role_skills"]
+            keys_to_remove_in_players = ["role", "role_skills"]
 
-        for player in public_game_data['players']:
-            for key in keys_to_remove_in_players:
-                public_game_data['players'][player].pop(key, None)
+            for player in public_game_data['players']:
+                for key in keys_to_remove_in_players:
+                    public_game_data['players'][player].pop(key, None)
 
-        for ai_player in public_game_data['ai_players']:
-            for key in keys_to_remove_in_players:
-                public_game_data['ai_players'][ai_player].pop(key, None)
+            for ai_player in public_game_data['ai_players']:
+                for key in keys_to_remove_in_players:
+                    public_game_data['ai_players'][ai_player].pop(key, None)
 
-        # print(public_game_data)
+            # print(public_game_data)
 
-        await channel_layer.group_send(
-            f"room_{room_id}",
-            {
-                "type": "game_message",
-                "event": event_type,
-                "game": public_game_data
-            }
-        )
-        # except Exception as e:
-        #     print(f"广播消息时出错：{e}")
+            await channel_layer.group_send(
+                f"room_{room_id}",
+                {
+                    "type": "game_message",
+                    "event": event_type,
+                    "game": public_game_data
+                }
+            )
+        except Exception as e:
+            print(f"广播消息时出错：{e}")
 
     async def role_info(self, event):
         role_info = event.get("role_info")
