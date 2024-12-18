@@ -687,13 +687,18 @@ export default {
     }
 
     //
-    function handleTalkStart() {
-      sendNotification(
+    function handleTalkStart(message) {
+      if (currentPlayer.value.index === message.player){
+        sendNotification(
         `${currentPlayer.value.index}号玩家，轮到你发言`,
         "speak",
           "请在规定时间内发表意见",
         [],
       );
+      }
+      else {
+        sendSystemMessage("接下来请" + message.player + "号玩家发言：")
+      }
       talkStart.value = true;
       gameData.value.current_phase = "Speak"
       timerSeconds.value = gameData.value.phase_timer[gameData.value.current_phase];
@@ -1130,8 +1135,9 @@ export default {
       // if (!message.source){
       //   return;
       // }
-      const speaker = [...Object.values(players), ...Object.values(aiPlayers)][Number(message.source)]
-      console.log(JSON.stringify(speaker));
+      console.log("talkUpdate: " + message.source);
+      const speaker = [...Object.values(players.value), ...Object.values(aiPlayers.value)][Number(message.source) - 1]
+      console.log("talkUpdateSpeaker: " + [...Object.values(players.value), ...Object.values(aiPlayers.value)]);
       // console.log("source: " + message.source);
       // console.log("speaker: " + speaker);
       const newMessage = {
