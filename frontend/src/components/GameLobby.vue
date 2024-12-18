@@ -1313,6 +1313,8 @@ export default {
             // Show error message using showConfirmDialog
             showConfirmDialog('错误', response.data.message || '删除好友失败');
           }
+
+          fetchFriendsList();
         } catch (error) {
           console.error('删除好友失败:', error);
           showConfirmDialog('错误', '删除好友失败，请重试');
