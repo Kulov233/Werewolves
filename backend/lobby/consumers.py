@@ -626,6 +626,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                             "Vote": 40,
                             'End': 3,
                         },
+                        "starts_at": datetime.now().isoformat(),
                         # ...
                     }
                     speaking_phases = [f"Speak_{i}" for i in range(1, room_data["max_players"] + 1)]

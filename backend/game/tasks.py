@@ -585,6 +585,12 @@ def handle_phase_timed_out(room_id: str, current_phase: str):
             async_to_sync(GameConsumer.broadcast_game_end)(room_id, end, victory, victory_side, reveal_role)
             if end:
                 print(f"{room_id}游戏结束。")
+                # TODO: 记录战绩
+                from django.contrib.auth.models import User
+                for user_id, data in game_data["players"].items():
+                    user = User.objects.get(id=user_id)
+                    user.userprofile.add_game_record(game_data['starts_at'], victory_result[data['role']], data['role'])
+
                 # TODO: 通知前端游戏结束，并断开连接
                 for user_id, _ in game_data["players"].items():
                     async_to_sync(GameConsumer.handle_should_disconnect)(room_id, user_id)
