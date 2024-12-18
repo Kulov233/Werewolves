@@ -462,6 +462,7 @@ class GameConsumer(AsyncWebsocketConsumer):
             return
 
         # 取消定时器
+        from .tasks import end_current_phase
         await sync_to_async(end_current_phase)(room_id)
 
     @ensure_player_is_alive()
