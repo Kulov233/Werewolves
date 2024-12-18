@@ -1,10 +1,8 @@
 # accounts/serializers.py
-import os
-
 from django.contrib.auth.models import User
 from rest_framework import serializers
 from django.contrib.auth import authenticate
-from .models import UserProfile
+from .models import UserProfile, FriendRequest
 
 # 注册序列化器
 class RegisterSerializer(serializers.ModelSerializer):
@@ -100,7 +98,7 @@ class UsernameEmailLoginSerializer(serializers.Serializer):
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
-        fields = ['bio', 'avatar', 'games']
+        fields = ['bio', 'avatar', 'wins', 'loses', 'recent_games', 'games']
 
 # 用户公开信息序列化器
 class PublicUserProfileSerializer(serializers.ModelSerializer):
@@ -175,3 +173,64 @@ class BioUpdateSerializer(serializers.ModelSerializer):
         instance.bio = validated_data.get('bio', instance.bio)
         instance.save()
         return instance
+
+# 好友列表序列化器
+class FriendListSerializer(serializers.ModelSerializer):
+    player = serializers.SerializerMethodField()
+    friends = serializers.SerializerMethodField()
+
+    class Meta:
+        model = UserProfile
+        fields = ['player', 'friends']
+
+    def get_player(self, obj):
+        return obj.user.id
+
+    def get_friends(self, obj):
+        return obj.get_friend_ids()
+
+# 好友请求序列化器
+class FriendRequestSerializer(serializers.ModelSerializer):
+   class Meta:
+       model = FriendRequest
+       fields = []  # GET 不需要序列化字段
+
+class FriendRequestHandleSerializer(serializers.Serializer):
+   player = serializers.IntegerField()
+   friend_request = serializers.IntegerField()
+   type = serializers.ChoiceField(choices=['accept', 'deny'])
+
+   def validate_player(self, value):
+       # 验证player是否为当前用户
+       if value != self.context['request'].user.id:
+           raise serializers.ValidationError("只能处理自己收到的好友请求。")
+       return value
+
+# 删除好友序列化器
+class FriendDeleteSerializer(serializers.Serializer):
+   player = serializers.IntegerField()
+   target = serializers.IntegerField()
+
+   def validate_player(self, value):
+       if value != self.context['request'].user.id:
+           raise serializers.ValidationError("只能删除自己的好友。")
+       return value
+
+# 发送好友请求序列化器
+class FriendRequestSendSerializer(serializers.Serializer):
+   player = serializers.IntegerField()
+   target = serializers.IntegerField()
+
+   def validate_player(self, value):
+       if value != self.context['request'].user.id:
+           raise serializers.ValidationError("只能发送自己的好友请求。")
+       return value
+
+# 搜索用户序列化器
+class UserSearchSerializer(serializers.Serializer):
+    keyword = serializers.CharField(max_length=100)
+
+class UserInfoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username']

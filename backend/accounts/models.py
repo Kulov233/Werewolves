@@ -20,6 +20,27 @@ def user_directory_path(instance, filename):
         os.remove(os.path.join('media', path)) # TODO: 如果用户上传了以不同扩展名的同名文件，原有文件不会被删除，不过这个问题不大
     return path
 
+# 好友请求模型
+class FriendRequest(models.Model):
+    from_user = models.ForeignKey(User, related_name='sent_requests', on_delete=models.CASCADE)
+    to_user = models.ForeignKey(User, related_name='received_requests', on_delete=models.CASCADE)
+
+    class Meta:
+        unique_together = ('from_user', 'to_user')
+
+    def accept(self):
+        # 添加好友关系
+        from_user_profile, created = UserProfile.objects.get_or_create(user=self.from_user)
+        to_user_profile, created = UserProfile.objects.get_or_create(user=self.to_user)
+        from_user_profile.friends.add(self.to_user)
+        to_user_profile.friends.add(self.from_user)
+        # 删除请求
+        self.delete()
+
+    def reject(self):
+        # 直接删除请求
+        self.delete()
+
 # 扩展的用户模型
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
@@ -46,6 +67,8 @@ class UserProfile(models.Model):
     games = JSONField("游戏记录", default=list)  # 游戏记录，私密
     wins = models.IntegerField("胜场", default=0)  # 胜场，公开
     loses = models.IntegerField("败场", default=0)  # 败场，公开
+
+    friends = models.ManyToManyField(User, related_name='friend_of', blank=True)  # 好友列表，私密
 
     def __str__(self):
         return self.user.username
@@ -88,3 +111,11 @@ class UserProfile(models.Model):
         self.games.append(new_record_detailed)
 
         self.save()
+
+    def remove_friend(self, friend_user):
+        if friend_user in self.friends.all():
+            self.friends.remove(friend_user)
+
+    def get_friend_ids(self) -> list[int]:
+        """获取好友ID列表（整数形式）"""
+        return list(self.friends.values_list('id', flat=True))
