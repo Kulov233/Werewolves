@@ -10,6 +10,7 @@
         <div class="right-buttons">
           <button class="icon-button" @click.stop="toggleSidebar('friends')">
             <img class="icon" src="@/assets/friends.svg" alt="Friends" />
+            <span class="badge" v-if="friendRequests.length > 0">{{friendRequests.length}}</span>
           </button>
           <button class="icon-button" @click.stop="toggleSidebar('history')">
             <img class="icon" src="@/assets/history.svg" alt="History" />
@@ -145,16 +146,25 @@
             </div>
             <div class="requests-list">
               <div v-for="request in friendRequests" 
-                  :key="request.id" 
-                  class="request-item">
+                   :key="request.id"
+                   :id="'request-' + request.id"
+                   class="request-item"
+                   :class="{
+                      'accept-exit': request.status === 'accept',
+                      'reject-exit': request.status === 'reject'
+                    }">
                 <img :src="request.avatar" alt="Avatar" class="request-avatar"/>
                 <div class="request-info">
                   <span class="request-name">{{request.name}}</span>
                   <span class="request-time">{{request.time}}</span>
                 </div>
                 <div class="request-actions">
-                  <button class="accept-btn" @click="handleFriendRequest(request.id, 'accept')">接受</button>
-                  <button class="reject-btn" @click="handleFriendRequest(request.id, 'reject')">拒绝</button>
+                  <button class="accept-btn"
+                          @click="handleFriendRequest(request.id, 'accept')"
+                          :disabled="request.status">接受</button>
+                  <button class="reject-btn"
+                          @click="handleFriendRequest(request.id, 'reject')"
+                          :disabled="request.status">拒绝</button>
                 </div>
               </div>
             </div>
@@ -183,7 +193,7 @@
                 <div v-for="friend in onlineFriends" 
                     :key="friend.id" 
                     class="friend-item">
-                  <img :src="friend.avatar" alt="Avatar" class="friend-avatar"/>
+                  <img :src="friend.avatar" alt="Avatar" class="friend-avatar" @click.stop="showProfile(friend.id)"/>
                   <div class="friend-info">
                     <span class="friend-name">{{friend.name}}</span>
                     <span class="friend-status">{{friend.status}}</span>
@@ -196,6 +206,55 @@
                       <img src="@/assets/more.svg" alt="More"/>
                     </button>
                   </div>
+                  <!-- 个人资料卡弹窗 -->
+                  <transition name="profile">
+                    <div v-if="selectedFriend === friend.id" class="profile-card" @click.stop>
+                      <div class="profile-header">
+                         <img :src="selectedProfile.avatar"
+                            alt="头像"
+                            class="large-avatar"/>
+                        <div class="profile-info">
+                          <h4>{{ selectedProfile.name || '房主昵称' }}</h4>
+                          <span class="profile-status" :class="{'online': selectedProfile.isOnline}">
+                            {{ selectedProfile.isOnline ? '在线' : '离线' }}
+                          </span>
+                        </div>
+                      </div>
+                      <div class="profile-stats">
+                        <div v-for="(stat, index) in selectedProfile.stats"
+                            :key="index"
+                            class="stat-item">
+                          <span class="stat-value">{{ stat.value }}</span>
+                          <span class="stat-label">{{ stat.label }}</span>
+                        </div>
+                      </div>
+                      <div class="profile-actions">
+                        <button class="action-btn add-friend-btn"
+                                @click="sendFriendRequest(selectedProfile.userId)"
+                                :disabled="selectedProfile.isFriend">
+                          <img src="@/assets/addFriend.svg" alt="加好友" class="action-icon"/>
+                          {{ selectedProfile.isFriend ? '已是好友' : '加好友' }}
+                        </button>
+                        <button class="action-btn report-btn" @click="reportUser(selectedProfile.userId)">
+                          <img src="@/assets/report.svg" alt="举报" class="action-icon"/>
+                          举报
+                        </button>
+                      </div>
+                      <div class="recent-games">
+                        <h5>最近对战</h5>
+                        <div class="game-list">
+                          <div v-for="game in selectedProfile.recentGames"
+                              :key="game.id"
+                              class="game-item">
+                            <span class="game-result" :class="game.result">
+                              {{ game.result === 'win' ? '胜利' : '失败' }}
+                            </span>
+                            <span class="game-date">{{ game.date }}</span>
+                          </div>
+                        </div>
+                    </div>
+                    </div>
+                  </transition>
                 </div>
               </div>
             </div>
@@ -210,7 +269,7 @@
                 <div v-for="friend in offlineFriends" 
                     :key="friend.id" 
                     class="friend-item offline">
-                  <img :src="friend.avatar" alt="Avatar" class="friend-avatar"/>
+                  <img :src="friend.avatar" alt="Avatar" class="friend-avatar" @click.stop="showProfile(friend.id)"/>
                   <div class="friend-info">
                     <span class="friend-name">{{friend.name}}</span>
                     <span class="friend-status">{{friend.lastSeen}}</span>
@@ -220,6 +279,55 @@
                       <img src="@/assets/more.svg" alt="More"/>
                     </button>
                   </div>
+                  <!-- 个人资料卡弹窗 -->
+                  <transition name="profile">
+                    <div v-if="selectedFriend === friend.id" class="profile-card" @click.stop>
+                      <div class="profile-header">
+                         <img :src="selectedProfile.avatar"
+                            alt="头像"
+                            class="large-avatar"/>
+                        <div class="profile-info">
+                          <h4>{{ selectedProfile.name || '房主昵称' }}</h4>
+                          <span class="profile-status" :class="{'online': selectedProfile.isOnline}">
+                            {{ selectedProfile.isOnline ? '在线' : '离线' }}
+                          </span>
+                        </div>
+                      </div>
+                      <div class="profile-stats">
+                        <div v-for="(stat, index) in selectedProfile.stats"
+                            :key="index"
+                            class="stat-item">
+                          <span class="stat-value">{{ stat.value }}</span>
+                          <span class="stat-label">{{ stat.label }}</span>
+                        </div>
+                      </div>
+                      <div class="profile-actions">
+                        <button class="action-btn add-friend-btn"
+                                @click="sendFriendRequest(selectedProfile.userId)"
+                                :disabled="selectedProfile.isFriend">
+                          <img src="@/assets/addFriend.svg" alt="加好友" class="action-icon"/>
+                          {{ selectedProfile.isFriend ? '已是好友' : '加好友' }}
+                        </button>
+                        <button class="action-btn report-btn" @click="reportUser(selectedProfile.userId)">
+                          <img src="@/assets/report.svg" alt="举报" class="action-icon"/>
+                          举报
+                        </button>
+                      </div>
+                      <div class="recent-games">
+                        <h5>最近对战</h5>
+                        <div class="game-list">
+                          <div v-for="game in selectedProfile.recentGames"
+                              :key="game.id"
+                              class="game-item">
+                            <span class="game-result" :class="game.result">
+                              {{ game.result === 'win' ? '胜利' : '失败' }}
+                            </span>
+                            <span class="game-date">{{ game.date }}</span>
+                          </div>
+                        </div>
+                    </div>
+                    </div>
+                  </transition>
                 </div>
               </div>
             </div>
@@ -268,6 +376,10 @@
               <option value="win">胜利</option>
               <option value="lose">失败</option>
             </select>
+            <select v-model="timeSort" class="filter-select">
+              <option value="desc">从近到远</option>
+              <option value="asc">从远到近</option>
+            </select>
           </div>
 
           <!-- 历史记录列表 -->
@@ -279,12 +391,12 @@
                 <span class="game-result" :class="game.result">
                   {{game.result === 'win' ? '胜利' : '失败'}}
                 </span>
-                <span class="game-time">{{game.time}}</span>
+                <span class="game-time">{{game.date}}</span>
               </div>
               <div class="game-details">
                 <div class="role-info">
                   <img :src="getRoleIcon(game.role)" alt="Role" class="role-icon"/>
-                  <span class="role-name">{{game.role}}</span>
+                  <span class="role-name">{{$translate(game.role) }}</span>
                 </div>
                 <div class="game-stats">
                   <div class="stat">
@@ -712,11 +824,11 @@ export default {
     return {
 
       roleIcons: {
-        //: require('@/assets/witch.svg'),
-        '狼人': require('@/assets/wolf.svg'),
-        '村民': require('@/assets/villager.svg'),
-        //'预言家': require('@/assets/prophet.svg'),
-        //'白痴': require('@/assets/idiot.svg')
+        //'Witch': require('@/assets/witch.svg'),
+        'Werewolf': require('@/assets/wolf.svg'),
+        'Villager': require('@/assets/villager.svg'),
+        //'Prophet': require('@/assets/prophet.svg'),
+        //'Idiot': require('@/assets/idiot.svg')
       },
       friendRequests: [
         {
@@ -764,13 +876,14 @@ export default {
       avgRating: 4.8,
       timeFilter: 'all',
       resultFilter: 'all',
+      timeSort: 'desc', // 新增：默认从近到远排序
       gameHistory: [
         {
           id: 1,
           result: 'win',
-          time: '2024-11-31 14:30',
+          date: '2024-12-15 14:30',
           roleIcon: require('@/assets/wolf.svg'),
-          role: '狼人',
+          role: 'Werewolf',
           rating: 4.9,
           duration: '25分钟',
           goodTeam: [
@@ -785,9 +898,9 @@ export default {
         {
           id: 2,
           result: 'lose',
-          time: '2024-11-07 13:15',
+          date: '2024-12-07 13:15',
           roleIcon: require('@/assets/villager.svg'),
-          role: '平民',
+          role: 'Villager',
           rating: 4.7,
           duration: '30分钟',
           goodTeam: [
@@ -1204,6 +1317,16 @@ export default {
       try {
         const response = await api.get('/api/accounts/info/');
         const data = response.data;
+
+        // 处理对战记录
+        const gameHistory = data.profile.games.map((game, index) => ({
+          id: index, // 使用索引作为虚拟id
+          result: game.won ? 'win' : 'lose',
+          date: new Date(game.date).toLocaleString(), // 格式化日期
+          timestamp: new Date(game.date).getTime(), // 添加时间戳用于排序
+          role: game.role,
+          duration: `${game.duration}分钟`,
+        }));
         
         userProfile.value = {
           userId: data.id,
@@ -1212,6 +1335,7 @@ export default {
           avatar: `http://localhost:8000${data.profile.avatar}`,
           isOnline: true,
           isFriend: true,
+          games:gameHistory,
           stats: [
             { label: '游戏场数', value: data.profile.games.length },
             { label: '胜率', value: calculateWinRate(data.profile.games) },
@@ -1388,7 +1512,7 @@ export default {
       });
     },
       filteredGameHistory() {
-      let filtered = this.gameHistory;
+      let filtered = this.userProfile?.games || this.gameHistory;
 
       // 按时间筛选
       if (this.timeFilter !== 'all') {
@@ -1397,7 +1521,7 @@ export default {
         const timeLimit = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
         
         filtered = filtered.filter(game => {
-          const gameTime = new Date(game.time);
+          const gameTime = new Date(game.date);
           return gameTime >= timeLimit;
         });
       }
@@ -1406,6 +1530,13 @@ export default {
       if (this.resultFilter !== 'all') {
         filtered = filtered.filter(game => game.result === this.resultFilter);
       }
+
+      // 按时间排序
+      filtered.sort((a, b) => {
+        const timeA = new Date(a.time).getTime();
+        const timeB = new Date(b.time).getTime();
+        return this.timeSort === 'desc' ? timeB - timeA : timeA - timeB;
+      });
 
       return filtered;
     }
@@ -1503,15 +1634,27 @@ export default {
   },
 
   handleFriendRequest(requestId, action) {
+    // 更新数据的方式需要改变，以触发动画
+    this.friendRequests = this.friendRequests.map(request => {
+      if (request.id === requestId) {
+        return {
+          ...request,
+          status: action // 添加状态来触发动画
+        };
+      }
+      return request;
+    });
     // 处理好友请求
-    if (action === 'accept') {
-      // 接受好友请求的逻辑
-      this.friendRequests = this.friendRequests.filter(req => req.id !== requestId);
-      // 这里应该调用后端API处理好友关系
-    } else {
-      // 拒绝好友请求的逻辑
-      this.friendRequests = this.friendRequests.filter(req => req.id !== requestId);
-    }
+    setTimeout(() => {
+      if (action === 'accept') {
+        // 接受好友请求的逻辑
+        this.friendRequests = this.friendRequests.filter(req => req.id !== requestId);
+        // 这里应该调用后端API处理好友关系
+      } else {
+        // 拒绝好友请求的逻辑
+        this.friendRequests = this.friendRequests.filter(req => req.id !== requestId);
+      }
+    }, 500);
   },
 
   searchFriend() {
@@ -1901,6 +2044,10 @@ export default {
   cursor: pointer;
   margin-right: 20px;
   transition: transform 0.3s ease;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .icon-button:last-child {
@@ -2271,7 +2418,23 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
+  border: 2px solid white;
+  font-weight: bold;
+  animation: badgePulse 2s infinite;
 }
+
+@keyframes badgePulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 
 .close-btn {
   padding: 8px;
@@ -2296,6 +2459,23 @@ export default {
   background: #f8f9fa;
   border-bottom: 1px solid #eee;
 }
+
+.friend-requests-panel,
+.add-friend-panel {
+  animation: slideIn 0.3s ease forwards;
+  transform-origin: top;
+}
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 
 .panel-header {
   padding: 12px 20px;
@@ -2327,6 +2507,31 @@ export default {
   background: white;
   border-radius: 8px;
   margin-bottom: 8px;
+  transition: all 0.5s ease;
+  transform: translateX(0);
+  opacity: 1;
+}
+
+
+/* 接受请求的退出动画 */
+.request-item.accept-exit {
+  transform: translateX(100%);
+  opacity: 0;
+  background-color: rgba(103, 194, 58, 0.1); /* 添加轻微的绿色背景 */
+}
+
+/* 拒绝请求的退出动画 */
+.request-item.reject-exit {
+  transform: translateX(-100%);
+  opacity: 0;
+  background-color: rgba(245, 108, 108, 0.1); /* 添加轻微的红色背景 */
+}
+
+/* 禁用状态的按钮样式 */
+.accept-btn:disabled,
+.reject-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .request-avatar {
@@ -2563,6 +2768,19 @@ export default {
   font-size: 0.9em;
   color: #666;
   background: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  flex: 1; /* 让选择器平均分配空间 */
+}
+
+.filter-select:hover {
+  border-color: #409eff;
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: #409eff;
+  box-shadow: 0 0 0 2px rgba(64,158,255,0.2);
 }
 
 .game-history-list {
@@ -2576,7 +2794,110 @@ export default {
   padding: 16px;
   margin-bottom: 16px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  transform-origin: top;
+  animation: slideDown 0.3s ease forwards;
+  opacity: 0;
+  position: relative;
+  transition: all 0.3s ease;
+  cursor: pointer;
 }
+
+.game-record:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+}
+
+/* 添加光晕效果 */
+.game-record::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 8px;
+  background: linear-gradient(45deg, #409eff15, #67c23a15);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.game-record:hover::before {
+  opacity: 1;
+}
+
+/* 胜利和失败记录的特殊悬停效果 */
+.game-record .game-result.win:hover + .game-details {
+  background: linear-gradient(to right, #f0f9eb22, transparent);
+}
+
+.game-record .game-result.lose:hover + .game-details {
+  background: linear-gradient(to right, #fef0f022, transparent);
+}
+
+/* 游戏详情的过渡效果 */
+.game-details {
+  transition: all 0.3s ease;
+}
+
+.game-record:hover .game-details {
+  padding-left: 8px;
+}
+
+/* 角色图标悬停效果 */
+.role-icon {
+  transition: transform 0.3s ease;
+}
+
+.game-record:hover .role-icon {
+  transform: scale(1.1) rotate(5deg);
+}
+
+/* 统计数据悬停效果 */
+.game-stats .stat {
+  transition: transform 0.3s ease;
+}
+
+.game-record:hover .game-stats .stat {
+  transform: translateY(-2px);
+}
+
+/* 添加交互式边框效果 */
+.game-record {
+  border: 1px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.game-record:hover {
+  border-color: #409eff22;
+}
+
+/* 时间标签的悬停效果 */
+.game-time {
+  transition: color 0.3s ease;
+}
+
+.game-record:hover .game-time {
+  color: #409eff;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 为每个记录添加延迟，创造瀑布效果 */
+.game-record:nth-child(1) { animation-delay: 0.1s; }
+.game-record:nth-child(2) { animation-delay: 0.2s; }
+.game-record:nth-child(3) { animation-delay: 0.3s; }
+.game-record:nth-child(4) { animation-delay: 0.4s; }
+.game-record:nth-child(5) { animation-delay: 0.5s; }
 
 .game-header {
   display: flex;
