@@ -158,6 +158,11 @@
 
         <!-- 输入框和发送按钮在聊天框外部 -->
         <div class="message-input-section">
+          <!-- 结束发言按钮 -->
+          <!-- TODO: 需要美化 -->
+          <button @click="handleTalkEnd" class="send-button" v-if="talkStart">
+            结束发言
+          </button>
           <input
             v-model="userMessage"
             @keyup.enter="sendChatMessage"
@@ -168,6 +173,8 @@
           <button @click="sendChatMessage" class="send-button" :disabled="!talkStart">
             <img class="send-icon" src="@/assets/send.svg" alt="发送图标" /> <!-- 或者使用一个自定义图标图片 -->
           </button>
+
+
         </div>
       </div>
 
@@ -195,15 +202,9 @@
         <div class="role-item">
             <span class="label">阵营目标：</span>
 <!--          TODO: 后端改好后这里改为roleInfo.objective-->
-            <span class="value">{{ objective }}</span>
+            <span class="value">{{ roleGoalsConfig[roleInfo.role] }}</span>
 
         </div>
-        <div class="role-item">
-            <span class="label">胜利条件：</span>
-<!--            <span class="value">{{ gameData.victory_condition }}</span>-->
-            <span class="value">{{ victoryCondition }}</span>
-        </div>
-
 
         <div class="role-item" v-if="roleInfo.teammates">
             <span class="label">存活队友：</span>
@@ -276,7 +277,7 @@
     </div>
 
   </template>
-  
+
 <script>
 import {onMounted, ref, onUnmounted, onBeforeMount,} from 'vue';
 import { useStore } from 'vuex';
@@ -430,6 +431,14 @@ export default {
           }
         ]
         // ... 可以继续添加其他角色的技能配置
+      },
+      roleGoalsConfig: {
+        Werewolf: "杀死所有狼人之外的角色",
+        Prophet: "使用查验结果引导村民，放逐所有狼人",
+        Witch: "灵活利用解药与毒药，放逐所有狼人",
+        Villager: "分辨好人与狼人，放逐所有狼人",
+        Idiot: "引导他人投票将你放逐",
+        Guard: "保护好阵营关键角色，放逐所有狼人",
       },
       userMessage: "",
 
@@ -897,7 +906,7 @@ export default {
         }
       }
 
-      console.log("phase end: " + gameData.value.current_phase);
+      // console.log("phase end: " + gameData.value.current_phase);
       // 不能再选了
 
       // 如果没选中，返回-1
@@ -980,6 +989,17 @@ export default {
         "game"
       );
     }
+    function handleTalkEnd(){
+      // 不能确定成功发过去了，所以等待服务器回消息再改为false
+      // talkStart.value = false;
+      console.log("talk actual end")
+      const actionToSend = {
+        type: "talk_end",
+        player: currentPlayer.value.index,
+      }
+      sendMessage(actionToSend,
+      "game")
+    }
 
 
     // // 白天投票
@@ -996,6 +1016,7 @@ export default {
           "game"
       )
     }
+
 
     /* WebSocket实时监听部分*/
     function handlePlayerJoined(message){
@@ -1056,7 +1077,7 @@ export default {
       // 处理Prophet查人阶段, 不能告诉他谁死了
 
       updateGame(message.game);
-      if (roleInfo.value.role === "Prophet"){
+      if (roleInfo.value.role === "Prophet" && gameData.value.current_phase === "Prophet"){
         sendNotification("预言家请行动", "action", "请选择要查验的玩家");
         const checkTarget = await select("选择要查验的目标", "查验",
             gameData.value.phase_timer[gameData.value.current_phase], null, true);
@@ -1086,7 +1107,7 @@ export default {
         // console.log("phase: " + selectablePhase.value + "indices: " + selectableIndices.value);
         let cure_target = -1, poison_target = -1;
 
-        if (roleInfo.value.role_skills.cure_count){
+        if (roleInfo.value.role_skills.cure_count && message.cure_target){
           cure_target = await select("解药选择", "解救",
               gameData.value.phase_timer.Witch / 2, message.cure_target, false);
 
@@ -1152,10 +1173,11 @@ export default {
       messages.value.push(newMessage);
 
       // 检查是否需要显示未读消息提示
-      const chatBox = this.$refs.chatBox;
-      if (chatBox && (chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight > 100)) {
-        hasUnreadMessages.value = true;
-      }
+      // closed
+      // const chatBox = this.$refs.chatBox;
+      // if (chatBox && (chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight > 100)) {
+      //   hasUnreadMessages.value = true;
+      // }
 
     }
 
@@ -1323,6 +1345,7 @@ export default {
       isLobbyConnected,
       connectToGame,
       sendMessage,
+      handleTalkEnd,
       gameData,
       userProfile,
       players,
@@ -1494,7 +1517,8 @@ export default {
 
     sendChatMessage() {
 
-      if (this.userMessage.trim()) {
+      if (this.userMessage.trim() && this.talkStart) {
+        // 只有在自己的阶段才能说话
         // 创建消息对象
         // const newMessage = {
         //   senderid: this.currentPlayer.index, // 假设当前玩家是“你”
@@ -2318,6 +2342,10 @@ p {
 .confirm-button:hover .confirm-icon {
   transform: scale(1.05);
 }
+
+
+
+
 /* 玩家容器样式优化 */
 .player-container {
   position: relative;
