@@ -234,3 +234,28 @@ class UserInfoSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username']
+
+# 修改密码序列化器
+class PasswordChangeSerializer(serializers.Serializer):
+   old_password = serializers.CharField(
+       write_only=True,
+       min_length=8,
+       error_messages={
+           'blank': '密码不能为空。',
+           'min_length': '密码不能少于8个字符。'
+       }
+   )
+   new_password = serializers.CharField(
+       write_only=True,
+       min_length=8,
+       error_messages={
+           'blank': '密码不能为空。',
+           'min_length': '密码不能少于8个字符。'
+       }
+   )
+
+   def validate_old_password(self, value):
+       user = self.context['request'].user
+       if not user.check_password(value):
+           raise serializers.ValidationError("原密码不正确。")
+       return value

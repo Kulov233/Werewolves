@@ -31,4 +31,6 @@ urlpatterns = [
     path('friends/delete/', FriendDeleteView.as_view(), name='friend-delete'),
     # 搜索用户
     path('search/', UserSearchView.as_view(), name='user-search'),
+    # 修改密码
+    path('password/change/', PasswordChangeView.as_view(), name='password-change'),
 ]

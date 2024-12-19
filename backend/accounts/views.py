@@ -314,3 +314,23 @@ class UserSearchView(APIView):
         return Response({
             "users": list(users)
         }, status=status.HTTP_200_OK)
+
+# 修改密码
+class PasswordChangeView(APIView):
+    @staticmethod
+    def post(request):
+        serializer = PasswordChangeSerializer(
+            data=request.data,
+            context={'request': request}
+        )
+
+        if serializer.is_valid():
+            # 修改密码
+            request.user.set_password(serializer.validated_data['new_password'])
+            request.user.save()
+
+            return Response({
+                "message": "密码修改成功。"
+            }, status=status.HTTP_200_OK)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
