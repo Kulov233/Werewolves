@@ -79,6 +79,7 @@ class GameConsumer(AsyncWebsocketConsumer):
         self.game_cache = caches['game_cache']
         self.lobby_cache = caches['lobby_cache']
         self.room_timeout = 3600
+        self.status_update_interval = 30  # 用户在线状态更新间隔[s]
 
     # noinspection PyUnresolvedReferences
     @with_game_data_lock(timeout=5)
@@ -121,10 +122,20 @@ class GameConsumer(AsyncWebsocketConsumer):
                         self.channel_name
                     )
 
+                await self.accept()
+
+                if bool(await self.is_user_online(user_id)):
+                    await self.send(text_data=json.dumps({
+                        "type": "warning",
+                        "message": "您似乎已经有一个活跃连接，请确保没有重复连接。"
+                    }))
+
                 game_data['players'][user_id]['online'] = True
                 await self.update_game_data_in_cache(room_id, game_data)
 
-                await self.accept()
+                await self.set_online_status(user_id)
+                # 启动定期更新状态的任务
+                self.status_update_task = asyncio.create_task(self.update_online_status())
 
                 # await self.send(text_data=json.dumps({
                 #     "type": "game_info",
@@ -148,6 +159,12 @@ class GameConsumer(AsyncWebsocketConsumer):
     async def disconnect(self, close_code):
         room_id = self.scope['url_route']['kwargs']['room_id']
         user_id = str(self.scope['user'].id)
+
+        # 清除在线状态
+        await self.remove_online_status(user_id)
+        # 取消状态更新任务
+        if hasattr(self, 'status_update_task'):
+            self.status_update_task.cancel()
 
         await self.channel_layer.group_discard(f"room_{room_id}", self.channel_name)
         await self.channel_layer.group_discard(f"room_{room_id}_user_{user_id}", self.channel_name)
@@ -1072,6 +1089,33 @@ class GameConsumer(AsyncWebsocketConsumer):
         except Exception as e:
             print(f"发送退出房间指示时出错：{e}")
 
+    # 定期更新在线状态
+    # noinspection PyUnresolvedReferences
+    async def update_online_status(self):
+        while True:
+            user_id = self.scope["user"].id
+            await self.set_online_status(user_id)
+            await asyncio.sleep(self.status_update_interval)
+
+    # 设置用户在线状态
+    @database_sync_to_async
+    def set_online_status(self, user_id):
+        self.game_cache.set(
+            f"user_online:{user_id}",
+            True,
+            timeout=self.status_update_interval * 2
+        )
+
+    # 移除用户在线状态
+    @database_sync_to_async
+    def remove_online_status(self, user_id):
+        self.game_cache.delete(f"user_online:{user_id}")
+
+    # 检查用户是否在线
+    @classmethod
+    @database_sync_to_async
+    def is_user_online(cls, user_id):
+        return bool(caches['game_cache'].get(f"user_online:{user_id}"))
 
     # 从缓存中获取房间信息
     @database_sync_to_async

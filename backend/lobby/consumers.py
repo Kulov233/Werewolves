@@ -89,6 +89,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
         self.lobby_cache = caches["lobby_cache"]
         self.game_cache = caches["game_cache"]
         self.room_timeout = 3600  # 房间超时时间[s]
+        self.status_update_interval = 30  # 用户在线状态更新间隔[s]
 
     # 连接时触发
     # noinspection PyUnresolvedReferences
@@ -101,8 +102,8 @@ class LobbyConsumer(AsyncWebsocketConsumer):
             else:
                 # TODO: 需要检查用户是否已连接吗？
                 # TODO: 需要检查用户是否在房间中吗？
-                # 检查用户是否已有连接
-                # user_id = self.scope["user"].id
+                user_id = self.scope["user"].id
+
                 # if await self.has_active_connection(user_id):
                 #     # 如果有现有连接，拒绝连接
                 #     raise DenyConnection("您已经有一个活跃连接。")
@@ -111,11 +112,24 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                 await self.channel_layer.group_add("lobby", self.channel_name)
                 await self.accept()
 
+                if bool(await self.is_user_online(user_id)):
+                    await self.send(text_data=json.dumps({
+                        "type": "warning",
+                        "message": "您似乎已经有一个活跃连接，请确保没有重复连接。"
+                    }))
+
+                # 设置用户在线状态
+                await self.set_online_status(user_id)
+                # 启动定期更新状态的任务
+                self.status_update_task = asyncio.create_task(self.update_online_status())
+
                 # 将用户的连接信息添加到 channel_layer 中
                 # await self.add_connection(user_id)
 
                 # 清理信息
                 await self.clear_user_room_in_cache(self.scope["user"].id)
+
+                # TODO: 发送在线的好友列表
 
                 # 发送房间列表
                 rooms = await self.get_room_list_from_cache()
@@ -134,8 +148,14 @@ class LobbyConsumer(AsyncWebsocketConsumer):
     # noinspection PyUnresolvedReferences
     async def disconnect(self, close_code):
         # 从 "lobby" 组移除用户
-        # user_id = self.scope["user"].id
+        user_id = self.scope["user"].id
         # await self.remove_connection(user_id)
+
+        # 清除在线状态
+        await self.remove_online_status(user_id)
+        # 取消状态更新任务
+        if hasattr(self, 'status_update_task'):
+            self.status_update_task.cancel()
 
         # TODO: 游戏已开始？
 
@@ -766,6 +786,33 @@ class LobbyConsumer(AsyncWebsocketConsumer):
     # def remove_connection(self, user_id):
     #     # 用户断开连接时，从缓存中删除连接标记
     #     self.lobby_cache.delete(f"user:{user_id}:connected")
+
+    # 定期更新在线状态
+    # noinspection PyUnresolvedReferences
+    async def update_online_status(self):
+        while True:
+            user_id = self.scope["user"].id
+            await self.set_online_status(user_id)
+            await asyncio.sleep(self.status_update_interval)
+
+    # 设置用户在线状态
+    @database_sync_to_async
+    def set_online_status(self, user_id):
+        self.lobby_cache.set(
+            f"user_online:{user_id}",
+            True,
+            timeout=self.status_update_interval * 2
+        )
+
+    # 移除用户在线状态
+    @database_sync_to_async
+    def remove_online_status(self, user_id):
+        self.lobby_cache.delete(f"user_online:{user_id}")
+
+    # 检查用户是否在线
+    @database_sync_to_async
+    def is_user_online(self, user_id):
+        return bool(self.lobby_cache.get(f"user_online:{user_id}"))
 
     # 添加房间 ID 列表到缓存中
     @database_sync_to_async
