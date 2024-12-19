@@ -247,7 +247,7 @@ export default {
       }
 
       emit('update-password', {
-        currentPassword: currentPassword.value,
+        oldPassword: currentPassword.value,
         newPassword: newPassword.value
       });
 

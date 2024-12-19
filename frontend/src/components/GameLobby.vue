@@ -972,6 +972,9 @@ export default {
     const friendRequests = ref([]);
     const onlineFriends = ref([]);
 
+    // 密码相关状态
+    const tempPasswordData = ref(null);
+
     // 弹窗相关的状态
     const showProfileDialog  = ref(false);
     const showDialog = ref(false);
@@ -1284,8 +1287,25 @@ export default {
       selectedFriendToDelete.value = friendId;
     };
 
+    const handlePasswordUpdate = async ({ oldPassword, newPassword }) => {
+      // 使用 showConfirmDialog 显示确认对话框
+      showConfirmDialog(
+        '确认修改',
+        '确定要修改密码吗？',
+        true,
+        'changePassword'
+      );
+
+      // 存储密码信息以供确认后使用
+      tempPasswordData.value = {
+        oldPassword,
+        newPassword
+      };
+    };
+
 
     const handleDialogConfirm = async () => {
+      showDialog.value = false;
       if (currentDialogAction.value === 'deleteFriend') {
         // 处理删除好友的逻辑
         try {
@@ -1316,11 +1336,11 @@ export default {
 
           fetchFriendsList();
         } catch (error) {
-          console.error('删除好友失败:', error);
           showConfirmDialog('错误', '删除好友失败，请重试');
         }
 
-      } else if (currentDialogAction.value === 'acceptFriend') {
+      }
+      else if (currentDialogAction.value === 'acceptFriend') {
         // 处理接受好友请求的逻辑
         console.log('接受好友请求');
       }
@@ -1332,9 +1352,74 @@ export default {
         // 处理举报用户的逻辑
         console.log('举报用户');
       }
-      else if (currentDialogAction.value === 'clearAllHistory') {
-        // 处理清空历史记录的逻辑
-        console.log('清空历史记录');
+      else if (currentDialogAction.value === 'changePassword') {
+        try {
+          const response = await api.post('/api/accounts/password/change/',
+              {
+                old_password: tempPasswordData.value.oldPassword,
+                new_password: tempPasswordData.value.newPassword
+              },
+              {
+                headers: {
+                  'Content-Type': 'application/json'
+                }
+              }
+              );
+
+          if (response.status === 200) {
+            // 显示成功消息并提示重新登录
+            showConfirmDialog(
+              '密码修改成功',
+              '请重新登录',
+                true,
+                'reLogin',
+            );
+
+          }
+        }
+        catch (error) {
+            // 处理不同的错误情况
+            if (error.response?.status === 400) {
+              const errorData = error.response.data;
+              let errorMessage = '';
+
+              // 直接检查错误消息
+              if (errorData.old_password) {
+                // 如果是数组，获取第一个错误消息
+                if (Array.isArray(errorData.old_password)) {
+                  errorMessage += errorData.old_password[0] + '<br>';
+                } else {
+                  errorMessage += errorData.old_password + '<br>';
+                }
+              }
+              if (errorData.new_password) {
+                if (Array.isArray(errorData.new_password)) {
+                  errorMessage += errorData.new_password[0];
+                } else {
+                  errorMessage += errorData.new_password;
+                }
+              }
+              showConfirmDialog(
+                '错误',
+                errorMessage.trim(),
+                false
+              );
+            } else {
+              showConfirmDialog(
+                '错误',
+                '修改密码失败，请重试',
+                false
+              );
+            }
+          }
+      }
+      else if (currentDialogAction.value === 'reLogin') {
+        // 断连websocket
+        disconnect();
+        // 清空 localStorage
+        localStorage.clear();
+        // 回到登录界面
+        router.push('/login');
       }
       else if(currentDialogAction.value === 'quickMatchSuccess'){
         // 处理快速匹配成功的逻辑
@@ -1355,12 +1440,20 @@ export default {
           alert('退出登录失败，请重试');
         }
       }
-      showDialog.value = false;
+
     };
 
     // 处理对话框取消
     const handleDialogCancel = () => {
       showDialog.value = false;
+      if (currentDialogAction.value === 'reLogin') {
+        // 断连websocket
+        disconnect();
+        // 清空 localStorage
+        localStorage.clear();
+        // 回到登录界面
+        router.push('/login');
+      }
       currentDialogAction.value = '';
     };
 
@@ -1687,6 +1780,8 @@ export default {
     };
 
     return {
+      handlePasswordUpdate,
+      tempPasswordData,
       deleteFriend,
       handleSearch,
       friendRequests,
