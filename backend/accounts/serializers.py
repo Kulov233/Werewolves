@@ -241,16 +241,16 @@ class PasswordChangeSerializer(serializers.Serializer):
        write_only=True,
        min_length=8,
        error_messages={
-           'blank': '密码不能为空。',
-           'min_length': '密码不能少于8个字符。'
+           'blank': '旧密码不能为空。',
+           'min_length': '旧密码不能少于8个字符。'
        }
    )
    new_password = serializers.CharField(
        write_only=True,
        min_length=8,
        error_messages={
-           'blank': '密码不能为空。',
-           'min_length': '密码不能少于8个字符。'
+           'blank': '新密码不能为空。',
+           'min_length': '新密码不能少于8个字符。'
        }
    )
 
