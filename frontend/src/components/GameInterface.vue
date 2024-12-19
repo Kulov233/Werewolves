@@ -113,7 +113,7 @@
       <!-- 中间聊天框 -->
       <div class="chat-section">
         <!-- 当前阶段显示 -->
-      <GamePhase :phase="gameData.current_phase" />
+      <GamePhase :phase="$translate(gameData.current_phase)" />
         <div class="chat-box" ref="chatBox" @scroll="handleScroll">
           <div class="chat-messages">
             <div  v-for="message in messages" :key="message.senderid"
@@ -197,11 +197,10 @@
       <div class="role-info">
         <div class="role-item">
             <span class="label">你的身份：</span>
-            <span class="value">{{ roleInfo.role }}</span>
+            <span class="value" style="font-size: 1.3em; font-weight: bold;">{{ $translate(roleInfo.role) }}</span>
         </div>
         <div class="role-item">
             <span class="label">阵营目标：</span>
-<!--          TODO: 后端改好后这里改为roleInfo.objective-->
             <span class="value">{{ roleGoalsConfig[roleInfo.role] }}</span>
 
         </div>
@@ -1431,7 +1430,13 @@ export default {
 
     targetPlayer(index) {
       // 投票选中目标玩家的逻辑
-      this.selectedPlayer = index;
+      if (this.selectedPlayer === index){
+        this.selectedPlayer = -1;
+      }
+      else {
+        this.selectedPlayer = index;
+      }
+
       // console.log("selectables: " + this.selectableIndices);
       //
       // console.log("selected number " + this.selectedPlayer);
@@ -2015,7 +2020,7 @@ p {
     color: #555; 
     text-align: center; 
     flex: 1;
-    font-size: 1.1em;
+    font-size: 1.0em;
 }
 
 .role-abilities {

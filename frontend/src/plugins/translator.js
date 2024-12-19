@@ -18,10 +18,18 @@ const translations = {
   'waiting': '等待中',
   'finished': '已结束',
 
+  // 阶段
+  'Speak': '发言',
+  'Initialize': '初始化',
+  'End_Night': '夜晚结束',
+  'Day': '白天',
+  'Waiting': '等待中',
+
   // 其他游戏相关术语
   'online': '在线',
   'offline': '离线',
   'room': '房间'
+
 };
 
 // 创建Vue插件
@@ -31,6 +39,10 @@ const TranslatorPlugin = {
     app.config.globalProperties.$translate = function(text) {
       // 如果文本为空，返回空字符串
       if (!text) return '';
+
+      // 首字母大小写转化(先不用)
+      // const toggleFirstLetterCase = t =>
+      //     (c => c.toUpperCase() === c ? c.toLowerCase() : c.toUpperCase())(t[0]) + t.slice(1);
 
       // 如果存在直接翻译，返回翻译结果
       if (translations[text]) {
