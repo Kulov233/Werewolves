@@ -692,6 +692,13 @@ export default {
           deadPlayers
         );
       }
+
+      for (victim of message.victims) {
+        if (victim === currentPlayer.value.index) {
+          sendNotification("你在这个晚上被杀死了", "death",
+              "接下来你可以与其他死亡玩家聊天，静待阵营胜利");
+        }
+      }
     }
 
     //
@@ -1208,7 +1215,7 @@ export default {
 
     }
 
-    function handleDayDeathInfo() {
+    function handleDayDeathInfo(message) {
       // 处理白天死掉的人
       // let line = message.victims.join("号，");
       // if (line === ""){
@@ -1218,7 +1225,12 @@ export default {
       //   sendSystemMessage("白天" + line + "号玩家出局了");
       // }
       // console.log("line: " + line);
-
+      for (victim of message.victims){
+        if (victim === currentPlayer.value.index){
+          sendNotification("你在这个白天死去了", "death",
+          "接下来你可以与其他死亡玩家聊天，静待阵营胜利");
+        }
+      }
     }
 
     function handleGameEnd(message) {
@@ -1258,6 +1270,11 @@ export default {
       // TODO: 展示所有人的角色并留两分钟复盘
     }
 
+    function handleRoomCleanup(){
+      sendNotification("游戏结束，返回大厅", "info",)
+      router.push('/GameLobby')
+    }
+
     const setupWebsocketListeners = () => {
         // 处理各个阶段和事件
         const playerJoinedCleanup = onType('player_joined', handlePlayerJoined);
@@ -1282,6 +1299,7 @@ export default {
         const voteResultCleanup = onType('vote_result', handleVoteResult);
         const dayDeathInfoCleanup = onType('day_death_info', handleDayDeathInfo);
         const gameEndCleanup = onType('game_end', handleGameEnd);
+        const roomCleanupCleanup = onType('room_cleanup', handleRoomCleanup)
 
         // 返回清理函数
         onUnmounted(() => {
@@ -1307,6 +1325,7 @@ export default {
           voteResultCleanup();
           dayDeathInfoCleanup();
           gameEndCleanup();
+          roomCleanupCleanup();
           console.log('WebSocket listeners cleaned up');
         });
     }
