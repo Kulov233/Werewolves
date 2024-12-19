@@ -1162,9 +1162,23 @@ export default {
       // if (!message.source){
       //   return;
       // }
-      console.log("talkUpdate: " + message.source);
-      const speaker = [...Object.values(players.value), ...Object.values(aiPlayers.value)][Number(message.source) - 1]
-      console.log("talkUpdateSpeaker: " + [...Object.values(players.value), ...Object.values(aiPlayers.value)]);
+      // console.log("source: " + message.source);
+      // console.log("speaker: " + speaker);
+      const newMessage = {
+        senderid: Number(message.source),
+        sendername: speaker.name,
+        avatar: speaker.avatar,
+        text: message.message,
+        recipients: "all" // 死亡玩家只能发送给"dead"
+      };
+
+      function handleTalkUpdateDead(message) {
+      // 处理聊天消息更新
+
+      // 创建消息对象
+      // if (!message.source){
+      //   return;
+      // }
       // console.log("source: " + message.source);
       // console.log("speaker: " + speaker);
       const newMessage = {
@@ -1293,6 +1307,7 @@ export default {
         const nightDeathInfoCleanup = onType('night_death_info', handleNightDeathInfo);
         const talkPhaseCleanup = onType('talk_phase', handleTalkPhase);
         const talkUpdateCleanup = onType('talk_update', handleTalkUpdate);
+        const talkUpdateDeadCleanup = onType('talk_update_dead', handleTalkUpdateDead);
         const talkStartCleanup = onType('talk_start', handleTalkStart);
         const talkEndCleanup = onType('talk_end', handleTalkEndByServer);
         const votePhaseCleanup = onType('vote_phase', handleVotePhase);
@@ -1319,6 +1334,7 @@ export default {
           nightDeathInfoCleanup();
           talkPhaseCleanup();
           talkUpdateCleanup();
+          talkUpdateDeadCleanup();
           talkStartCleanup();
           talkEndCleanup();
           votePhaseCleanup();
