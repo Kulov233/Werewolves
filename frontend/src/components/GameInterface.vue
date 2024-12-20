@@ -705,6 +705,7 @@ export default {
     //
     function handleTalkStart(message) {
       if (currentPlayer.value.index === message.player){
+        talkStart.value = true;
         sendNotification(
         `${currentPlayer.value.index}号玩家，轮到你发言`,
         "speak",
@@ -715,7 +716,6 @@ export default {
       else {
         sendSystemMessage("接下来请" + message.player + "号玩家发言：")
       }
-      talkStart.value = true;
       gameData.value.current_phase = "Speak"
       timerSeconds.value = gameData.value.phase_timer[gameData.value.current_phase];
     }
@@ -1160,12 +1160,14 @@ export default {
 
     }
 
-    function handleTalkEndByServer() {
+    function handleTalkEndByServer(message) {
       // 处理服务器发过来的聊天结束
       // this.userMessage = "";  // 没必要直接清空
       // TODO: 消息按钮重新变成灰的
-      sendNotification("你的发言时间结束。", "speak")
-      talkStart.value = false;
+      if (currentPlayer.value.index === message.player){
+        sendNotification("你的发言时间结束。", "speak")
+        talkStart.value = false;
+      }
     }
 
     async function handleVotePhase(message) {
