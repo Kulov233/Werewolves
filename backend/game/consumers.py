@@ -70,6 +70,31 @@ def ensure_player_is_alive():
 
     return decorator
 
+def ensure_player_is_dead():
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(consumer, *args, **kwargs):
+            room_id = consumer.scope['url_route']['kwargs']['room_id']
+            game_data = await consumer.get_game_data_from_cache(room_id)
+            if game_data is None:
+                await consumer.send(text_data=json.dumps({
+                    "type": "error",
+                    "message": "房间不存在。"
+                }))
+                return
+            user_id = str(consumer.scope['user'].id)
+            is_alive = game_data['players'][user_id]['alive']
+            if is_alive:
+                await consumer.send(text_data=json.dumps({
+                    "type": "error",
+                    "message": "你还活着，不能进行此操作。"
+                }))
+                return
+            return await func(consumer, *args, **kwargs)
+        return wrapper
+
+    return decorator
+
 
 # Channel: room:{room_id}
 # noinspection PyUnresolvedReferences
@@ -199,6 +224,8 @@ class GameConsumer(AsyncWebsocketConsumer):
                 await self.handle_witch_action(data)
             elif action == "talk_content":
                 await self.handle_talk_content(data)
+            elif action == "talk_content_dead":
+                await self.handle_talk_content_dead(data)
             elif action == "talk_end":
                 await self.handle_talk_end(data)
             elif action == "vote":
@@ -446,6 +473,25 @@ class GameConsumer(AsyncWebsocketConsumer):
         game_data['action_history'].append({
             "all": f"{index} 号玩家说：“{content}”。"
         })
+
+    @ensure_player_is_dead()
+    @with_game_data_lock(timeout=5)
+    async def handle_talk_content_dead(self, data):
+        # 获取房间 ID
+        room_id = self.scope['url_route']['kwargs']['room_id']
+
+        # 获取用户 ID
+        user_id = str(self.scope['user'].id)
+
+        game_data = await self.get_game_data_from_cache(room_id)
+
+        index = game_data['players'][user_id]['index']
+
+        content = data.get("content")
+
+        # 广播发言
+        await self.broadcast_talk_message_dead(room_id, index, content)
+
 
     @ensure_player_is_alive()
     @with_game_data_lock(timeout=5)
@@ -871,6 +917,39 @@ class GameConsumer(AsyncWebsocketConsumer):
         except Exception as e:
             print(f"广播玩家发言时出错：{e}")
 
+    async def talk_update_dead(self, event):
+        source = event.get("source")
+        message = event.get("message")
+
+        """
+        {
+          "type": "talk_update_dead",
+          "source": "5",
+          "message": "我会喷火，你会吗？"
+        }
+        """
+
+        await self.send(text_data=json.dumps({
+            "type": "talk_update_dead",
+            "source": source,
+            "message": message
+        }))
+
+    async def broadcast_talk_message_dead(self, room_id: str, source: str, message: str):
+        try:
+            channel_layer = get_channel_layer()
+
+            await channel_layer.group_send(
+                f"room_{room_id}_dead",
+                {
+                    "type": "talk_update_dead",
+                    "source": source,
+                    "message": message
+                }
+            )
+        except Exception as e:
+            print(f"广播玩家发言时出错：{e}")
+
     async def talk_start(self, event):
         player = event.get("player")
 
@@ -1043,6 +1122,29 @@ class GameConsumer(AsyncWebsocketConsumer):
         except Exception as e:
             print(f"广播白天死亡玩家时出错：{e}")
 
+    async def join_dead_group(self, event):
+        room_id = event.get('room_id')
+
+        await self.channel_layer.group_add(
+            f"room_{room_id}_dead",
+            self.channel_name
+        )
+
+    @classmethod
+    async def add_player_to_dead_group(cls, room_id: str, user_id: str):
+        try:
+            channel_layer = get_channel_layer()
+
+            await channel_layer.group_send(
+                f"room_{room_id}_user_{user_id}",
+                {
+                    "type": "join_dead_group",
+                    "room_id": room_id
+                }
+            )
+        except Exception as e:
+            print(f"将玩家加入死亡玩家群组时出错：{e}")
+
     async def not_connected(self, event):
         event_type = event.get("event")
         message = event.get("message")
@@ -1072,6 +1174,9 @@ class GameConsumer(AsyncWebsocketConsumer):
             print(f"广播消息时出错：{e}")
 
     async def should_disconnect(self, event):
+        await self.send(text_data=json.dumps({
+            "type": "room_cleanup"
+        }))
         await self.close()
 
     @classmethod

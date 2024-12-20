@@ -569,37 +569,28 @@ def handle_phase_timed_out(room_id: str, current_phase: str):
 
             # 更新存活状态
             players = {**game_data["players"], **game_data["ai_players"]}
-            for _, data in players.items():
+            for user_id, data in players.items():
                 if data["index"] in game_data["voted_victims_info"]:
                     data["alive"] = False
+                    async_to_sync(GameConsumer.add_player_to_dead_group)(room_id, user_id)
 
             game_cache.set(f"room:{room_id}", game_data)
 
-        elif current_phase.startswith('End'):
-            # 结算游戏胜利
-            victory_result = check_victory(room_id)
-            end = victory_result["end"]
-            victory = victory_result["victory"]
-            victory_side = victory_result["victory_side"]
-            reveal_role = victory_result["reveal_role"]
-            async_to_sync(GameConsumer.broadcast_game_end)(room_id, end, victory, victory_side, reveal_role)
-            if end:
-                print(f"{room_id}游戏结束。")
-                # TODO: 记录战绩
-                from django.contrib.auth.models import User
-                for user_id, data in game_data["players"].items():
-                    user = User.objects.get(id=user_id)
-                    user.userprofile.add_game_record(game_data['starts_at'], victory_result[data['role']], data['role'])
-
-                # TODO: 通知前端游戏结束，并断开连接
+        elif current_phase.startswith("End"):
+            if game_data["should_cleanup"]:
+                # 通知前端游戏结束，并断开连接
                 for user_id, _ in game_data["players"].items():
                     async_to_sync(GameConsumer.handle_should_disconnect)(room_id, user_id)
                 # 应该先发通知，再清理数据
                 game_cache.delete(f"room_{room_id}_current_task")
                 game_cache.delete(f"room:{room_id}")
+                print(f"正在清理 {room_id} 房间。")
+                lobby_cache = caches['lobby_cache']
+                room_data = lobby_cache.get(f"room:{room_id}")
+                room_data["status"] = "waiting"
+                lobby_cache.set(f"room:{room_id}", room_data)
                 return
-                # TODO: 清理房间数据，留一个阶段以供复盘？
-                # TODO: 添加玩家战绩
+
 
         # 3. 开始下一个阶段
         next_phase_task = start_phase.delay(room_id, next_phase)
@@ -636,16 +627,16 @@ def handle_ai_action(room_id: str, ai_id: str, phase: str, action: dict):
         # print(players)
 
         for _, data in players.items():
-            if data['alive']: # TODO: BUG
+            if data['alive']:
                 alive_player_indices.append(data['index'])
 
         if phase != game_data["current_phase"]:
-            print(f"AI执行动作时阶段不匹配：{phase} != {game_data['current_phase']}")
+            print(f"{room_id} 房间 {game_data['ai_players'][ai_id]['index']} 号 AI执行动作时阶段不匹配：{phase} != {game_data['current_phase']}")
             return None
 
         if action["type"] == "kill":
             if result not in alive_player_indices:
-                print(f"AI在刀人时选择的目标不合法：{result}")
+                print(f"{room_id} 房间 {game_data['ai_players'][ai_id]['index']} 号AI在刀人时选择的目标不合法：{result}")
                 return
 
             game_data['werewolves_targets'][game_data["ai_players"][ai_id]["index"]] = result
@@ -653,10 +644,10 @@ def handle_ai_action(room_id: str, ai_id: str, phase: str, action: dict):
                 game_data["ai_players"][ai_id]["index"]: f"我选择杀死 {result} 号玩家。"
             })
             async_to_sync(GameConsumer.sync_werewolf_target)(room_id, game_data['werewolves_targets'])
-            print(f"{game_data['ai_players'][ai_id]['index']} 号AI {ai_id} 选择杀死 {result} 号玩家。")
+            print(f"{room_id} 房间 {game_data['ai_players'][ai_id]['index']} 号 AI选择杀死 {result} 号玩家。")
         elif action["type"] == "check":
             if result not in alive_player_indices:
-                print(f"AI在验人时选择的目标不合法：{result}")
+                print(f"{room_id} 房间 {game_data['ai_players'][ai_id]['index']} 号AI在验人时选择的目标不合法：{result}")
                 return
 
             role = None
@@ -669,7 +660,7 @@ def handle_ai_action(room_id: str, ai_id: str, phase: str, action: dict):
             game_data['action_history'].append({
                 game_data["ai_players"][ai_id]["index"]: f"我选择查验 {result} 号玩家，他的角色是 {role}。"
             })
-            print(f"AI {ai_id}选择查验 {result} 号玩家，他的角色是 {role}。")
+            print(f"{room_id} 房间 {game_data['ai_players'][ai_id]['index']} 号AI选择查验 {result} 号玩家，他的角色是 {role}。")
         elif action["type"] == "witch":
             cure = result[0]
             poison = result[1]
@@ -683,9 +674,9 @@ def handle_ai_action(room_id: str, ai_id: str, phase: str, action: dict):
 
             if cure != "-1":
                 if cure not in game_data['victims_info']:
-                    print(f"AI在救人时选择的目标不合法：{cure}，目标不在死亡名单中。")
+                    print(f"{room_id} 房间 {game_data['ai_players'][ai_id]['index']} 号AI在救人时选择的目标不合法：{cure}，目标不在死亡名单中。")
                 elif game_data['ai_players'][ai_id]['role_skills']['cure_count'] <= 0:
-                    print(f"AI在救人时选择的目标不合法：{cure}，解药数量不足。")
+                    print(f"{room_id} 房间 {game_data['ai_players'][ai_id]['index']} 号AI在救人时选择的目标不合法：{cure}，解药数量不足。")
                 else:
                     message += f"。我选择将 {cure} 号玩家救活。\n"
 
@@ -694,9 +685,9 @@ def handle_ai_action(room_id: str, ai_id: str, phase: str, action: dict):
                 message += "。我选择不救人。\n"
             if poison != "-1":
                 if poison not in alive_player_indices:
-                    print(f"AI在毒人时选择的目标不合法：{poison}")
+                    print(f"{room_id} 房间 {game_data['ai_players'][ai_id]['index']} 号AI在毒人时选择的目标不合法：{poison}")
                 elif game_data['ai_players'][ai_id]['role_skills']['poison_count'] <= 0:
-                    print(f"AI在毒人时选择的目标不合法：{poison}，毒药数量不足。")
+                    print(f"{room_id} 房间 {game_data['ai_players'][ai_id]['index']} 号AI在毒人时选择的目标不合法：{poison}，毒药数量不足。")
                 else:
                     if game_data["ai_players"][ai_id]["index"] != poison:
                         message += f"我选择毒死 {poison} 号玩家。"
@@ -708,7 +699,7 @@ def handle_ai_action(room_id: str, ai_id: str, phase: str, action: dict):
             game_data['action_history'].append({
                 game_data["ai_players"][ai_id]["index"]: message
             })
-            print(f"AI {ai_id}选择救人 {cure} 号玩家，毒人 {poison} 号玩家。")
+            print(f"{room_id} 房间 {game_data['ai_players'][ai_id]['index']} 号AI选择救人 {cure} 号玩家，毒人 {poison} 号玩家。")
         elif action["type"] == "speak":
             async_to_sync(GameConsumer.broadcast_talk_message)(room_id, game_data["ai_players"][ai_id]["index"], result)
 
@@ -722,7 +713,7 @@ def handle_ai_action(room_id: str, ai_id: str, phase: str, action: dict):
             end_current_phase(room_id)
         elif action["type"] == "vote":
             if result not in alive_player_indices:
-                print(f"AI在投票时选择的目标不合法：{result}")
+                print(f"{room_id} 房间 {game_data['ai_players'][ai_id]['index']} 号AI在投票时选择的目标不合法：{result}")
                 return
             game_data['votes'][game_data["ai_players"][ai_id]["index"]] = result
             game_data['action_history'].append({
@@ -732,7 +723,7 @@ def handle_ai_action(room_id: str, ai_id: str, phase: str, action: dict):
         set_game_data(room_id, game_data)
         return result
     except Exception as e:
-        print(f"AI action error: {e}")
+        print(f"{room_id} AI action error: {e}")
         return None
 
 @shared_task
@@ -864,9 +855,10 @@ def start_phase(room_id: str, phase: str):
 
             # 更新存活状态
             players = {**game_data["players"], **game_data["ai_players"]}
-            for _, data in players.items():
+            for user_id, data in players.items():
                 if data["index"] in victims:
                     data["alive"] = False
+                    async_to_sync(GameConsumer.add_player_to_dead_group)(room_id, user_id)
 
             # 通知天亮
             async_to_sync(GameConsumer.broadcast_game_update)(room_id, 'day_phase', game_data)
@@ -908,11 +900,32 @@ def start_phase(room_id: str, phase: str):
                     )
                     delay = min(delay + 3, 40)
 
+        elif phase.startswith('End'):
+            # 结算游戏胜利
+            victory_result = check_victory(room_id)
+            end = victory_result["end"]
+            victory = victory_result["victory"]
+            victory_side = victory_result["victory_side"]
+            reveal_role = victory_result["reveal_role"]
+            async_to_sync(GameConsumer.broadcast_game_end)(room_id, end, victory, victory_side, reveal_role)
+            if end:
+                print(f"{room_id}游戏结束。")
+                game_data["should_cleanup"] = True
+                # 记录战绩并将玩家加入死亡组
+                from django.contrib.auth.models import User
+                for user_id, data in game_data["players"].items():
+                    user = User.objects.get(id=user_id)
+                    user.userprofile.add_game_record(game_data['starts_at'], victory_result[data['role']], data['role'])
+                    async_to_sync(GameConsumer.add_player_to_dead_group)(room_id, user_id)
+
         # 2. 设置阶段结束定时器
         if phase.startswith("Speak_"):
             phase_duration = phase_timer["Speak"]
         elif phase.startswith("End"):
-            phase_duration = phase_timer["End"]
+            if not game_data["should_cleanup"]:
+                phase_duration = phase_timer["End"]
+            else:
+                phase_duration = phase_timer["Cleanup"]
         else:
             phase_duration = phase_timer[phase]
         timer_task = handle_phase_timed_out.apply_async(

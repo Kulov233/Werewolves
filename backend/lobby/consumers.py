@@ -131,11 +131,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                 await self.clear_user_room_in_cache(self.scope["user"].id)
 
                 # 发送在线的好友列表
-                online_friends = await self.get_online_friends(self.scope["user"].id)
-                await self.send(text_data=json.dumps({
-                    "type": "online_friends",
-                    "friends": online_friends
-                }))
+                await self.send_online_friends()
 
                 # 发送房间列表
                 rooms = await self.get_room_list_from_cache()
@@ -197,6 +193,9 @@ class LobbyConsumer(AsyncWebsocketConsumer):
             # 加入房间
             elif action == "join_room":
                 await self.handle_join_room(data)
+            # 获取在线好友列表
+            elif action == "get_friends":
+                await self.send_online_friends()
             # 邀请玩家
             elif action == "invite_player":
                 await self.handle_invite_player(data)
@@ -763,9 +762,11 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                             "Day": 3,
                             "Speak": 40,
                             "Vote": 40,
-                            'End': 3,
+                            "End": 3,
+                            "Cleanup": 120
                         },
                         "starts_at": datetime.now().isoformat(),
+                        "should_cleanup": False,
                         # ...
                     }
                     speaking_phases = [f"Speak_{i}" for i in range(1, room_data["max_players"] + 1)]
@@ -803,6 +804,9 @@ class LobbyConsumer(AsyncWebsocketConsumer):
 
                     # 触发游戏开始检查
                     await trigger_game_start_check(room_id)
+
+                    room_data["status"] = "in-game"
+                    await self.update_room_in_cache(room_id, room_data)
 
             else:
                 await self.send(text_data=json.dumps({
@@ -891,6 +895,25 @@ class LobbyConsumer(AsyncWebsocketConsumer):
             )
         except Exception as e:
             print(f"广播消息时出错：{e}")
+
+    # noinspection PyUnresolvedReferences
+    async def online_friends(self):
+        online_friends = await self.get_online_friends(self.scope["user"].id)
+        await self.send(text_data=json.dumps({
+            "type": "online_friends",
+            "friends": online_friends
+        }))
+
+    async def send_online_friends(self):
+        try:
+            await self.channel_layer.group_send(
+                f"lobby_user_{self.scope['user'].id}",
+                {
+                    "type": "online_friends"
+                }
+            )
+        except Exception as e:
+            print(f"发送在线好友列表时出错：{e}")
 
     async def game_invite(self, event):
         """处理接收到的游戏邀请"""
