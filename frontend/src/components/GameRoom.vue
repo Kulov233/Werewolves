@@ -1,5 +1,5 @@
 <template>
-  
+
     <div class="main-page" @click="closeALL" >
       <!-- 顶部菜单栏 -->
       <div class="top-bar">
@@ -49,8 +49,8 @@
           </div>
         </div>
       </transition>
-  
-      <div class="room-container" :class="{ 'show-create-room': showCreateRoomPanel }"> 
+
+      <div class="room-container" :class="{ 'show-create-room': showCreateRoomPanel }">
         <!-- 主要房间区域 -->
         <div class="room-list" :class="{ 'shrink': showCreateRoomPanel }" ref="roomList">
             <!-- 房间标题区域 -->
@@ -62,9 +62,9 @@
                 <h1 class="room-title">{{ currentRoom.title }}</h1>
               </div>
               <div class="control-buttons">
-                <button 
+                <button
                   v-if="isHost"
-                  class="remove-room-btn" 
+                  class="remove-room-btn"
                   @click="removeRoom"
                 >
                   <img src="@/assets/removeRoom.svg" alt="Remove" />
@@ -82,9 +82,9 @@
 
             <!-- 房间ID (放在room-list底部) -->
             <div class="room-id">
-              Room ID: {{ currentRoom.id }}
+              房间 ID: {{ currentRoom.id }}
             </div>
-        
+
         <!-- 房主部分 -->
         <div class="section">
             <h2 class="section-title">房主</h2>
@@ -97,7 +97,7 @@
                     <div v-if="selectedPlayerId === 'host'" class="profile-card" @click.stop>
                         <div class="profile-header">
                         <img :src="hostProfile.avatar"
-                            alt="房主头像" 
+                            alt="房主头像"
                             class="large-avatar"/>
                         <div class="profile-info">
                             <h4>{{ userProfile.name }}</h4>
@@ -107,15 +107,15 @@
                         </div>
                         </div>
                         <div class="profile-stats">
-                        <div v-for="(stat, index) in userProfile.stats" 
-                            :key="index" 
+                        <div v-for="(stat, index) in userProfile.stats"
+                            :key="index"
                             class="stat-item">
                             <span class="stat-value">{{ stat.value }}</span>
                             <span class="stat-label">{{ stat.label }}</span>
                         </div>
                         </div>
                         <div class="profile-actions">
-                        <button class="action-btn add-friend-btn" 
+                        <button class="action-btn add-friend-btn"
                                 @click="sendFriendRequest(userProfile.userId)"
                                 :disabled="userProfile.isFriend">
                             <img src="@/assets/addFriend.svg" alt="加好友" class="action-icon"/>
@@ -129,8 +129,8 @@
                         <div class="recent-games">
                         <h5>最近对战</h5>
                         <div class="game-list">
-                            <div v-for="game in userProfile.recentGames" 
-                                :key="game.id" 
+                            <div v-for="game in userProfile.recentGames"
+                                :key="game.id"
                                 class="game-item">
                             <span class="game-result" :class="game.result">
                                 {{ game.result === 'win' ? '胜利' : '失败' }}
@@ -149,24 +149,24 @@
             <h2 class="section-title">成员（{{ currentRoom.currentPeople }}/{{ currentRoom.max_players }}）</h2>
             <div class="members-grid">
             <!-- 成员头像 -->
-            <div v-for="member in members" 
-                :key="member.id" 
+            <div v-for="member in members"
+                :key="member.id"
                 class="player-avatar"
                 @click.stop="!member.isAI && showProfile(member.id)">
                 <img :src="member.avatar" :alt="member.name" />
                 <span class="player-name">{{ member.name }}</span>
-                <button v-if="isHost && (member.isAI || !member.isAI)" 
-                        class="kick-button" 
+                <button v-if="isHost && (member.isAI || !member.isAI)"
+                        class="kick-button"
                         @click.stop="member.isAI ? removeAIPlayer(member.id) : handleKickMember(member.id)">×</button>
-                
+
                 <!-- 成员资料卡 -->
                 <transition name="profile">
-                <div v-if="selectedPlayerId === member.id && !member.isAI" 
-                    class="profile-card" 
+                <div v-if="selectedPlayerId === member.id && !member.isAI"
+                    class="profile-card"
                     @click.stop>
                     <div class="profile-header">
                     <img :src="member.avatar"
-                        alt="成员头像" 
+                        alt="成员头像"
                         class="large-avatar"/>
                     <div class="profile-info">
                         <h4>{{ member.name }}</h4>
@@ -176,15 +176,15 @@
                     </div>
                     </div>
                     <div class="profile-stats">
-                    <div v-for="(stat, index) in userProfile.stats" 
-                        :key="index" 
+                    <div v-for="(stat, index) in userProfile.stats"
+                        :key="index"
                         class="stat-item">
                         <span class="stat-value">{{ stat.value }}</span>
                         <span class="stat-label">{{ stat.label }}</span>
                     </div>
                     </div>
                     <div class="profile-actions">
-                    <button class="action-btn add-friend-btn" 
+                    <button class="action-btn add-friend-btn"
                             @click="sendFriendRequest(member.userId)"
                             :disabled="userProfile.isFriend">
                         <img src="@/assets/addFriend.svg" alt="加好友" class="action-icon"/>
@@ -198,8 +198,8 @@
                     <div class="recent-games">
                     <h5>最近对战</h5>
                     <div class="game-list">
-                        <div v-for="game in userProfile.recentGames" 
-                            :key="game.id" 
+                        <div v-for="game in userProfile.recentGames"
+                            :key="game.id"
                             class="game-item">
                         <span class="game-result" :class="game.result">
                             {{ game.result === 'win' ? '胜利' : '失败' }}
@@ -216,8 +216,8 @@
 
         <!-- 操作按钮部分 -->
         <div class="action-buttons">
-            <button class="action-btn add-ai" 
-                    @click="addAIPlayer" 
+            <button class="action-btn add-ai"
+                    @click="addAIPlayer"
                     :disabled="!isHost || currentRoom.currentPeople >= currentRoom.max_players || currentRoom.type === '无AI'"
                     :style="(!isHost || currentRoom.currentPeople >= currentRoom.max_players || currentRoom.type === '无AI') ? {
                       background: '#9ca3af',
@@ -227,9 +227,9 @@
               <img src="@/assets/ai.svg" alt="AI" />
               添加AI
             </button>
-            <button class="action-btn invite-player">
-            <img src="@/assets/addFriend.svg" alt="邀请" />
-            邀请玩家
+            <button class="action-btn invite-player" @click="showInviteDialog = true">
+              <img src="@/assets/addFriend.svg" alt="邀请" />
+              邀请玩家
             </button>
         </div>
 
@@ -239,7 +239,7 @@
             <span class="warning-dot"></span>
             还需要{{ requiredPlayers }}位玩家
             </div>
-            <button 
+            <button
             class="start-game-btn"
             :disabled="needMorePlayers || !isHost"
             :class="{ 'disabled': needMorePlayers || !isHost }"
@@ -279,8 +279,15 @@
                   <span class="friend-name">{{ friend.name }}</span>
                   <span class="friend-status online">{{ friend.status }}</span>
                 </div>
-                <button class="invite-btn" @click="inviteFriend(friend.id)">
-                  <span class="invite-text">邀请</span>
+                <button
+                  class="invite-btn"
+                  @click="inviteFriend(friend.id)"
+                  :disabled="friend.isInvited"
+                  :class="{ 'success': friend.isInvited }"
+                >
+                  <span class="invite-text">
+                    {{ friend.isInvited ? '已邀请' : '邀请' }}
+                  </span>
                 </button>
               </div>
             </div>
@@ -392,22 +399,22 @@
                     <img src="@/assets/roomTitle.svg" alt="房间" class="setting-icon"/>
                     房间名称
                   </label>
-                  <input 
-                    v-model="editRoomForm.title" 
-                    type="text" 
+                  <input
+                    v-model="editRoomForm.title"
+                    type="text"
                     class="setting-control"
                     placeholder="请输入房间名称"
                   />
                 </div>
-                
+
                 <!-- 房间简介设置 -->
                 <div class="form-group">
                   <label class="setting-label">
                     <img src="@/assets/description.svg" alt="简介" class="setting-icon"/>
                     房间简介
                   </label>
-                  <textarea 
-                    v-model="editRoomForm.description" 
+                  <textarea
+                    v-model="editRoomForm.description"
                     class="setting-control"
                     placeholder="请输入房间简介"
                     rows="3"
@@ -449,7 +456,7 @@
                 <!-- 保存按钮 -->
                 <div class="action-buttons">
                 <button
-                   class="save-settings-btn" 
+                   class="save-settings-btn"
                    @click="saveRoomSettings"
                    :disabled="!isHost"
                    :class="{ 'disabled': !isHost }"
@@ -471,19 +478,33 @@
       @confirm="handleDialogConfirm"
       @cancel="handleDialogCancel"
     />
+
+      <!-- 添加搜索组件 -->
+    <InvitePlayerDialog
+      :show="showInviteDialog"
+      :search-results="searchResults"
+      :has-searched="hasSearched"
+      :invited-users="invitedUsers"
+      @close="resetInviteDialog"
+      @search="debouncedSearch"
+      @invite="handleInvite"
+    />
     </div>
-    
+
+
+
 </template>
-  
+
 <script>
 import ConfirmDialog from './shared_components/ConfirmDialog.vue'
+import InvitePlayerDialog from './shared_components/InvitePlayerDialog.vue';
 import { onMounted, ref , onUnmounted, watch, computed } from 'vue';
 import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';
 import { useWebSocket } from '@/composables/useWebSocket';
 import axios from 'axios';
+import debounce from 'lodash/debounce';
 
-const router = useRouter();
 // 创建axios实例
 const api = axios.create({
   baseURL: 'http://localhost:8000'
@@ -528,7 +549,7 @@ api.interceptors.response.use(
 
         // 更新原始请求的Authorization header
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-        
+
         // 重试原始请求
         return api(originalRequest);
       } catch (refreshError) {
@@ -536,8 +557,8 @@ api.interceptors.response.use(
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         // 重定向到登录页面
-        router.push('/login');  // 跳转到登录页面
-        
+        this.router.push('/login');  // 跳转到登录页面
+
         // 可以添加一些用户提示信息，提醒用户重新登录
         alert('您的会话已过期，请重新登录。');
         return Promise.reject(refreshError);
@@ -597,7 +618,8 @@ const ROLE_CONFIGS = {
 
 export default {
   components: {
-    ConfirmDialog
+    ConfirmDialog,
+    InvitePlayerDialog,
   },
 
   setup() {
@@ -615,7 +637,7 @@ export default {
     const offlineFriends = ref(store.state.offlineFriends);
     const token = localStorage.getItem('access_token');
     const { connect, sendMessage, onType, isGameConnected, isLobbyConnected, disconnect } = useWebSocket(token);
-    
+
 
     // 弹窗相关的状态
     const showDialog = ref(false);
@@ -623,6 +645,12 @@ export default {
     const dialogMessage = ref('');
     const dialogShowConfirm = ref(true);
     const currentDialogAction = ref('');
+
+    // 搜索玩家
+    const showInviteDialog = ref(false);
+    const searchResults = ref([]);
+    const hasSearched = ref(false);
+    const invitedUsers = ref([]);
 
     // 是否为房主
     const isHost = ref(false);
@@ -770,31 +798,164 @@ export default {
 
     // 踢人
     const handleKickMember = (memberId) => {
-    if (!isHost.value) return; // 二次验证确保只有房主能踢人
-    
-    // 这里添加接口调用
-    // 示例：
-    // sendMessage({
-    //   type: 'kick_player',
-    //   room_id: currentRoom.value.id,
-    //   player_id: memberId
-    // });
-    
-    console.log('踢出玩家:', memberId);
-  };
+      if (!isHost.value) return; // 二次验证确保只有房主能踢人
+
+      sendMessage({
+        action: 'remove_player_from_room',
+        room_id: currentRoom.value.id,
+        user_id: memberId,
+      });
+
+      console.log('踢出玩家:', memberId);
+    };
+
+    // 处理搜索的函数
+    const debouncedSearch = debounce(async (query) => {
+      if (query.trim().length === 0) {
+        searchResults.value = [];
+        hasSearched.value = false;
+        return;
+      }
+
+    const result = await handleSearch(query);
+      if (result.success) {
+        searchResults.value = result.users;
+      } else {
+        searchResults.value = [];
+      }
+      hasSearched.value = true;
+    }, 300);
+
+    // 搜索
+    const handleSearch = async (keyword) => {
+      try {
+        const response = await api.get('/api/accounts/search/', {
+          params: { keyword }
+        });
+
+        if (response.status === 200) {
+          const users = await Promise.all(
+            response.data.users.map(async (user) => {
+              try {
+                const avatarResponse = await api.get(`/api/accounts/avatar/${user.id}/`);
+                return {
+                  id: user.id,
+                  username: user.username,
+                  avatar: avatarResponse.status === 200
+                      ? avatarResponse.data.avatar_url
+                      : require('@/assets/profile-icon.png'),
+                  isFriend: checkIsFriend(user.id)
+                };
+              } catch (error) {
+                return {
+                  id: user.id,
+                  username: user.username,
+                  avatar: require('@/assets/profile-icon.png'),
+                  isFriend: checkIsFriend(user.id)
+                };
+              }
+            })
+          );
+
+          return {
+            success: true,
+            users: users
+          };
+        }
+
+        return {
+          success: false,
+          message: '搜索失败'
+        };
+      } catch (error) {
+        console.error('Search error:', error);
+        return {
+          success: false,
+          message: error.response?.data?.message || '搜索失败'
+        };
+      }
+    };
+
+    // 检查是否是好友
+    const checkIsFriend = (userId) => {
+      return onlineFriends.value.some(friend => friend.id === userId) ||
+             offlineFriends.value.some(friend => friend.id === userId);
+    };
+
+    // 处理邀请的函数
+    const handleInvite = async (userId) => {
+      if (!currentRoom.value || invitedUsers.value.includes(userId)) return;
+
+      try {
+        // 发送邀请
+        sendMessage({
+          action: "invite_player",
+          room_id: currentRoom.value.id,
+          target: userId
+        });
+
+        // 添加到已邀请列表
+        invitedUsers.value.push(userId);
+
+      } catch (error) {
+        console.error('邀请失败:', error);
+      }
+    };
+
+    // 重置邀请对话框
+    const resetInviteDialog = () => {
+      showInviteDialog.value = false;
+      searchResults.value = [];
+      hasSearched.value = false;
+    };
+
+    const inviteFriend = async (friendId) => {
+      try {
+        // 确保有房间ID和好友ID
+        if (!currentRoom.value.id || !friendId) {
+          console.error('Missing required parameters for invitation');
+          return;
+        }
+
+        // 显示加载状态
+        const targetFriend = onlineFriends.value.find(f => f.id === friendId);
+        if (!targetFriend) return;
+
+        // 发送邀请WebSocket消息
+        sendMessage({
+          action: 'invite_player',
+          room_id: currentRoom.value.id,
+          target: friendId
+        });
+
+        // 临时禁用邀请按钮
+        targetFriend.isInvited = true;
+
+        // 3秒后重置邀请状态
+        setTimeout(() => {
+          if (targetFriend) {
+            targetFriend.isInvited = false;
+          }
+        }, 3000);
+
+      } catch (error) {
+        console.error('邀请失败:', error);
+      }
+    };
+
 
     // 获取选中的人信息
     const fetchSelectedProfile = async (userId) => {
       try {
         const avatarResponse = await api.get(`/api/accounts/avatar/${userId}/`);
         const userResponse = await api.get(`/api/accounts/public_info/${userId}/`);
-        
+
         if (userResponse.status === 200) {
           const userData = userResponse.data;
           return {
             userId: userData.id,
             name: userData.username,
-            avatar: avatarResponse.status === 200 
+            avatar: avatarResponse.status === 200
               ? avatarResponse.data.avatar_url
               : require('@/assets/profile-icon.png'),
             isOnline: true, // 这里可以从websocket获取在线状态
@@ -826,7 +987,7 @@ export default {
 
     // 处理新玩家加入
     async function handlePlayerJoined(data){
-      
+
       // 检查是否是当前房间
       if (data.room.id !== roomData.value.id) return;
 
@@ -836,7 +997,7 @@ export default {
         players: data.room.players,
         currentPeople: data.room.players.length + Object.keys(data.room.ai_players || {}).length
       };
-    
+
       // 找出当前成员列表中没有的新玩家
       const newJoinedPlayers = data.room.players.filter(
         playerId => !members.value.some(member => member.id === playerId)
@@ -879,6 +1040,12 @@ export default {
         id => !data.room.players.includes(id)
       );
 
+      // 如果离开的玩家是自己，跳转到大厅
+      if (leftPlayerId === userProfile.value.userId) {
+        router.push('/GameLobby');
+        return;
+      }
+
       // 从成员列表中移除离开的玩家
       members.value = members.value.filter(member => member.id !== leftPlayerId);
 
@@ -901,7 +1068,7 @@ export default {
             stats: newOwnerProfile.stats
           };
         }
-        
+
         // 如果当前用户成为新房主，更新UI相关状态
         if (data.room.owner === userProfile.value.userId) {
           // 例如显示房主特有的操作按钮等
@@ -912,9 +1079,9 @@ export default {
 
     const addAIPlayer = () => {
       if (!currentRoom.value || !isHost.value) return;
-      
+
       const aiName = `AI_${aiCounter.value}`;
-      
+
       sendMessage({
         action: "add_ai_player",
         room_id: currentRoom.value.id,
@@ -928,7 +1095,7 @@ export default {
     // Method to remove AI player
     const removeAIPlayer = (playerId) => {
       if (!currentRoom.value || !isHost.value) return;
-      
+
 
       sendMessage({
         action: "remove_ai_player",
@@ -943,7 +1110,7 @@ export default {
       if (data.room.id !== currentRoom.value.id) return;
 
       const aiPlayers = data.room.ai_players || {};
-      
+
       const aiMembers = Object.entries(aiPlayers).map(([id, info]) => ({
         id,
         name: info.name,
@@ -987,7 +1154,7 @@ export default {
 
       // 处理玩家加入
       const playerJoinedCleanup = onType('player_joined', handlePlayerJoined);
-      
+
       // 处理玩家离开
       const playerLeftCleanup = onType('player_left', handlePlayerLeft);
 
@@ -1003,18 +1170,18 @@ export default {
         if (data.room.id === currentRoom.value.id) {
           router.push({
             name: 'GameInterface',
-            params: { id: data.room.id }
+            params: {id: data.room.id}
           });
         }
       });
-      
+
       // 处理房间被移除
       const roomRemovedCleanup = onType('room_removed', (data) => {
         if (data.room.id === currentRoom.value.id) {
           router.push('/GameLobby');
         }
       });
-      
+
       // 处理房间更新
       const roomUpdatedCleanup = onType('room_updated', (data) => {
         console.log('Room updated:', data);
@@ -1045,12 +1212,12 @@ export default {
             currentRoom.value.currentPeople = data.room.players.length;
             aiCounter.value = 1;
           }
-          
+
         }
       });
 
       // 返回清理函数
-      onUnmounted (() => {
+      onUnmounted(() => {
         gameStartedCleanup();
         playerJoinedCleanup();
         playerLeftCleanup();
@@ -1061,7 +1228,7 @@ export default {
         console.log('WebSocket listeners cleaned up');
       });
     }
-    
+
 
     // 离开房间
     const leaveRoom = () => {
@@ -1077,7 +1244,7 @@ export default {
     // 销毁房间
     const removeRoom = () => {
       if (!isHost.value || !currentRoom.value) return;
-      
+
       // 显示确认弹窗
       dialogTitle.value = '销毁房间';
       dialogMessage.value = '确定要销毁这个房间吗？此操作不可撤销。';
@@ -1120,7 +1287,7 @@ export default {
 
     // 保存房间设置
     const saveRoomSettings = async () => {
-      if (!isHost.value ||!currentRoom.value) return;
+      if (!isHost.value || !currentRoom.value) return;
 
       try {
         dialogTitle.value = '更新房间';
@@ -1128,7 +1295,7 @@ export default {
         dialogShowConfirm.value = true;
         currentDialogAction.value = 'editRoom';
         showDialog.value = true;
-      
+
       } catch (error) {
         console.error('保存房间设置失败:', error);
         // 可以添加错误提示
@@ -1150,7 +1317,7 @@ export default {
 
     });
 
-    function refreshOnline(){
+    function refreshOnline() {
       // 刷新在线状态
       // 发个消息
       fetchFriendsList();
@@ -1163,13 +1330,12 @@ export default {
       onlineFriends.value = [];
       offlineFriends.value = [];
       console.log("allfriends: " + allFriendsList);
-      for (const friend of allFriendsList){
-        if (onlineList.indexOf(friend.id) !== -1){
+      for (const friend of allFriendsList) {
+        if (onlineList.indexOf(friend.id) !== -1) {
           // 如果在线
           friend.lastSeen = "在线";
           onlineFriends.value.push(friend);
-        }
-        else {
+        } else {
           friend.lastSeen = "离线";
           offlineFriends.value.push(friend);
         }
@@ -1184,25 +1350,25 @@ export default {
 
         // 获取每个好友的详细信息
         const friendsDetails = await Promise.all(
-          friendIds.map(async (friendId) => {
-            try {
-              const userResponse = await api.get(`/api/accounts/public_info/${friendId}/`);
-              const avatarResponse = await api.get(`/api/accounts/avatar/${friendId}/`);
+            friendIds.map(async (friendId) => {
+              try {
+                const userResponse = await api.get(`/api/accounts/public_info/${friendId}/`);
+                const avatarResponse = await api.get(`/api/accounts/avatar/${friendId}/`);
 
-              return {
-                id: friendId,
-                name: userResponse.data.username,
-                avatar: avatarResponse.status === 200
+                return {
+                  id: friendId,
+                  name: userResponse.data.username,
+                  avatar: avatarResponse.status === 200
                       ? avatarResponse.data.avatar_url
                       : require('@/assets/profile-icon.png'),
-                status: '在线', // 目前都显示为在线
-                lastSeen: '在线'
-              };
-            } catch (error) {
-              console.error('获取好友信息失败:', error);
-              return null;
-            }
-          })
+                  status: '在线', // 目前都显示为在线
+                  lastSeen: '在线'
+                };
+              } catch (error) {
+                console.error('获取好友信息失败:', error);
+                return null;
+              }
+            })
         );
 
         // 过滤掉获取失败的好友信息
@@ -1222,7 +1388,7 @@ export default {
     // 开始游戏方法
     const startGame = () => {
       if (!currentRoom.value || !isHost.value) return;
-      
+
       sendMessage({
         action: "start_game",
         room_id: currentRoom.value.id
@@ -1267,6 +1433,15 @@ export default {
 
 
     return {
+      router,
+      showInviteDialog,
+      searchResults,
+      hasSearched,
+      invitedUsers,
+      inviteFriend,
+      debouncedSearch,
+      handleInvite,
+      resetInviteDialog,
       ROLE_COLOR_MAP,
       ROLE_NAME_MAP,
       roleCountMap,
@@ -1310,19 +1485,19 @@ export default {
   data() {
     return {
 
-      
+
       roomType: "无AI", // 房间类型（默认无AI）
 
       selectedPeopleCount: 2, // 默认选中2人
       peopleOptions: [4, 6, 8, 10, 12, 16], // 可选人数列表
-      
+
       showMenuSidebar: false, // 控制侧边栏的显示与否
       showFriendsSidebar: false,
       showHistorySidebar: false,
 
-      
+
       selectedRoom: null, // 用于控制显示哪个房间的个人资料卡
-      
+
       //userProfile: null,
       newRoom: {
         title: `云想衣裳花想容的房间`,  // 这里需要替换实际的用户名
@@ -1331,7 +1506,7 @@ export default {
         currentPeople: 1,
         max_players: 2
       },
-      
+
       // 当前房间信息
       currentRoom_test: {
         title: "示例房间",
@@ -1339,16 +1514,16 @@ export default {
         max_players: 6,
         type: "无AI"
       },
-      
+
       // 房主信息
       hostProfile_test: {
         name: "云想衣裳花想容",
         avatar: require("@/assets/profile-icon.png"),
         isOnline: true,
         stats: [
-          { label: '游戏场数', value: 128 },
-          { label: '胜率', value: '76%' },
-          { label: '评分', value: 4.8 }
+          {label: '游戏场数', value: 128},
+          {label: '胜率', value: '76%'},
+          {label: '评分', value: 4.8}
         ]
       },
 
@@ -1359,78 +1534,78 @@ export default {
         isFriend: false,
         userId: "host",
         stats: [
-          { label: '游戏场数', value: 128 },
-          { label: '胜率', value: '76%' },
-          { label: '评分', value: 4.8 }
+          {label: '游戏场数', value: 128},
+          {label: '胜率', value: '76%'},
+          {label: '评分', value: 4.8}
         ],
         recentGames: [
-          { id: 'g1', result: 'win', date: '2024-12-04' },
-          { id: 'g2', result: 'win', date: '2024-12-03' },
-          { id: 'g3', result: 'lose', date: '2024-12-03' }
+          {id: 'g1', result: 'win', date: '2024-12-04'},
+          {id: 'g2', result: 'win', date: '2024-12-03'},
+          {id: 'g3', result: 'lose', date: '2024-12-03'}
         ]
       },
 
       // 成员列表
       members_test: [
-        { 
-          id: 1, 
-          name: '玩家1', 
+        {
+          id: 1,
+          name: '玩家1',
           avatar: require("@/assets/profile-icon.png"),
           isAI: false,
           userId: 'user1',
           isOnline: true,
           isFriend: false,
           stats: [
-            { label: '游戏场数', value: 85 },
-            { label: '胜率', value: '65%' },
-            { label: '评分', value: 4.2 }
+            {label: '游戏场数', value: 85},
+            {label: '胜率', value: '65%'},
+            {label: '评分', value: 4.2}
           ],
           recentGames: [
-            { id: 'm1', result: 'win', date: '2024-12-04' },
-            { id: 'm2', result: 'lose', date: '2024-12-03' }
+            {id: 'm1', result: 'win', date: '2024-12-04'},
+            {id: 'm2', result: 'lose', date: '2024-12-03'}
           ],
         },
-        { 
-          id: 2, 
-          name: '玩家2', 
+        {
+          id: 2,
+          name: '玩家2',
           avatar: require("@/assets/profile-icon.png"),
           isAI: false,
           userId: 'user2',
           isOnline: true,
           isFriend: false,
           stats: [
-            { label: '游戏场数', value: 85 },
-            { label: '胜率', value: '65%' },
-            { label: '评分', value: 4.2 }
+            {label: '游戏场数', value: 85},
+            {label: '胜率', value: '65%'},
+            {label: '评分', value: 4.2}
           ],
           recentGames: [
-            { id: 'm1', result: 'win', date: '2024-12-04' },
-            { id: 'm2', result: 'lose', date: '2024-12-03' }
+            {id: 'm1', result: 'win', date: '2024-12-04'},
+            {id: 'm2', result: 'lose', date: '2024-12-03'}
           ]
         },
-        { 
-          id: 3, 
-          name: 'GPT', 
+        {
+          id: 3,
+          name: 'GPT',
           avatar: require("@/assets/ai.svg"),
           isAI: true,
           userId: 'gpt1',
           isOnline: true,
           isFriend: false,
           stats: [
-            { label: '游戏场数', value: 85 },
-            { label: '胜率', value: '65%' },
-            { label: '评分', value: 4.2 }
+            {label: '游戏场数', value: 85},
+            {label: '胜率', value: '65%'},
+            {label: '评分', value: 4.2}
           ],
           recentGames: [
-            { id: 'm1', result: 'win', date: '2024-12-04' },
-            { id: 'm2', result: 'lose', date: '2024-12-03' }
+            {id: 'm1', result: 'win', date: '2024-12-04'},
+            {id: 'm2', result: 'lose', date: '2024-12-03'}
           ]
         }
       ],
 
       // 选中的玩家ID (用于显示资料卡)
       selectedPlayerId_test: null,
-      
+
     };
   },
   computed: {
@@ -1438,7 +1613,7 @@ export default {
     needMorePlayers() {
       return this.currentRoom.currentPeople < this.currentRoom.max_players;
     },
-    
+
     // 计算还需要多少玩家
     requiredPlayers() {
       return this.currentRoom.max_players - this.currentRoom.currentPeople;
@@ -1456,19 +1631,7 @@ export default {
       }
       this.selectedPlayerId = playerId;
     },
-    
-    // 踢出成员
-    kickMember(memberId) {
-      const index = this.members.findIndex(m => m.id === memberId);
-      if (index !== -1) {
-        this.members.splice(index, 1);
-        this.currentRoom.currentPeople--;
-      }
-    },
-    
-    handleInput() {
-      // 监听输入事件，方便以后扩展
-    },
+
 
     toggleSidebar(type) {
       if (type === 'menu') {
@@ -1486,13 +1649,13 @@ export default {
       }
     },
     // 关闭侧边栏
-    closeALL(){
+    closeALL() {
       this.closeMenuSidebar();
       this.closeFriendsSidebar();
       this.closeHistorySidebar();
       this.closePlayerDetails();
     },
-    
+
     closeMenuSidebar() {
       this.showMenuSidebar = false;
     },
@@ -1508,12 +1671,6 @@ export default {
       this.selectedRoom = null
     },
 
-    inviteFriend() {
-      alert("好友邀请功能！");
-    },
-    friendRecord() {
-      alert("好友记录功能！");
-    },
 
     toggleCreateRoom() {
       this.showCreateRoomPanel = !this.showCreateRoomPanel;
@@ -1526,11 +1683,11 @@ export default {
         this.$refs.roomList.classList.remove('shrink');
       }
     },
-    
+
   },
 };
 </script>
-  <style scoped>
+<style scoped>
 
 /* 横向工具栏样式 */
 .top-bar {
@@ -1594,8 +1751,9 @@ export default {
 .sidebar-content {
   padding: 20px;
 }
+
 .menu-sidebar {
-  left: 0; 
+  left: 0;
 }
 
 .friends-sidebar, .history-sidebar {
@@ -1643,7 +1801,6 @@ export default {
 }
 
 
-
 /* 全局样式 */
 .main-page {
   display: flex;
@@ -1652,7 +1809,7 @@ export default {
   background-color: var(--background-color);
   font-family: Arial, sans-serif;
 }
-  
+
 .room-container {
   display: flex;
   height: 100vh;
@@ -1675,6 +1832,7 @@ export default {
 .room-list {
   transition: transform 0.3s ease, flex 0.3s ease;
 }
+
 .room-list.shrink {
   transform: translateX(-1%);
 }
@@ -1776,7 +1934,7 @@ export default {
   justify-content: center;
   gap: 8px;
   transition: all 0.2s;
-  width: auto; 
+  width: auto;
 }
 
 .add-ai {
@@ -1849,6 +2007,13 @@ export default {
 .friends-list.hidden {
   transform: translateX(100%);
   opacity: 0;
+}
+
+.friends-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 32px; /* 增加底部间距 */
 }
 
 .refresh-btn {
@@ -2024,15 +2189,68 @@ export default {
   padding: 8px 16px;
   border-radius: 8px;
   border: none;
-  background: linear-gradient(135deg, #3f51b5, #5c6bc0);
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
   color: white;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
   display: flex;
   align-items: center;
   gap: 6px;
+  position: relative;
+  overflow: hidden;
+}
+
+.invite-btn:disabled {
+  background: linear-gradient(135deg, #93c5fd, #60a5fa);
+  cursor: not-allowed;
+}
+
+.invite-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
+  transition: 0.5s;
+}
+
+.invite-btn:not(:disabled):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+}
+
+.invite-btn:not(:disabled):hover::before {
+  left: 100%;
+}
+
+.invite-btn:disabled .invite-text {
+  opacity: 0.7;
+}
+
+.invite-text {
+  font-weight: 500;
+  position: relative;
+}
+
+/* 添加动画效果 */
+@keyframes successPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+.invite-btn.success {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  animation: successPulse 0.3s ease;
 }
 
 .invite-btn:hover {
@@ -2069,7 +2287,7 @@ export default {
 
 /* 房间列表头部布局 */
 .room-list-header {
-  position: relative;  /* 添加相对定位 */
+  position: relative; /* 添加相对定位 */
   display: flex;
   justify-content: center; /* 居中对齐 */
   align-items: center;
@@ -2148,7 +2366,7 @@ export default {
   position: absolute; /* 使用绝对定位 */
   left: 50%;
   transform: translateX(-50%); /* 确保完全居中 */
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3); 
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 /* 房间描述样式 */
@@ -2359,7 +2577,7 @@ export default {
   opacity: 0.9;
 }
 
-.action-btn img{
+.action-btn img {
   width: 24px;
   height: 24px;
 }
@@ -2408,7 +2626,6 @@ export default {
   color: #666;
   font-size: 0.85em;
 }
-  
 
 
 /* 创建房间滑动动画 */
@@ -2776,5 +2993,4 @@ textarea.setting-control {
   color: #2563eb;
   font-weight: 500;
 }
-  </style>
-  
+</style>
