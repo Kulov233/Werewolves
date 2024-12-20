@@ -705,6 +705,7 @@ export default {
     //
     function handleTalkStart(message) {
       if (currentPlayer.value.index === message.player){
+        talkStart.value = true;
         sendNotification(
         `${currentPlayer.value.index}号玩家，轮到你发言`,
         "speak",
@@ -715,7 +716,6 @@ export default {
       else {
         sendSystemMessage("接下来请" + message.player + "号玩家发言：")
       }
-      talkStart.value = true;
       gameData.value.current_phase = "Speak"
       timerSeconds.value = gameData.value.phase_timer[gameData.value.current_phase];
     }
