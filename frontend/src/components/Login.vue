@@ -272,7 +272,6 @@ const showConfirmDialog = (title, message, showConfirm = false, action = '') => 
 const handleDialogConfirm = async () => {
   showDialog.value = false;
   if (currentDialogAction.value === "confirm_login") {
-    await nextTick(); // 等待 DOM 更新
     router.push("/GameLobby");
   }
   currentDialogAction.value = '';
@@ -282,7 +281,6 @@ const handleDialogConfirm = async () => {
 const handleDialogCancel = async () => {
   showDialog.value = false;
   if (currentDialogAction.value === "confirm_login") {
-    await nextTick(); // 等待 DOM 更新
     router.push("/GameLobby");
   }
   currentDialogAction.value = '';
@@ -325,8 +323,6 @@ const onFinish = async (values) => {
     localStorage.setItem("refresh_token", refresh);
 
     showConfirmDialog("登录成功！", "", true, "confirm_login");
-
-
   } catch (error) {
     if (error.response && error.response.status === 401) {
       const errors = error.response.data;
