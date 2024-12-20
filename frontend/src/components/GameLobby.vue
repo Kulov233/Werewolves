@@ -2091,10 +2091,10 @@ export default {
 
   methods: {
     // 需要复制
-    handleSearchComplete(users) {
+    handleSearchComplete() {
     },
 
-    handleFriendRequestSent(userId) {
+    handleFriendRequestSent() {
     },
     async handleLogout() {
       // Show confirmation dialog

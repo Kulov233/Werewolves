@@ -633,8 +633,8 @@ export default {
     const router = useRouter();
     const roomData = ref(store.state.currentRoom);
     const userProfile = ref(store.state.userProfile);
-    const onlineFriends = ref(store.state.onlineFriends || []);
-    const offlineFriends = ref(store.state.offlineFriends || []);
+    const onlineFriends = ref( []);
+    const offlineFriends = ref( []);
     const token = localStorage.getItem('access_token');
     const { connect, sendMessage, onType, isGameConnected, isLobbyConnected, disconnect } = useWebSocket(token);
 
@@ -1318,7 +1318,7 @@ export default {
     }
 
     const handleOnlineFriends = (message) => {
-      // 刷新在线还有
+      // 刷新在线好友
       const onlineList = message.friends;
       const allFriendsList = [...onlineFriends.value, ...offlineFriends.value];
       onlineFriends.value = [];
@@ -1472,7 +1472,6 @@ export default {
       removeAIPlayer,
       aiCounter,
       startGame,
-      // ... 其他需要的数据和方法
     };
   },
   data() {
