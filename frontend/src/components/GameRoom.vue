@@ -806,7 +806,6 @@ export default {
         user_id: memberId,
       });
 
-      console.log('踢出玩家:', memberId);
     };
 
     // 处理搜索的函数
@@ -1005,7 +1004,6 @@ export default {
       // 为每个新玩家获取信息并添加到成员列表
       for (const newPlayerId of newJoinedPlayers) {
         const profile = await fetchSelectedProfile(newPlayerId);
-        console.log('新玩家信息:', newPlayerId);
         if (profile) {
           members.value.push({
             id: newPlayerId,
@@ -1023,8 +1021,6 @@ export default {
       members.value = members.value.filter((member, index, self) =>
         index === self.findIndex(m => m.id === member.id)
       );
-      // 调试输出所有玩家ID，使用members.value查看所有成员信息
-      console.log('所有玩家ID:', members.value.map(member => member.id));
 
     }
 
@@ -1184,7 +1180,6 @@ export default {
 
       // 处理房间更新
       const roomUpdatedCleanup = onType('room_updated', (data) => {
-        console.log('Room updated:', data);
         if (data.room.id === currentRoom.value.id) {
 
           const currentConfig = ROLE_CONFIGS[currentRoom.value.max_players];
@@ -1225,7 +1220,6 @@ export default {
         roomUpdatedCleanup();
         aiPlayerJoinedCleanup();
         aiPlayerLeftCleanup();
-        console.log('WebSocket listeners cleaned up');
       });
     }
 
@@ -1329,7 +1323,6 @@ export default {
       const allFriendsList = [...onlineFriends.value, ...offlineFriends.value];
       onlineFriends.value = [];
       offlineFriends.value = [];
-      console.log("allfriends: " + allFriendsList);
       for (const friend of allFriendsList) {
         if (onlineList.indexOf(friend.id) !== -1) {
           // 如果在线
