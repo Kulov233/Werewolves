@@ -132,6 +132,9 @@
               <button class="icon-btn" @click="toggleAddFriend" title="添加好友">
                 <img src="@/assets/addFriend.svg" alt="Add Friend"/>
               </button>
+              <button class="icon-btn" @click="refreshOnline" title="刷新好友列表好友">
+                <img src="@/assets/refresh.svg" alt="refresh online"/>
+              </button>
               <button class="close-btn" @click="toggleSidebar('friends')">
                 <img src="@/assets/close-createRoom.svg" alt="Close"/>
               </button>
@@ -1103,6 +1106,33 @@ export default {
       showDialog.value = true;
     };
 
+    function refreshOnline(){
+      // 刷新在线状态
+      // 发个消息
+      fetchFriendsList();
+      fetchFriendRequests();
+    }
+
+    const handleOnlineFriends = (message) => {
+      // 刷新在线还有
+      const onlineList = message.friends;
+      const allFriendsList = [...onlineFriends.value, ...offlineFriends.value];
+      onlineFriends.value = [];
+      offlineFriends.value = [];
+      console.log("allfriends: " + allFriendsList);
+      for (const friend of allFriendsList){
+        if (onlineList.indexOf(friend.id) !== -1){
+          // 如果在线
+          console.log("online: " + friend.id);
+          onlineFriends.value.push(friend);
+        }
+        else {
+          console.log("offline: " + friend.id);
+          offlineFriends.value.push(friend);
+        }
+      }
+    };
+
     // 获取好友列表
     const fetchFriendsList = async () => {
       try {
@@ -1134,6 +1164,13 @@ export default {
 
         // 过滤掉获取失败的好友信息
         onlineFriends.value = friendsDetails.filter(friend => friend !== null);
+        offlineFriends.value = [];
+        // 更新在线状态
+        sendMessage({
+          action: "get_friends"
+        });
+        onType('online_friends', handleOnlineFriends);
+
       } catch (error) {
         console.error('获取好友列表失败:', error);
       }
@@ -1563,21 +1600,8 @@ export default {
       Rooms.value = Rooms.value.filter(room => room.id !== removedRoomId);
     };
 
-    const handleOnlineFriends = (message) => {
-      const onlineList = message.friends;
-      const allFriendsList = [...onlineFriends.value, ...offlineFriends.value];
-      onlineFriends.value = [];
-      offlineFriends.value = [];
-      for (const friend of allFriendsList){
-        if (onlineList.indexOf(friend.id) !== -1){
-          // 如果在线
-          onlineFriends.value.push(friend);
-        }
-        else {
-          offlineFriends.value.push(friend);
-        }
-      }
-    };
+
+
 
     // 处理好友状态改变
 
@@ -1588,7 +1612,6 @@ export default {
         // 添加监听器
         roomCreatedListenerCleanup.value = onType('room_created', handleRoomCreated);
         roomRemovedListenerCleanup.value = onType('room_removed', handleRoomRemoved);
-        onlineFriendsCleanup.value = onType('online_friends', handleOnlineFriends);
 
 
       } else {
@@ -1600,10 +1623,6 @@ export default {
         if (roomRemovedListenerCleanup.value) {
           roomRemovedListenerCleanup.value()
           roomRemovedListenerCleanup.value = null
-        }
-        if (onlineFriendsCleanup.value) {
-          onlineFriendsCleanup.value()
-          onlineFriendsCleanup.value = null
         }
       }
     };
@@ -1808,6 +1827,8 @@ export default {
       handleSearch,
       friendRequests,
       onlineFriends,
+      offlineFriends,
+      refreshOnline,
       fetchFriendsList,
       fetchFriendRequests,
       sendFriendRequest,
