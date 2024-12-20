@@ -252,37 +252,67 @@
 
         <!-- 右侧好友列表 -->
         <div class="friends-list" :class="{ 'hidden': showCreateRoom }">
-        <h2 class="friends-title">好友列表 (1/2)</h2>
+          <div class="friends-header">
+            <h2 class="friends-title">
+              好友列表 ({{onlineFriends.length}}/{{onlineFriends.length + offlineFriends.length}})
+            </h2>
+            <button class="refresh-btn" @click="refreshOnline" title="刷新">
+              <img src="@/assets/refresh.svg" alt="Refresh" />
+            </button>
+          </div>
 
         <!-- 在线好友 -->
         <div class="friends-section">
-            <h3 class="friends-subtitle">在线好友</h3>
-            <div class="friend-item online">
-            <div class="friend-avatar">
-                <img src="@/assets/profile-icon.png" alt="好友头像" />
-                <span class="status-dot online"></span>
-            </div>
-            <div class="friend-info">
-                <span class="friend-name">ymxd</span>
-                <span class="friend-status online">在线</span>
-            </div>
-            <button class="invite-btn">邀请</button>
+            <h3 class="friends-subtitle">
+              <span class="subtitle-text">在线好友</span>
+              <span class="friend-count">({{ onlineFriends.length }})</span>
+            </h3>
+            <div class="friend-list" v-if="onlineFriends.length > 0">
+              <div v-for="friend in onlineFriends"
+                   :key="friend.id"
+                   class="friend-item online">
+                <div class="friend-avatar">
+                  <img :src="friend.avatar" :alt="friend.name" />
+                  <span class="status-dot online"></span>
+                </div>
+                <div class="friend-info">
+                  <span class="friend-name">{{ friend.name }}</span>
+                  <span class="friend-status online">{{ friend.status }}</span>
+                </div>
+                <button class="invite-btn" @click="inviteFriend(friend.id)">
+                  <span class="invite-text">邀请</span>
+                </button>
+              </div>
             </div>
         </div>
 
         <!-- 离线好友 -->
         <div class="friends-section">
-            <h3 class="friends-subtitle">离线好友</h3>
-            <div class="friend-item offline">
-            <div class="friend-avatar">
-                <img src="@/assets/profile-icon.png" alt="好友头像" />
-                <span class="status-dot offline"></span>
+            <h3 class="friends-subtitle">
+              <span class="subtitle-text">离线好友</span>
+              <span class="friend-count">({{ offlineFriends.length }})</span>
+            </h3>
+            <div class="friend-list" v-if="offlineFriends.length > 0">
+              <div v-for="friend in offlineFriends"
+                   :key="friend.id"
+                   class="friend-item offline">
+                <div class="friend-avatar">
+                  <img :src="friend.avatar" :alt="friend.name" />
+                  <span class="status-dot offline"></span>
+                </div>
+                <div class="friend-info">
+                  <span class="friend-name">{{ friend.name }}</span>
+                  <span class="friend-status offline">{{ friend.lastSeen || '离线' }}</span>
+                </div>
+              </div>
             </div>
-            <div class="friend-info">
-                <span class="friend-name">未知</span>
-                <span class="friend-status offline">离线</span>
-            </div>
-            </div>
+        </div>
+
+        <!-- 无好友提示 -->
+        <div v-if="!onlineFriends.length && !offlineFriends.length"
+             class="no-friends">
+          <img src="@/assets/friends.svg" alt="No Friends" class="no-friends-icon" />
+          <p class="no-friends-text">还没有好友哦，快去添加吧！</p>
         </div>
         </div>
         <!-- 房间设置面板部分 -->
@@ -334,35 +364,6 @@
                     </div>
                   </div>
 
-                  <!-- 角色优先选择设置 -->
-                  <div class="priority-settings">
-                    <div class="priority-header">
-                      <h4>角色优先分配</h4>
-                      <label class="switch">
-                        <input
-                          type="checkbox"
-                          v-model="enableRolePriority"
-                        >
-                        <span class="slider round"></span>
-                      </label>
-                    </div>
-
-                    <div v-if="enableRolePriority" class="priority-selection">
-                      <div class="priority-roles">
-                        <template v-for="role in getAvailableRoles()" :key="role">
-                          <label class="role-checkbox" :class="getRoleColorClass(role)">
-                            <input
-                              type="checkbox"
-                              v-model="selectedPriorityRoles"
-                              :value="role"
-                            >
-                            <span class="role-label">{{ getRoleDisplayName(role) }}</span>
-                          </label>
-                        </template>
-                      </div>
-                    </div>
-                  </div>
-
                   <!-- 女巫道具信息 -->
                   <div class="witch-items-section" v-if="editRoomForm.roleConfig?.witchItems">
                     <h4>女巫道具配置</h4>
@@ -370,12 +371,12 @@
                       <div class="witch-item">
                         <img src="@/assets/cure.svg" alt="解药" class="item-icon"/>
                         <span class="item-name">解药</span>
-                        <span class="item-count">× {{ editRoomForm.roleConfig.witchItems.cure_count }}</span>
+                        <span class="item-count">× {{ editRoomForm.roleConfig.witchItems.cure }}</span>
                       </div>
                       <div class="witch-item">
                         <img src="@/assets/medicine.svg" alt="毒药" class="item-icon"/>
                         <span class="item-name">毒药</span>
-                        <span class="item-count">× {{ editRoomForm.roleConfig.witchItems.poison_count }}</span>
+                        <span class="item-count">× {{ editRoomForm.roleConfig.witchItems.poison }}</span>
                       </div>
                     </div>
                   </div>
@@ -1165,11 +1166,11 @@ export default {
       for (const friend of allFriendsList){
         if (onlineList.indexOf(friend.id) !== -1){
           // 如果在线
-          console.log("online: " + friend.id);
+          friend.lastSeen = "在线";
           onlineFriends.value.push(friend);
         }
         else {
-          console.log("offline: " + friend.id);
+          friend.lastSeen = "离线";
           offlineFriends.value.push(friend);
         }
       }
@@ -1840,11 +1841,60 @@ export default {
   padding: 24px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   transition: all 0.3s ease;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .friends-list.hidden {
   transform: translateX(100%);
   opacity: 0;
+}
+
+.refresh-btn {
+  background: transparent;
+  border: none;
+  padding: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.refresh-btn:hover {
+  background: #f3f4f6;
+  transform: rotate(180deg);
+}
+
+.refresh-btn img {
+  width: 20px;
+  height: 20px;
+  filter: invert(45%) sepia(50%) saturate(1000%) hue-rotate(190deg) brightness(90%) contrast(95%);
+}
+
+/* 刷新按钮旋转动画 */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.refresh-btn:active img {
+  animation: spin 0.6s linear;
+}
+
+.friends-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .friends-title {
@@ -1853,21 +1903,60 @@ export default {
   margin-bottom: 24px;
   padding-bottom: 12px;
   border-bottom: 1px solid #e5e7eb;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .friends-subtitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e8eaf6;
+}
+
+.subtitle-text {
+  font-size: 16px;
+  color: #3949ab;
+  font-weight: 500;
+}
+
+.friend-count {
   font-size: 14px;
-  color: #6b7280;
-  margin-bottom: 12px;
+  color: #5c6bc0;
+  font-weight: normal;
+}
+
+.friend-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .friend-item {
   display: flex;
   align-items: center;
-  padding: 12px;
-  border-radius: 8px;
-  margin-bottom: 8px;
+  padding: 12px 16px;
+  border-radius: 12px;
   background: #f8fafc;
+  transition: all 0.2s ease;
+  border: 1px solid #e8eaf6;
+}
+
+.friend-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.friend-item.online {
+  background: #f3f6fd;
+}
+
+.friend-item.offline {
+  background: #fafafa;
 }
 
 .friend-avatar {
@@ -1876,19 +1965,23 @@ export default {
 }
 
 .friend-avatar img {
-  width: 40px;
-  height: 40px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  object-fit: cover;
 }
 
 .status-dot {
   position: absolute;
-  bottom: 0;
-  right: 0;
+  bottom: 2px;
+  right: 2px;
   width: 12px;
   height: 12px;
   border-radius: 50%;
   border: 2px solid white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .status-dot.online {
@@ -1901,16 +1994,22 @@ export default {
 
 .friend-info {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .friend-name {
-  display: block;
-  font-weight: 500;
-  color: #2c3e50;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a237e;
 }
 
 .friend-status {
-  font-size: 12px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .friend-status.online {
@@ -1922,18 +2021,50 @@ export default {
 }
 
 .invite-btn {
-  padding: 6px 12px;
-  border-radius: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
   border: none;
-  background: #3b82f6;
+  background: linear-gradient(135deg, #3f51b5, #5c6bc0);
   color: white;
-  font-size: 12px;
+  font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .invite-btn:hover {
-  background: #2563eb;
+  background: linear-gradient(135deg, #3949ab, #3f51b5);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(63, 81, 181, 0.2);
+}
+
+.invite-text {
+  font-weight: 500;
+}
+
+.no-friends {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.no-friends-icon {
+  width: 80px;
+  height: 80px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.no-friends-text {
+  color: #9e9e9e;
+  font-size: 16px;
+  line-height: 1.5;
 }
 
 /* 房间列表头部布局 */
@@ -2541,39 +2672,6 @@ textarea.setting-control {
 .role-idiot {
   background: #dcfce7;
   color: #166534;
-}
-
-.priority-settings {
-  background: #f8fafc;
-  border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 20px;
-}
-
-.priority-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.priority-header h4 {
-  margin: 0;
-  color: #2c3e50;
-}
-
-/* 开关样式 */
-.switch {
-  position: relative;
-  display: inline-block;
-  width: 48px;
-  height: 24px;
-}
-
-.switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
 }
 
 .slider {
