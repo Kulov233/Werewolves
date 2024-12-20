@@ -2992,6 +2992,228 @@ export default {
   height: 16px;
 }
 
+.header-actions .icon-btn {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: transparent;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.header-actions .icon-btn::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background: rgba(64, 158, 255, 0.1);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: width 0.3s ease, height 0.3s ease;
+}
+
+.header-actions .icon-btn:hover::before {
+  width: 100%;
+  height: 100%;
+}
+
+.header-actions .icon-btn img {
+  width: 20px;
+  height: 20px;
+  transition: transform 0.3s ease;
+}
+
+.header-actions .icon-btn:hover img {
+  transform: scale(1.1);
+}
+
+.header-actions .icon-btn:active img {
+  transform: scale(0.95);
+}
+
+/* 好友操作按钮样式增强 */
+.friend-actions .action-btn {
+  position: relative;
+  padding: 8px;
+  background: transparent;
+  border-radius: 8px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.friend-actions .action-btn::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background: rgba(245, 108, 108, 0.1);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: width 0.3s ease, height 0.3s ease;
+}
+
+.friend-actions .action-btn:hover::before {
+  width: 100%;
+  height: 100%;
+}
+
+.friend-actions .action-btn img {
+  position: relative;
+  z-index: 1;
+  transition: transform 0.3s ease, filter 0.3s ease;
+}
+
+.friend-actions .action-btn:hover img {
+  transform: scale(1.1);
+  filter: brightness(0) saturate(100%) invert(64%) sepia(94%) saturate(5620%) hue-rotate(335deg) brightness(101%) contrast(93%);
+}
+
+.friend-actions .action-btn:active img {
+  transform: scale(0.95);
+}
+
+/* 好友请求操作按钮样式增强 */
+.request-actions .accept-btn,
+.request-actions .reject-btn {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateY(0);
+}
+
+.request-actions .accept-btn::before,
+.request-actions .reject-btn::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: width 0.3s ease, height 0.3s ease;
+}
+
+.request-actions .accept-btn::before {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.request-actions .reject-btn::before {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.request-actions .accept-btn:hover::before,
+.request-actions .reject-btn:hover::before {
+  width: 150%;
+  height: 150%;
+}
+
+.request-actions .accept-btn:hover,
+.request-actions .reject-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.request-actions .accept-btn:active,
+.request-actions .reject-btn:active {
+  transform: translateY(1px);
+}
+
+/* 好友刷新按钮样式增强 */
+.icon-btn[title="刷新好友列表好友"] {
+  position: relative;
+  overflow: hidden;
+}
+
+.icon-btn[title="刷新好友列表好友"] img {
+  transition: transform 0.3s ease;
+}
+
+@keyframes rotateRefresh {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.icon-btn[title="刷新好友列表好友"]:hover img {
+  animation: rotateRefresh 1s linear infinite;
+}
+
+.icon-btn[title="刷新好友列表好友"]::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background: rgba(64, 158, 255, 0.1);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: width 0.3s ease, height 0.3s ease;
+}
+
+.icon-btn[title="刷新好友列表好友"]:hover::before {
+  width: 100%;
+  height: 100%;
+}
+
+/* 添加好友按钮特殊效果 */
+.icon-btn[title="添加好友"] {
+  position: relative;
+  overflow: hidden;
+}
+
+.icon-btn[title="添加好友"]::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
+  transition: left 0.3s ease;
+}
+
+.icon-btn[title="添加好友"]:hover::after {
+  left: 100%;
+}
+
+/* 好友请求徽章动画增强 */
+@keyframes badgePulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(245, 108, 108, 0.4);
+  }
+  70% {
+    transform: scale(1.1);
+    box-shadow: 0 0 0 10px rgba(245, 108, 108, 0);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(245, 108, 108, 0);
+  }
+}
+
+.badge {
+  animation: badgePulse 2s infinite;
+}
+
 /* 游戏邀请列表样式 */
 .invites-list {
   padding: 20px;

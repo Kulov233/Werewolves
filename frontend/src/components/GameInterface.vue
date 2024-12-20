@@ -160,8 +160,8 @@
         <div class="message-input-section">
           <!-- 结束发言按钮 -->
           <!-- TODO: 需要美化 -->
-          <button @click="handleTalkEnd" class="send-button" v-if="talkStart">
-            结束发言
+          <button @click="handleTalkEnd" class="end-talk-button" v-if="talkStart">
+            <span class="button-text">结束发言</span>
           </button>
           <input
             v-model="userMessage"
@@ -1767,6 +1767,8 @@ p {
   border-radius: 15px;
 }
 
+
+
 /* 聊天框 */
 .chat-box {
   background: #fff;
@@ -1942,7 +1944,59 @@ p {
   gap: 10px; 
 }
 
-/* 输入框 */
+/* 结束发言按钮样式 */
+.end-talk-button {
+  background: linear-gradient(135deg, #ff4d4d 0%, #ff0000 100%);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 25px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 15px;
+  box-shadow: 0 4px 12px rgba(255, 0, 0, 0.2);
+  position: relative;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.end-talk-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transform: translateX(-100%);
+  transition: transform 0.6s;
+}
+
+.end-talk-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(255, 0, 0, 0.3);
+}
+
+.end-talk-button:hover::before {
+  transform: translateX(100%);
+}
+
+.end-talk-button:active {
+  transform: translateY(1px);
+  box-shadow: 0 2px 8px rgba(255, 0, 0, 0.2);
+}
+
+.button-text {
+  margin-right: 5px;
+  letter-spacing: 0.5px;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+}
+
 .message-input {
   border: 1px solid #ccc;
   border-radius: 15px;
@@ -2393,9 +2447,10 @@ p {
 /* 同步目标包装器 */
 .sync-targets-wrapper {
   position: absolute;
-  top: -30px;
+  top: 100%;  /* 将位置改为父元素的底部 */
   left: 60px;
   z-index: 5;
+  margin-top: 5px;
 }
 
 .sync-targets-content {
