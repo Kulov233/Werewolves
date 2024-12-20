@@ -633,8 +633,8 @@ export default {
     const router = useRouter();
     const roomData = ref(store.state.currentRoom);
     const userProfile = ref(store.state.userProfile);
-    const onlineFriends = ref(store.state.onlineFriends);
-    const offlineFriends = ref(store.state.offlineFriends);
+    const onlineFriends = ref(store.state.onlineFriends || []);
+    const offlineFriends = ref(store.state.offlineFriends || []);
     const token = localStorage.getItem('access_token');
     const { connect, sendMessage, onType, isGameConnected, isLobbyConnected, disconnect } = useWebSocket(token);
 

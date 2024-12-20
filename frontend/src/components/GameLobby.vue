@@ -8,6 +8,10 @@
         </button>
         <!-- 右侧按钮组 -->
         <div class="right-buttons">
+          <button class="icon-button" @click.stop="toggleSidebar('invites')">
+            <img class="icon" src="@/assets/wolf.svg" alt="Game Invites" />
+            <span class="badge" v-if="gameInvites.length > 0">{{gameInvites.length}}</span>
+          </button>
           <button class="icon-button" @click.stop="toggleSidebar('friends')">
             <img class="icon" src="@/assets/friends.svg" alt="Friends" />
             <span class="badge" v-if="friendRequests.length > 0">{{friendRequests.length}}</span>
@@ -119,6 +123,43 @@
         </div>
       </transition>
 
+      <!-- 右侧滑出菜单 Invites -->
+      <transition name="slide-right">
+        <div v-if="showInvitesSidebar" class="sidebar invites-sidebar" @click.stop>
+          <div class="sidebar-header">
+            <h3>游戏邀请</h3>
+            <div class="header-actions">
+              <button class="close-btn" @click="toggleSidebar('invites')">
+                <img src="@/assets/close-createRoom.svg" alt="Close"/>
+              </button>
+            </div>
+          </div>
+
+          <div class="invites-list">
+            <div v-for="invite in gameInvites"
+                 :key="invite.id"
+                 class="invite-item"
+                 :class="{
+                    'accept-exit': invite.status === 'accept',
+                    'reject-exit': invite.status === 'reject'
+                  }">
+              <img :src="invite.avatar" alt="Avatar" class="invite-avatar"/>
+              <div class="invite-info">
+                <span class="invite-name">{{invite.name}}</span>
+              </div>
+              <div class="invite-actions">
+                <button class="accept-btn"
+                        @click="handleGameInvite(invite.room_id, 'accept')"
+                        :disabled="invite.status">接受</button>
+                <button class="reject-btn"
+                        @click="handleGameInvite(invite.room_id, 'reject')"
+                        :disabled="invite.status">拒绝</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </transition>
+
       <!-- 右侧滑出菜单 Friends -->
       <transition name="slide-right">
         <div v-if="showFriendsSidebar" class="sidebar friends-sidebar" @click.stop>
@@ -159,7 +200,6 @@
                 <img :src="request.avatar" alt="Avatar" class="request-avatar"/>
                 <div class="request-info">
                   <span class="request-name">{{request.name}}</span>
-                  <span class="request-time">{{request.time}}</span>
                 </div>
                 <div class="request-actions">
                   <button class="accept-btn"
@@ -969,6 +1009,10 @@ export default {
     const onlineFriends = ref([]);
     const offlineFriends = ref([]);
 
+    // 游戏邀请相关状态
+    const gameInvites = ref([]);
+    const showInvitesSidebar = ref(false);
+
     // 密码相关状态
     const tempPasswordData = ref(null);
 
@@ -1095,7 +1139,98 @@ export default {
       fetchUserInfo();
       fetchFriendsList();
       fetchFriendRequests();
+
+      // 设置游戏邀请监听
+      setupGameInviteListener();
     });
+
+    // 保存清理函数的 ref
+    const gameInviteListenerCleanup = ref(null);
+
+    const setupGameInviteListener = () => {
+
+      // 监听游戏邀请
+      gameInviteListenerCleanup.value = onType('game_invite', async (data) => {
+        try {
+          // 获取邀请者信息
+          const inviterInfo = await fetchInviterInfo(data.source);
+
+          // 添加新邀请到列表
+          gameInvites.value.unshift({
+            id: Date.now(),
+            room_id: data.room_id,
+            source: data.source,
+            name: inviterInfo.name,
+            avatar: inviterInfo.avatar,
+            status: null
+          });
+
+          // 创建一个新的数组以存储无重复的邀请
+          const uniqueInvites = [];
+          const seenCombinations = new Set();
+
+          gameInvites.value.forEach(invite => {
+            const combinationKey = `${invite.room_id}-${invite.source}`;
+            if (!seenCombinations.has(combinationKey)) {
+              uniqueInvites.push(invite);
+              seenCombinations.add(combinationKey);
+            }
+          });
+
+          // 更新gameInvites为无重复的邀请数组
+          gameInvites.value = uniqueInvites;
+        } catch (error) {
+          console.error('处理游戏邀请失败:', error);
+        }
+      });
+    };
+
+    // 获取游戏邀请者信息
+    const fetchInviterInfo = async (userId) => {
+      try {
+        const [userResponse, avatarResponse] = await Promise.all([
+          api.get(`/api/accounts/public_info/${userId}/`),
+          api.get(`/api/accounts/avatar/${userId}/`)
+        ]);
+
+        return {
+          name: userResponse.data.username,
+          avatar: avatarResponse.status === 200
+            ? avatarResponse.data.avatar_url
+            : require('@/assets/profile-icon.png')
+        };
+      } catch (error) {
+        console.error('获取邀请者信息失败:', error);
+        return {
+          name: '未知用户',
+          avatar: require('@/assets/profile-icon.png')
+        };
+      }
+    };
+
+    // 处理游戏邀请
+    const handleGameInvite = async (roomId, action) => {
+      // 更新邀请状态以触发动画
+      gameInvites.value = gameInvites.value.map(invite => {
+        if (invite.room_id === roomId) {
+          return {
+            ...invite,
+            status: action
+          };
+        }
+        return invite;
+      });
+
+      if (action === 'accept') {
+        // 接受邀请，加入房间
+        await joinRoom(roomId);
+      }
+
+      // 延时移除邀请
+      setTimeout(() => {
+        gameInvites.value = gameInvites.value.filter(invite => invite.room_id !== roomId);
+      }, 500);
+    };
 
      // 显示对话框
     const showConfirmDialog = (title, message, showConfirm = false, action = '') => {
@@ -1194,7 +1329,6 @@ export default {
                 avatar: avatarResponse.status === 200
                       ? avatarResponse.data.avatar_url
                       : require('@/assets/profile-icon.png'),
-                time: '刚刚'
               };
             } catch (error) {
               console.error('获取请求者信息失败:', error);
@@ -1490,6 +1624,10 @@ export default {
     // 不在组件卸载时断开连接
     onUnmounted(() => {
       // 确保组件卸载时移除监听器
+      if (gameInviteListenerCleanup.value) {
+        gameInviteListenerCleanup.value();
+        gameInviteListenerCleanup.value = null;
+      }
       if (roomCreatedListenerCleanup.value) {
         roomCreatedListenerCleanup.value();
       }
@@ -1820,6 +1958,9 @@ export default {
     };
 
     return {
+      gameInvites,
+      showInvitesSidebar,
+      handleGameInvite,
       handlePasswordUpdate,
       tempPasswordData,
       deleteFriend,
@@ -2134,37 +2275,6 @@ export default {
     }
   },
 
-  handleGameInvite(invite) {
-    // 处理游戏邀请
-    this.$notify({
-      title: '游戏邀请',
-      message: `${invite.fromName} 邀请你加入游戏`,
-      type: 'info',
-      duration: 0,
-      showClose: true,
-      customClass: 'game-invite-notification',
-      onClick: () => {
-        this.respondToGameInvite(invite.id, true);
-      }
-    });
-  },
-
-  respondToGameInvite(inviteId, accept) {
-    // 响应游戏邀请
-    if (accept) {
-      // 接受邀请的逻辑
-      this.ws.send(JSON.stringify({
-        type: 'acceptGameInvite',
-        inviteId: inviteId
-      }));
-    } else {
-      // 拒绝邀请的逻辑
-      this.ws.send(JSON.stringify({
-        type: 'rejectGameInvite',
-        inviteId: inviteId
-      }));
-    }
-  },
 
     showChangeAvatar() {
       this.isHoveringAvatar = true;
@@ -2391,7 +2501,12 @@ export default {
         this.showHistorySidebar = !this.showHistorySidebar;
         this.showMenuSidebar = false;
         this.showFriendsSidebar = false;
-      }
+      } else if (type === 'invites') {
+      this.showInvitesSidebar = !this.showInvitesSidebar;
+      this.showMenuSidebar = false;
+      this.showFriendsSidebar = false;
+      this.showHistorySidebar = false;
+    }
     },
     // 关闭侧边栏
     closeALL(){
@@ -2781,7 +2896,8 @@ export default {
 }
 
 .friends-sidebar,
-.history-sidebar {
+.history-sidebar,
+.invites-sidebar {
   width: 360px;
   background: #ffffff;
   right: 0;
@@ -2874,6 +2990,125 @@ export default {
 .close-btn img {
   width: 16px;
   height: 16px;
+}
+
+/* 游戏邀请列表样式 */
+.invites-list {
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.invite-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: white;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  transition: all 0.5s ease;
+  transform: translateX(0);
+  opacity: 1;
+  border: 1px solid #eee;
+}
+
+.invite-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  border-color: #409eff22;
+}
+
+.invite-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.invite-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.invite-name {
+  font-size: 1em;
+  font-weight: 500;
+  color: #333;
+}
+
+.invite-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* 接受按钮 */
+.accept-btn {
+  padding: 8px 16px;
+  background: #67c23a;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9em;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.accept-btn:hover:not(:disabled) {
+  background: #5daf34;
+  transform: translateY(-2px);
+}
+
+/* 拒绝按钮 */
+.reject-btn {
+  padding: 8px 16px;
+  background: #f56c6c;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9em;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.reject-btn:hover:not(:disabled) {
+  background: #e74c3c;
+  transform: translateY(-2px);
+}
+
+/* 接受动画 */
+.invite-item.accept-exit {
+  transform: translateX(100%);
+  opacity: 0;
+  background-color: rgba(103, 194, 58, 0.1);
+}
+
+/* 拒绝动画 */
+.invite-item.reject-exit {
+  transform: translateX(-100%);
+  opacity: 0;
+  background-color: rgba(245, 108, 108, 0.1);
+}
+
+/* 禁用按钮状态 */
+.accept-btn:disabled,
+.reject-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* 空列表提示 */
+.invites-list:empty::after {
+  content: "暂无游戏邀请";
+  display: block;
+  text-align: center;
+  color: #999;
+  padding: 32px 0;
 }
 
 /* 好友请求面板 */
