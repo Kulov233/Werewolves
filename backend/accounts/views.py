@@ -167,6 +167,12 @@ class FriendAddView(APIView):
             try:
                 target_user = User.objects.get(id=target_id)
 
+                if user == target_user:
+                    return Response({
+                        "status": "error",
+                        "message": "不能添加自己为好友。"
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
                 # 检查是否已经是好友
                 if user_profile.friends.filter(id=target_id).exists():
                     return Response({
@@ -298,6 +304,7 @@ class FriendDeleteView(APIView):
 class UserSearchView(APIView):
     @staticmethod
     def get(request):
+        user_id = request.user.id
         keyword = request.GET.get('keyword', '')
         if not keyword:
             return Response({
@@ -309,6 +316,7 @@ class UserSearchView(APIView):
         users = User.objects.filter(
             Q(username__icontains=keyword) |  # 用户名包含关键词（不区分大小写）
             Q(id__iexact=keyword)  # ID 完全匹配
+        ).exclude(id=user_id
         ).values('id', 'username')[:10]  # 限制返回数量
 
         return Response({
