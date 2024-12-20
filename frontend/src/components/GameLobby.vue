@@ -173,7 +173,7 @@
               <button class="icon-btn" @click="toggleAddFriend" title="添加好友">
                 <img src="@/assets/addFriend.svg" alt="Add Friend"/>
               </button>
-              <button class="icon-btn" @click="refreshOnline" title="刷新好友列表好友">
+              <button class="icon-btn" @click="refreshOnline" title="刷新好友相关信息">
                 <img src="@/assets/refresh.svg" alt="refresh online"/>
               </button>
               <button class="close-btn" @click="toggleSidebar('friends')">
@@ -953,9 +953,9 @@ export default {
       searchQuery: "", // 搜索输入
       showSearchIcon: false,   // 控制 search.svg 是否显示
       showHistory: false,      // 控制历史搜索的显示
-      history: ['房间1', '房间2', '房间3'], // 历史记录
+      history: [], // 历史记录
 
-      peopleOptions: [4, 6, 8, 10, 12, 16], // 可选人数列表
+      peopleOptions: [4, 6, 8, 12, 16], // 可选人数列表
 
       showMenuSidebar: false, // 控制侧边栏的显示与否
       showFriendsSidebar: false,
@@ -1912,7 +1912,7 @@ export default {
           signature: data.profile.bio,
           avatar: `http://localhost:8000${data.profile.avatar}`,
           isOnline: true,
-          isFriend: false,
+          isFriend: checkIsFriend(userId),
           stats: [
             { label: '游戏场数', value: data.profile.wins + data.profile.loses },
             { label: '胜率', value: `${calculateWinRate(data.profile.games)}` },
@@ -3075,29 +3075,20 @@ export default {
 }
 
 /* 好友刷新按钮样式增强 */
-.icon-btn[title="刷新好友列表好友"] {
+.icon-btn[title="刷新好友相关信息"] {
   position: relative;
   overflow: hidden;
 }
 
-.icon-btn[title="刷新好友列表好友"] img {
+.icon-btn[title="刷新好友相关信息"] img {
   transition: transform 0.3s ease;
 }
 
-@keyframes rotateRefresh {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.icon-btn[title="刷新好友相关信息"]:hover img {
+  transform: rotate(180deg);
 }
 
-.icon-btn[title="刷新好友列表好友"]:hover img {
-  animation: rotateRefresh 1s linear infinite;
-}
-
-.icon-btn[title="刷新好友列表好友"]::before {
+.icon-btn[title="刷新好友相关信息"]::before {
   content: '';
   position: absolute;
   top: 50%;
@@ -3110,7 +3101,7 @@ export default {
   transition: width 0.3s ease, height 0.3s ease;
 }
 
-.icon-btn[title="刷新好友列表好友"]:hover::before {
+.icon-btn[title="刷新好友相关信息"]:hover::before {
   width: 100%;
   height: 100%;
 }
@@ -4451,7 +4442,6 @@ export default {
 }
 
 .add-friend-btn:disabled {
-  background-color: #a0cfff;
   cursor: not-allowed;
 }
 
@@ -4460,9 +4450,12 @@ export default {
   color: red;
 }
 
-.action-btn:hover:not(:disabled) {
+/* 禁用状态下保持相同的悬停效果 */
+.add-friend-btn:hover,
+.add-friend-btn:disabled:hover {
   transform: translateY(-2px);
   filter: brightness(1.1);
+  background-color: #f5f5f5;
 }
 
 .action-icon {
@@ -4475,7 +4468,11 @@ export default {
   width: 24px;
   height: 24px;
 }
-
+.report-btn:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.1);
+  background-color: #fff1f0;
+}
 
 .recent-games {
   background: #f8fafc;

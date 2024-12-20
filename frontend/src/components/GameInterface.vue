@@ -2,56 +2,6 @@
     <div class="game-container"
          @click="closeALL">
 
-  
-      <!-- 顶部菜单栏 -->
-      <div class="top-bar">
-        <button class="icon-button left" @click.stop="toggleSidebar('menu')">
-          <img class="icon" src="@/assets/menu.svg" alt="Menu" />
-        </button>
-        <!-- 右侧按钮组 -->
-        <div class="right-buttons">
-          <button class="icon-button" @click.stop="toggleSidebar('friends')">
-            <img class="icon" src="@/assets/friends.svg" alt="Friends" />
-          </button>
-          <button class="icon-button" @click.stop="toggleSidebar('history')">
-            <img class="icon" src="@/assets/history.svg" alt="History" />
-          </button>
-        </div>
-      </div>
-
-      <!-- 左侧滑出菜单 -->
-      <transition name="slide-left">
-        <div v-if="showMenuSidebar" class="sidebar menu-sidebar" @click.stop>
-          <div class="sidebar-content">
-            <h3>菜单内容</h3>
-            <p>这里是一些内容。</p>
-            <button @click="toggleSidebar('menu')">关闭</button>
-          </div>
-        </div>
-      </transition>
-
-      <!-- 右侧滑出菜单 Friends -->
-      <transition name="slide-right">
-        <div v-if="showFriendsSidebar" class="sidebar friends-sidebar" @click.stop>
-          <div class="sidebar-content">
-            <h3>朋友列表</h3>
-            <p>这里显示朋友的信息。</p>
-            <button @click="toggleSidebar('friends')">关闭</button>
-          </div>
-        </div>
-      </transition>
-
-      <!-- 右侧滑出菜单 History -->
-      <transition name="slide-right">
-        <div v-if="showHistorySidebar" class="sidebar history-sidebar" @click.stop>
-          <div class="sidebar-content">
-            <h3>历史记录</h3>
-            <p>这里显示历史记录信息。</p>
-            <button @click="toggleSidebar('history')">关闭</button>
-          </div>
-        </div>
-      </transition>
-
       <!-- 左侧玩家列表 -->
       <div class="player-list" v-if="Boolean(players && aiPlayers)">
         <!-- 使用 Object.values() 将对象的值转换为数组，并确保通过 .value 访问 ref 的值 -->
@@ -62,10 +12,58 @@
                 :src="player.avatar"
                 alt="avatar"
                 class="avatar0"
-                @click.stop="showPlayerDetails(player, $event)"
+                @click.stop="showPlayerProfile(player.userId, player)"
               />
               <p>{{ index + 1 }}号{{" "}}{{ player.name }}<span v-if="player.userId === currentPlayer.index"> (你)</span></p>
-
+              <!-- 添加个人资料卡弹窗 -->
+              <transition name="profile">
+                <div v-if="selectedProfileId === player.userId" class="profile-card" @click.stop>
+                  <div class="profile-header">
+                     <img :src="selectedProfile.avatar"
+                        alt="头像"
+                        class="large-avatar"/>
+                    <div class="profile-info">
+                      <h4>{{ selectedProfile.name }}</h4>
+                      <span class="profile-status" :class="{'online': selectedProfile.isOnline}">
+                        {{ selectedProfile.isOnline ? '在线' : '离线' }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="profile-stats">
+                    <div v-for="(stat, index) in selectedProfile.stats"
+                        :key="index"
+                        class="stat-item">
+                      <span class="stat-value">{{ stat.value }}</span>
+                      <span class="stat-label">{{ stat.label }}</span>
+                    </div>
+                  </div>
+                  <div class="profile-actions">
+                    <button class="action-btn add-friend-btn"
+                            @click="sendFriendRequest(selectedProfile.userId)"
+                            :disabled="selectedProfile.isFriend">
+                      <img src="@/assets/addFriend.svg" alt="加好友" class="action-icon"/>
+                      {{ selectedProfile.isFriend ? '已是好友' : '加好友' }}
+                    </button>
+                    <button class="action-btn report-btn" @click="reportUser(selectedProfile.userId)">
+                      <img src="@/assets/report.svg" alt="举报" class="action-icon"/>
+                      举报
+                    </button>
+                  </div>
+                  <div class="recent-games">
+                    <h5>最近对战</h5>
+                    <div class="game-list">
+                      <div v-for="game in selectedProfile.recentGames"
+                          :key="game.id"
+                          class="game-item">
+                        <span class="game-result" :class="game.result">
+                          {{ game.result === 'win' ? '胜利' : '失败' }}
+                        </span>
+                        <span class="game-date">{{ game.date }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </transition>
               <!-- 同步目标显示 -->
               <div class="sync-targets-wrapper" v-if="syncTargets[String(index + 1)]">
                 <div class="sync-targets-content">
@@ -235,28 +233,6 @@
         </div>
     </div>
       </div>
-      <!-- 玩家详细信息弹出框 -->
-      
-       <div 
-        v-if="showDetails" 
-        class="player-details-box" 
-        :style="{ top: playerDetailsTop + 'px', left: playerDetailsLeft + 'px' }"
-        @click.stop
-        >
-        <div class="player-details">
-          <img :src="selectedShowPlayer.avatar" alt="avatar" class="avatar-modal" />
-          <h4>{{ selectedShowPlayer.name }}</h4>
-          <p>角色：{{ selectedShowPlayer.role }}</p>
-          <p>阵营：{{ selectedShowPlayer.team }}</p>
-          <p>状态：{{ selectedShowPlayer.isDead ? '已死亡' : '存活' }}</p>
-          <button class="btn-report" @click="reportPlayer(selectedShowPlayer)">
-            <img class="icon" src="@/assets/report.svg" alt="举报" />
-          </button>
-          <button class="btn-add-friend" @click="addFriend(selectedShowPlayer)">
-            <img class="icon" src="@/assets/addFriend.svg" alt="添加好友" />
-          </button>
-        </div>
-      </div>
       <!--  弹出查验结果   -->
       <ConfirmDialog
       :show="showDialog"
@@ -279,6 +255,7 @@
 
 <script>
 import {onMounted, ref, onUnmounted, onBeforeMount,} from 'vue';
+import { getCurrentInstance } from 'vue';
 import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';
 import { useWebSocket } from '@/composables/useWebSocket';
@@ -471,6 +448,53 @@ export default {
 
 
   setup() {
+
+    const { proxy } = getCurrentInstance();
+    const $translate = (text) => proxy.$translate(text);
+
+    const selectedProfileId = ref(null); // 当前选中的玩家ID
+    const selectedProfile = ref({
+      userId: '',
+      name: '',
+      avatar: '',
+      isOnline: false,
+      isFriend: false,
+      stats: [],
+      recentGames: []
+    });
+
+    const showPlayerProfile = async (playerId, player) => {
+      // 从使用序号改为使用userId
+      if (selectedProfileId.value === player.userId) {
+        selectedProfileId.value = null;
+        return;
+      }
+
+      // 如果是AI玩家，显示基本信息
+      if (player.isAI) {
+        selectedProfile.value = {
+          userId: player.userId, // AI的userId是uuid
+          name: player.name,
+          avatar: player.avatar,
+          isOnline: true,
+          isFriend: false,
+          stats: [
+            { label: '身份', value: 'AI玩家' },
+          ],
+          recentGames: []
+        };
+        selectedProfileId.value = player.userId;
+        return;
+      }
+
+      // 获取玩家资料
+      const profile = await fetchSelectedProfile(player.userId);
+      if (profile) {
+        selectedProfile.value = profile;
+        selectedProfileId.value = player.userId; // 存储userId而不是序号
+      }
+    };
+
 
     const hasUnreadMessages = ref(false);
     // 弹窗以及websocket建立
@@ -1067,7 +1091,7 @@ export default {
 
     function handleCheckResult(message) {
       // 处理查人结果
-      sendNotification(message.target + "号玩家的身份为" + message.role );
+      sendNotification(message.target + "号玩家的身份为" +  $translate(message.role) );
 
     }
 
@@ -1328,6 +1352,10 @@ export default {
 
 
     return{
+      selectedProfileId,
+      selectedProfile,
+      showPlayerProfile,
+
       talkStart,
       messages,
       isGameConnected,
@@ -1459,6 +1487,7 @@ export default {
       this.closeFriendsSidebar();
       this.closeHistorySidebar();
       this.closePlayerDetails();
+      this.selectedProfileId = null;
     },
 
     closeMenuSidebar() {
@@ -2380,13 +2409,225 @@ p {
   width: 100%;
 }
 
+
+
+/* 添加资料卡动画 */
+.profile-enter-active,
+.profile-leave-active {
+  transition: all 0.3s ease;
+}
+
+.profile-enter-from,
+.profile-leave-to {
+  opacity: 0;
+  transform: translateX(-10px);
+}
+
+/* 个人资料卡样式 */
+/* 确保资料卡不会被其他元素遮挡 */
+.profile-card {
+  position: absolute;
+  left: 70px;
+  top: 150px;
+  transform: translateY(-50%);
+  width: 240px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 16px;
+  z-index: 1000;
+}
+
+
+/* 调整箭头位置，让它指向头像 */
+.profile-card::before {
+  content: '';
+  position: absolute;
+  top: 30px; /* 调整箭头垂直位置以对齐头像 */
+  left: -8px; /* 将箭头放在左侧 */
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  transform: rotate(45deg);
+  box-shadow: -2px 2px 5px rgba(0, 0, 0, 0.04);
+  z-index: -1;
+}
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  background: #fff ;
+}
+
+.large-avatar {
+  width: 80px !important;
+  height: 80px !important;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.profile-info {
+  flex: 1;
+}
+
+.profile-info h4 {
+  margin: 0 0 4px;
+  font-size: 0.95em;
+  color: #2c3e50;
+}
+
+.profile-status {
+  display: inline-block;
+  padding: 2px 6px;
+  background: #ecf5ff;
+  color: #409eff;
+  border-radius: 12px;
+  font-size: 0.85em;
+}
+
+.profile-status.online {
+  background: #ecf5ff;
+  color: #409eff;
+}
+
+.profile-stats {
+  display: flex;
+  justify-content: space-around;
+  padding: 12px 0;
+  border-top: 1px solid #eee;
+  border-bottom: 1px solid #eee;
+  margin-bottom: 16px;
+}
+
+.stat-item {
+  text-align: center;
+}
+
+.stat-value {
+  display: block;
+  font-size: 1em;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.stat-label {
+  font-size: 0.75em;
+  color: #666;
+}
+
+.profile-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.action-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.8em;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background-color: transparent;
+}
+
+.add-friend-btn {
+  background-color: transparent;
+  color: #333;
+}
+
+.add-friend-btn:disabled {
+  cursor: not-allowed;
+}
+
+.report-btn {
+  background-color: transparent;
+  color: red;
+}
+
+/* 禁用状态下保持相同的悬停效果 */
+.add-friend-btn:hover,
+.add-friend-btn:disabled:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.1);
+  background-color: #f5f5f5;
+}
+
+.action-icon {
+  width: 14px;
+  height: 14px;
+  opacity: 0.9;
+}
+
+.action-btn img {
+  width: 24px;
+  height: 24px;
+}
+
+.report-btn:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.1);
+  background-color: #fff1f0;
+}
+
+.recent-games {
+  background: #f8fafc;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.recent-games h5 {
+  margin: 0 0 8px;
+  color: #2c3e50;
+  font-size: 0.85em;
+}
+
+.game-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px;
+  background: #fff;
+  border-radius: 4px;
+  font-size: 0.8em;
+  margin-bottom: 4px;
+}
+
+.game-result {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.game-result.win {
+  background: #f0f9eb;
+  color: #67c23a;
+}
+
+.game-result.lose {
+  background: #fef0f0;
+  color: #f56c6c;
+}
+
+.game-date {
+  color: #666;
+  font-size: 0.85em;
+}
+
 /* 同步目标包装器 */
 .sync-targets-wrapper {
   position: absolute;
-  top: 100%;  /* 将位置改为父元素的底部 */
+  top: 5%;  /* 将位置改为父元素的底部 */
   left: 60px;
   z-index: 5;
-  margin-top: 5px;
 }
 
 .sync-targets-content {

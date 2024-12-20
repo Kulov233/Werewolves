@@ -1,54 +1,6 @@
 <template>
 
     <div class="main-page" @click="closeALL" >
-      <!-- 顶部菜单栏 -->
-      <div class="top-bar">
-        <button class="icon-button left" @click.stop="toggleSidebar('menu')">
-          <img class="icon" src="@/assets/menu.svg" alt="Menu" />
-        </button>
-        <!-- 右侧按钮组 -->
-        <div class="right-buttons">
-          <button class="icon-button" @click.stop="toggleSidebar('friends')">
-            <img class="icon" src="@/assets/friends.svg" alt="Friends" />
-          </button>
-          <button class="icon-button" @click.stop="toggleSidebar('history')">
-            <img class="icon" src="@/assets/history.svg" alt="History" />
-          </button>
-        </div>
-      </div>
-
-      <!-- 左侧滑出菜单 -->
-      <transition name="slide-left">
-        <div v-if="showMenuSidebar" class="sidebar menu-sidebar" @click.stop>
-          <div class="sidebar-content">
-            <h3>菜单内容</h3>
-            <p>这里是一些内容。</p>
-            <button @click="toggleSidebar('menu')">关闭</button>
-          </div>
-        </div>
-      </transition>
-
-      <!-- 右侧滑出菜单 Friends -->
-      <transition name="slide-right">
-        <div v-if="showFriendsSidebar" class="sidebar friends-sidebar" @click.stop>
-          <div class="sidebar-content">
-            <h3>朋友列表</h3>
-            <p>这里显示朋友的信息。</p>
-            <button @click="toggleSidebar('friends')">关闭</button>
-          </div>
-        </div>
-      </transition>
-
-      <!-- 右侧滑出菜单 History -->
-      <transition name="slide-right">
-        <div v-if="showHistorySidebar" class="sidebar history-sidebar" @click.stop>
-          <div class="sidebar-content">
-            <h3>历史记录</h3>
-            <p>这里显示历史记录信息。</p>
-            <button @click="toggleSidebar('history')">关闭</button>
-          </div>
-        </div>
-      </transition>
 
       <div class="room-container" :class="{ 'show-create-room': showCreateRoomPanel }">
         <!-- 主要房间区域 -->
@@ -1481,7 +1433,7 @@ export default {
       roomType: "无AI", // 房间类型（默认无AI）
 
       selectedPeopleCount: 2, // 默认选中2人
-      peopleOptions: [4, 6, 8, 10, 12, 16], // 可选人数列表
+      peopleOptions: [4, 6, 8, 12, 16], // 可选人数列表
 
       showMenuSidebar: false, // 控制侧边栏的显示与否
       showFriendsSidebar: false,
