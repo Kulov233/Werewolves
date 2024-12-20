@@ -93,8 +93,8 @@
           />
       </a-button>
     </a-col>
-  </a-row>
-  <ConfirmDialog
+
+    <ConfirmDialog
     :show="showDialog"
     :title="dialogTitle"
     :message="dialogMessage"
@@ -102,6 +102,8 @@
     @confirm="handleDialogConfirm"
     @cancel="handleDialogCancel"
   />
+  </a-row>
+
 </template>
 
 <script setup>
