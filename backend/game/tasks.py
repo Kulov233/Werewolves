@@ -183,6 +183,10 @@ def initialize(room_id):
             async_to_sync(GameConsumer.handle_should_disconnect)(room_id, user_id)
         game_cache.delete(f"room_{room_id}_current_task")
         game_cache.delete(f"room:{room_id}")
+        lobby_cache = caches['lobby_cache']
+        room_data = lobby_cache.get(f"room:{room_id}")
+        room_data["status"] = "waiting"
+        lobby_cache.set(f"room:{room_id}", room_data)
         return {"room_id": room_id, "status": "error", "message": "初始化游戏失败。", "error": str(e)}
 
 

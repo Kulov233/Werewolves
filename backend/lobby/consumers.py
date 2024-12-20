@@ -897,7 +897,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
             print(f"广播消息时出错：{e}")
 
     # noinspection PyUnresolvedReferences
-    async def online_friends(self):
+    async def online_friends(self, event):
         online_friends = await self.get_online_friends(self.scope["user"].id)
         await self.send(text_data=json.dumps({
             "type": "online_friends",
