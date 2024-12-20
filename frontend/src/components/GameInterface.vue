@@ -693,10 +693,11 @@ export default {
         );
       }
 
-      for (victim of message.victims) {
+      for (const victim of message.victims) {
         if (victim === currentPlayer.value.index) {
           sendNotification("你在这个晚上被杀死了", "death",
               "接下来你可以与其他死亡玩家聊天，静待阵营胜利");
+          talkStart.value = true;
         }
       }
     }
@@ -1158,12 +1159,8 @@ export default {
     function handleTalkUpdate(message) {
       // 处理聊天消息更新
 
-      // 创建消息对象
-      // if (!message.source){
-      //   return;
-      // }
-      // console.log("source: " + message.source);
-      // console.log("speaker: " + speaker);
+      const speaker = [...Object.values(players.value), ...Object.values(aiPlayers.value)][Number(message.source) - 1]
+
       const newMessage = {
         senderid: Number(message.source),
         sendername: speaker.name,
@@ -1171,16 +1168,14 @@ export default {
         text: message.message,
         recipients: "all" // 死亡玩家只能发送给"dead"
       };
-    }
-      function handleTalkUpdateDead(message) {
-      // 处理聊天消息更新
 
-      // 创建消息对象
-      // if (!message.source){
-      //   return;
-      // }
-      // console.log("source: " + message.source);
-      // console.log("speaker: " + speaker);
+      messages.value.push(newMessage);
+    }
+
+    function handleTalkUpdateDead(message) {
+      // 处理聊天消息更新
+      const speaker = [...Object.values(players.value), ...Object.values(aiPlayers.value)][Number(message.source) - 1]
+
       const newMessage = {
         senderid: Number(message.source),
         sendername: speaker.name,
@@ -1192,12 +1187,6 @@ export default {
       // 将消息推送到消息列表
       messages.value.push(newMessage);
 
-      // 检查是否需要显示未读消息提示
-      // closed
-      // const chatBox = this.$refs.chatBox;
-      // if (chatBox && (chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight > 100)) {
-      //   hasUnreadMessages.value = true;
-      // }
 
     }
 
@@ -1239,10 +1228,11 @@ export default {
       //   sendSystemMessage("白天" + line + "号玩家出局了");
       // }
       // console.log("line: " + line);
-      for (victim of message.victims){
+      for (const victim of message.victims){
         if (victim === currentPlayer.value.index){
           sendNotification("你在这个白天死去了", "death",
           "接下来你可以与其他死亡玩家聊天，静待阵营胜利");
+          talkStart.value = true;
         }
       }
     }
@@ -1280,6 +1270,8 @@ export default {
             "狼人将村民与守护者们屠戮殆尽，村庄沦为怪物们的巢穴。但我们仍相信人类的勇气、胆识与正义，邪不压正，它们总有被消灭的一天。");
           }
         }
+        // 游戏结束的聊天室
+        talkStart.value = true;
       }
       // TODO: 展示所有人的角色并留两分钟复盘
     }

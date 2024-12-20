@@ -252,40 +252,152 @@
 
         <!-- 右侧好友列表 -->
         <div class="friends-list" :class="{ 'hidden': showCreateRoom }">
-        <h2 class="friends-title">好友列表 (1/2)</h2>
-        
-        <!-- 在线好友 -->
-        <div class="friends-section">
-            <h3 class="friends-subtitle">在线好友</h3>
-            <div class="friend-item online">
-            <div class="friend-avatar">
-                <img src="@/assets/profile-icon.png" alt="好友头像" />
-                <span class="status-dot online"></span>
+            <!-- 在线好友 -->
+            <div class="friend-group">
+              <div class="group-header">
+                <span>在线好友</span>
+                <span class="count">{{onlineFriends.length}}</span>
+              </div>
+              <div class="friend-items">
+                <div v-for="friend in onlineFriends"
+                    :key="friend.id"
+                    class="friend-item">
+                  <img :src="friend.avatar" alt="Avatar" class="friend-avatar" @click.stop="showProfile(friend.id)"/>
+                  <div class="friend-info">
+                    <span class="friend-name">{{friend.name}}</span>
+                    <span class="friend-status">{{friend.status}}</span>
+                  </div>
+                  <div class="friend-actions">
+                    <button class="action-btn delete-friend-btn" @click="deleteFriend(friend.id)">
+                      <img src="@/assets/deleteFriend.svg" alt="Delete Friend"/>
+                    </button>
+                  </div>
+                  <!-- 个人资料卡弹窗 -->
+                  <transition name="profile">
+                    <div v-if="selectedFriend === friend.id" class="profile-card" @click.stop>
+                      <div class="profile-header">
+                         <img :src="selectedProfile.avatar"
+                            alt="头像"
+                            class="large-avatar"/>
+                        <div class="profile-info">
+                          <h4>{{ selectedProfile.name || '房主昵称' }}</h4>
+                          <span class="profile-status" :class="{'online': selectedProfile.isOnline}">
+                            {{ selectedProfile.isOnline ? '在线' : '离线' }}
+                          </span>
+                        </div>
+                      </div>
+                      <div class="profile-stats">
+                        <div v-for="(stat, index) in selectedProfile.stats"
+                            :key="index"
+                            class="stat-item">
+                          <span class="stat-value">{{ stat.value }}</span>
+                          <span class="stat-label">{{ stat.label }}</span>
+                        </div>
+                      </div>
+                      <div class="profile-actions">
+                        <button class="action-btn add-friend-btn"
+                                @click="sendFriendRequest(selectedProfile.userId)"
+                                :disabled="selectedProfile.isFriend">
+                          <img src="@/assets/addFriend.svg" alt="加好友" class="action-icon"/>
+                          {{ selectedProfile.isFriend ? '已是好友' : '加好友' }}
+                        </button>
+                        <button class="action-btn report-btn" @click="reportUser(selectedProfile.userId)">
+                          <img src="@/assets/report.svg" alt="举报" class="action-icon"/>
+                          举报
+                        </button>
+                      </div>
+                      <div class="recent-games">
+                        <h5>最近对战</h5>
+                        <div class="game-list">
+                          <div v-for="game in selectedProfile.recentGames"
+                              :key="game.id"
+                              class="game-item">
+                            <span class="game-result" :class="game.result">
+                              {{ game.result === 'win' ? '胜利' : '失败' }}
+                            </span>
+                            <span class="game-date">{{ game.date }}</span>
+                          </div>
+                        </div>
+                    </div>
+                    </div>
+                  </transition>
+                </div>
+              </div>
             </div>
-            <div class="friend-info">
-                <span class="friend-name">ymxd</span>
-                <span class="friend-status online">在线</span>
-            </div>
-            <button class="invite-btn">邀请</button>
-            </div>
-        </div>
 
-        <!-- 离线好友 -->
-        <div class="friends-section">
-            <h3 class="friends-subtitle">离线好友</h3>
-            <div class="friend-item offline">
-            <div class="friend-avatar">
-                <img src="@/assets/profile-icon.png" alt="好友头像" />
-                <span class="status-dot offline"></span>
+            <!-- 离线好友 -->
+            <div class="friend-group">
+              <div class="group-header">
+                <span>离线好友</span>
+                <span class="count">{{offlineFriends.length}}</span>
+              </div>
+              <div class="friend-items">
+                <div v-for="friend in offlineFriends"
+                    :key="friend.id"
+                    class="friend-item offline">
+                  <img :src="friend.avatar" alt="Avatar" class="friend-avatar" @click.stop="showProfile(friend.id)"/>
+                  <div class="friend-info">
+                    <span class="friend-name">{{friend.name}}</span>
+                    <span class="friend-status">{{friend.lastSeen}}</span>
+                  </div>
+                  <div class="friend-actions">
+                    <button class="action-btn delete-friend-btn" @click="deleteFriend(friend.id)">
+                      <img src="@/assets/deleteFriend.svg" alt="Delete Friend"/>
+                    </button>
+                  </div>
+                  <!-- 个人资料卡弹窗 -->
+                  <transition name="profile">
+                    <div v-if="selectedFriend === friend.id" class="profile-card" @click.stop>
+                      <div class="profile-header">
+                         <img :src="selectedProfile.avatar"
+                            alt="头像"
+                            class="large-avatar"/>
+                        <div class="profile-info">
+                          <h4>{{ selectedProfile.name || '房主昵称' }}</h4>
+                          <span class="profile-status" :class="{'online': selectedProfile.isOnline}">
+                            {{ selectedProfile.isOnline ? '在线' : '离线' }}
+                          </span>
+                        </div>
+                      </div>
+                      <div class="profile-stats">
+                        <div v-for="(stat, index) in selectedProfile.stats"
+                            :key="index"
+                            class="stat-item">
+                          <span class="stat-value">{{ stat.value }}</span>
+                          <span class="stat-label">{{ stat.label }}</span>
+                        </div>
+                      </div>
+                      <div class="profile-actions">
+                        <button class="action-btn add-friend-btn"
+                                @click="sendFriendRequest(selectedProfile.userId)"
+                                :disabled="selectedProfile.isFriend">
+                          <img src="@/assets/addFriend.svg" alt="加好友" class="action-icon"/>
+                          {{ selectedProfile.isFriend ? '已是好友' : '加好友' }}
+                        </button>
+                        <button class="action-btn report-btn" @click="reportUser(selectedProfile.userId)">
+                          <img src="@/assets/report.svg" alt="举报" class="action-icon"/>
+                          举报
+                        </button>
+                      </div>
+                      <div class="recent-games">
+                        <h5>最近对战</h5>
+                        <div class="game-list">
+                          <div v-for="game in selectedProfile.recentGames"
+                              :key="game.id"
+                              class="game-item">
+                            <span class="game-result" :class="game.result">
+                              {{ game.result === 'win' ? '胜利' : '失败' }}
+                            </span>
+                            <span class="game-date">{{ game.date }}</span>
+                          </div>
+                        </div>
+                    </div>
+                    </div>
+                  </transition>
+                </div>
+              </div>
             </div>
-            <div class="friend-info">
-                <span class="friend-name">未知</span>
-                <span class="friend-status offline">离线</span>
-            </div>
-            </div>
-        </div>
-        </div>
-
+          </div>
         <!-- 房间设置面板部分 -->
         <transition name="slide-create">
           <section v-if="showCreateRoomPanel" class="create-room">
@@ -611,6 +723,8 @@ export default {
     const router = useRouter();
     const roomData = ref(store.state.currentRoom);
     const userProfile = ref(store.state.userProfile);
+    const onlineFriends = ref(store.state.onlineFriends);
+    const offlineFriends = ref(store.state.offlineFriends);
     const token = localStorage.getItem('access_token');
     const { connect, sendMessage, onType, isGameConnected, isLobbyConnected, disconnect } = useWebSocket(token);
     
@@ -1213,6 +1327,8 @@ export default {
       members,
       selectedPlayerId,
       userProfile,
+      onlineFriends,
+      offlineFriends,
       isHost,
       handleKickMember,
       leaveRoom,

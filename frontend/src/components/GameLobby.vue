@@ -859,14 +859,7 @@ export default {
       //    status: '在线'
       //  }
       //],
-      offlineFriends: [
-        {
-          id: 3,
-          name: '小七',
-          avatar: require('@/assets/profile-icon.png'),
-          lastSeen: '2小时前在线'
-        }
-      ],
+
 
       // 历史记录相关
       totalGames: 128,
@@ -971,6 +964,7 @@ export default {
     const selectedFriendToDelete = ref(null)
     const friendRequests = ref([]);
     const onlineFriends = ref([]);
+    const offlineFriends = ref([]);
 
     // 密码相关状态
     const tempPasswordData = ref(null);
@@ -1496,6 +1490,8 @@ export default {
           // 存储房间数据和用户信息到 Vuex
           await store.dispatch('saveRoomData', data.room);
           await store.dispatch('saveUserProfile', userProfile.value);
+          await store.dispatch('saveOnlineFriends', onlineFriends.value);
+          await store.dispatch('saveOfflineFriends', offlineFriends.value);
 
           // 跳转到房间页面
           router.push({
@@ -1567,13 +1563,33 @@ export default {
       Rooms.value = Rooms.value.filter(room => room.id !== removedRoomId);
     };
 
+    const handleOnlineFriends = (message) => {
+      const onlineList = message.friends;
+      const allFriendsList = [...onlineFriends.value, ...offlineFriends.value];
+      onlineFriends.value = [];
+      offlineFriends.value = [];
+      for (const friend of allFriendsList){
+        if (onlineList.indexOf(friend.id) !== -1){
+          // 如果在线
+          onlineFriends.value.push(friend);
+        }
+        else {
+          offlineFriends.value.push(friend);
+        }
+      }
+    };
+
+    // 处理好友状态改变
+
     // 处理监听状态改变
     const handleListenChange = (newValue) => {
       if (newValue) {
         fetchRoomData();
         // 添加监听器
-        roomCreatedListenerCleanup.value = onType('room_created', handleRoomCreated)
+        roomCreatedListenerCleanup.value = onType('room_created', handleRoomCreated);
         roomRemovedListenerCleanup.value = onType('room_removed', handleRoomRemoved);
+        onlineFriendsCleanup.value = onType('online_friends', handleOnlineFriends);
+
 
       } else {
         // 移除监听器
@@ -1584,6 +1600,10 @@ export default {
         if (roomRemovedListenerCleanup.value) {
           roomRemovedListenerCleanup.value()
           roomRemovedListenerCleanup.value = null
+        }
+        if (onlineFriendsCleanup.value) {
+          onlineFriendsCleanup.value()
+          onlineFriendsCleanup.value = null
         }
       }
     };
@@ -1612,6 +1632,8 @@ export default {
           // 存储房间数据和用户信息到 Vuex
           await store.dispatch('saveRoomData', room_created.value);
           await store.dispatch('saveUserProfile', userProfile.value);
+          await store.dispatch('saveOnlineFriends', onlineFriends.value);
+          await store.dispatch('saveOfflineFriends', offlineFriends.value);
 
           // 使用 router 进行导航
           router.push({

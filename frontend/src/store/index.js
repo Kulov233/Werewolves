@@ -13,6 +13,8 @@ export default createStore({
     wsHandlers: new Map(),
     currentRoom: null,
     userProfile: null,
+    onlineFriends: null,
+    offlineFriends: null,
     wsBaseUrl: 'ws://localhost:8000/ws',
   },
   
@@ -44,6 +46,13 @@ export default createStore({
     SET_USER_PROFILE(state, profile) {
       state.userProfile = profile;
     },
+    SET_ONLINE_FRIENDS(state, friends) {
+      state.onlineFriends = friends;
+    },
+    SET_OFFLINE_FRIENDS(state, friends) {
+      state.offlineFriends = friends;
+    },
+
     ADD_WS_HANDLER(state, { type, handler }) {
       if (!state.wsHandlers.has(type)) {
         state.wsHandlers.set(type, new Set());
@@ -186,6 +195,16 @@ export default createStore({
     // 保存用户信息
     saveUserProfile({ commit }, profile) {
       commit('SET_USER_PROFILE', profile);
+    },
+
+    // 保存在线好友信息
+    saveOnlineFriends({ commit }, friends) {
+      commit('SET_ONLINE_FRIENDS', friends);
+    },
+
+    // 保存离线好友信息
+    saveOfflineFriends({ commit }, friends) {
+      commit('SET_OFFLINE_FRIENDS', friends);
     },
 
     // 清理 WebSocket 连接
