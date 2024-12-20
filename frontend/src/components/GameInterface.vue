@@ -1171,7 +1171,7 @@ export default {
         text: message.message,
         recipients: "all" // 死亡玩家只能发送给"dead"
       };
-
+    }
       function handleTalkUpdateDead(message) {
       // 处理聊天消息更新
 
