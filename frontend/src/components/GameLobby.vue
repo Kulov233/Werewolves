@@ -1119,15 +1119,14 @@ export default {
       const allFriendsList = [...onlineFriends.value, ...offlineFriends.value];
       onlineFriends.value = [];
       offlineFriends.value = [];
-      console.log("allfriends: " + allFriendsList);
       for (const friend of allFriendsList){
         if (onlineList.indexOf(friend.id) !== -1){
           // 如果在线
-          console.log("online: " + friend.id);
+          friend.lastSeen = "在线";
           onlineFriends.value.push(friend);
         }
         else {
-          console.log("offline: " + friend.id);
+          friend.lastSeen = "离线";
           offlineFriends.value.push(friend);
         }
       }

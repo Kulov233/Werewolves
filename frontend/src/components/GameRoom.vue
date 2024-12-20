@@ -251,7 +251,10 @@
         </div>
 
         <!-- 右侧好友列表 -->
-        <div class="friends-list" :class="{ 'hidden': showCreateRoom }">
+        <div class="friends-list" :class="{ 'hidden': showCreateRoomPanel }">
+            <button class="icon-btn" @click="refreshOnline" title="刷新好友列表好友">
+              <img src="@/assets/refresh.svg" alt="refresh online"/>
+            </button>
             <!-- 在线好友 -->
             <div class="friend-group">
               <div class="group-header">
@@ -1254,13 +1257,82 @@ export default {
         connect();
       }
       initializeRoom();
-      
+      fetchFriendsList();
       setupWebsocketListeners();
     });
 
     onUnmounted(() => {
 
     });
+
+    function refreshOnline(){
+      // 刷新在线状态
+      // 发个消息
+      fetchFriendsList();
+    }
+
+    const handleOnlineFriends = (message) => {
+      // 刷新在线还有
+      const onlineList = message.friends;
+      const allFriendsList = [...onlineFriends.value, ...offlineFriends.value];
+      onlineFriends.value = [];
+      offlineFriends.value = [];
+      console.log("allfriends: " + allFriendsList);
+      for (const friend of allFriendsList){
+        if (onlineList.indexOf(friend.id) !== -1){
+          // 如果在线
+          console.log("online: " + friend.id);
+          onlineFriends.value.push(friend);
+        }
+        else {
+          console.log("offline: " + friend.id);
+          offlineFriends.value.push(friend);
+        }
+      }
+    };
+
+    // 获取好友列表
+    const fetchFriendsList = async () => {
+      try {
+        const response = await api.get('/api/accounts/friends/list/');
+        const friendIds = response.data.friends;
+
+        // 获取每个好友的详细信息
+        const friendsDetails = await Promise.all(
+          friendIds.map(async (friendId) => {
+            try {
+              const userResponse = await api.get(`/api/accounts/public_info/${friendId}/`);
+              const avatarResponse = await api.get(`/api/accounts/avatar/${friendId}/`);
+
+              return {
+                id: friendId,
+                name: userResponse.data.username,
+                avatar: avatarResponse.status === 200
+                      ? avatarResponse.data.avatar_url
+                      : require('@/assets/profile-icon.png'),
+                status: '在线', // 目前都显示为在线
+                lastSeen: '在线'
+              };
+            } catch (error) {
+              console.error('获取好友信息失败:', error);
+              return null;
+            }
+          })
+        );
+
+        // 过滤掉获取失败的好友信息
+        onlineFriends.value = friendsDetails.filter(friend => friend !== null);
+        offlineFriends.value = [];
+        // 更新在线状态
+        sendMessage({
+          action: "get_friends"
+        });
+        onType('online_friends', handleOnlineFriends);
+
+      } catch (error) {
+        console.error('获取好友列表失败:', error);
+      }
+    };
 
     // 开始游戏方法
     const startGame = () => {
@@ -1329,6 +1401,7 @@ export default {
       userProfile,
       onlineFriends,
       offlineFriends,
+      refreshOnline,
       isHost,
       handleKickMember,
       leaveRoom,
