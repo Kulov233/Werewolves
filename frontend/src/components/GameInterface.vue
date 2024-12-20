@@ -1160,12 +1160,14 @@ export default {
 
     }
 
-    function handleTalkEndByServer() {
+    function handleTalkEndByServer(message) {
       // 处理服务器发过来的聊天结束
       // this.userMessage = "";  // 没必要直接清空
       // TODO: 消息按钮重新变成灰的
-      sendNotification("你的发言时间结束。", "speak")
-      talkStart.value = false;
+      if (currentPlayer.value.index === message.player){
+        sendNotification("你的发言时间结束。", "speak")
+        talkStart.value = false;
+      }
     }
 
     async function handleVotePhase(message) {
