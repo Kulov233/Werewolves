@@ -95,14 +95,26 @@
       </a-button>
     </a-col>
   </a-row>
+  <ConfirmDialog
+      :show="showDialog"
+      :title="dialogTitle"
+      :message="dialogMessage"
+      :showConfirm="dialogShowConfirm"
+      @confirm="handleDialogConfirm"
+      @cancel="handleDialogCancel"
+    />
+
 
 </template>
 
 <script setup>
-import { onMounted, ref } from "vue";
+
+import {nextTick, onMounted, ref} from "vue";
 import { reactive, computed } from 'vue';
 import { useRouter } from 'vue-router';
+
 import axios from 'axios';
+import ConfirmDialog from "@/components/shared_components/ConfirmDialog.vue";
 
 // 控制主题的状态
 let isDarkMode = false; // 默认是白色主题
@@ -242,6 +254,43 @@ const formErrors = reactive({
 });
 
 
+// 弹窗相关的状态
+const showDialog = ref(false);
+const dialogTitle = ref('');
+const dialogMessage = ref('');
+const dialogShowConfirm = ref(true);
+const currentDialogAction = ref('');
+ // 显示对话框
+const showConfirmDialog = (title, message, showConfirm = false, action = '') => {
+  dialogTitle.value = title;
+  dialogMessage.value = message;
+  dialogShowConfirm.value = showConfirm;
+  currentDialogAction.value = action;
+  showDialog.value = true;
+};
+
+const handleDialogConfirm = async () => {
+  showDialog.value = false;
+  if (currentDialogAction.value === "confirm_login") {
+    await nextTick(); // 等待 DOM 更新
+    router.push("/GameLobby");
+  }
+  currentDialogAction.value = '';
+};
+
+// 处理对话框取消
+const handleDialogCancel = async () => {
+  showDialog.value = false;
+  if (currentDialogAction.value === "confirm_login") {
+    await nextTick(); // 等待 DOM 更新
+    router.push("/GameLobby");
+  }
+  currentDialogAction.value = '';
+};
+
+
+
+
 
 const resetUsernameOrEmailState = () => {
   formStatus.username_or_email = '';
@@ -260,7 +309,7 @@ const disabled = computed(() => {
 const onFinish = async (values) => {
   // 验证码验证
   if (ver_code.value !== yanma.value) {
-    alert("验证码错误！");
+    showConfirmDialog("验证码错误！", "");
     return;
   }
   try {
@@ -275,8 +324,9 @@ const onFinish = async (values) => {
     localStorage.setItem("access_token", access);
     localStorage.setItem("refresh_token", refresh);
 
-    alert("登录成功！");
-    router.push("/GameLobby");
+    showConfirmDialog("登录成功！", "", true, "confirm_login");
+
+
   } catch (error) {
     if (error.response && error.response.status === 401) {
       const errors = error.response.data;
@@ -285,7 +335,7 @@ const onFinish = async (values) => {
         formErrors[field] = message;
       }
     } else {
-      alert("发生错误，请稍后再试。");
+      showConfirmDialog("发生错误，请稍后再试。", "");
     }
   }
 };
