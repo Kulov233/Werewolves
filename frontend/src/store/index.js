@@ -16,6 +16,9 @@ export default createStore({
     onlineFriends: null,
     offlineFriends: null,
     wsBaseUrl: 'ws://localhost:8000/ws',
+
+    isLoading: false,
+
   },
   
   getters: {
@@ -28,6 +31,9 @@ export default createStore({
   },
 
   mutations: {
+    setLoading(state, value) {
+      state.isLoading = value;
+    },
     SET_LOBBY_WEBSOCKET(state, ws) {
       state.lobbyWebSocket = ws;
     },
