@@ -109,7 +109,7 @@
 
 <script setup>
 
-import {nextTick, onMounted, ref} from "vue";
+import {onMounted, ref} from "vue";
 import { reactive, computed } from 'vue';
 import { useRouter } from 'vue-router';
 
@@ -261,7 +261,7 @@ const dialogMessage = ref('');
 const dialogShowConfirm = ref(true);
 const currentDialogAction = ref('');
  // 显示对话框
-const showConfirmDialog = (title, message, showConfirm = false, action = '') => {
+const showConfirmDialog = async(title, message, showConfirm = false, action = '') => {
   dialogTitle.value = title;
   dialogMessage.value = message;
   dialogShowConfirm.value = showConfirm;
@@ -307,7 +307,7 @@ const disabled = computed(() => {
 const onFinish = async (values) => {
   // 验证码验证
   if (ver_code.value !== yanma.value) {
-    showConfirmDialog("验证码错误！", "");
+    await showConfirmDialog("验证码错误！", "");
     return;
   }
   try {
@@ -322,7 +322,7 @@ const onFinish = async (values) => {
     localStorage.setItem("access_token", access);
     localStorage.setItem("refresh_token", refresh);
 
-    showConfirmDialog("登录成功！", "", true, "confirm_login");
+    await showConfirmDialog("登录成功！", "", true, "confirm_login");
   } catch (error) {
     if (error.response && error.response.status === 401) {
       const errors = error.response.data;
@@ -331,7 +331,7 @@ const onFinish = async (values) => {
         formErrors[field] = message;
       }
     } else {
-      showConfirmDialog("发生错误，请稍后再试。", "");
+      await showConfirmDialog("发生错误，请稍后再试。", "");
     }
   }
 };
