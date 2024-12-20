@@ -317,8 +317,7 @@ const onFinish = async (values) => {
       password: values.password,
     });
 
-    const { access, refresh, message } = response.data;
-    console.log(message);
+    const { access, refresh } = response.data;
 
     localStorage.setItem("access_token", access);
     localStorage.setItem("refresh_token", refresh);

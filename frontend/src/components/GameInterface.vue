@@ -762,10 +762,6 @@ export default {
 
     let initialized = false;
 
-    // 设置一个定时器，每过一段时间执行一次
-    // const intervalId = setInterval(() => {
-    //   console.log(Boolean(players.value && aiPlayers.value));
-    // }, 1000); // 这里设置为每1000毫秒（1秒）打印一次
 
 
     // 这里的信息以后就不动了
@@ -778,7 +774,6 @@ export default {
         // 获取并设置所有玩家信息
         const playerProfiles = {};
         for (const playerId of Object.keys(gameData.value.players)) {
-          // console.log(playerId);
           const profile = await fetchSelectedProfile(playerId);
           playerProfiles[playerId] = {
             index: gameData.value.players[playerId].index,
@@ -799,9 +794,6 @@ export default {
               alive: true,
               online: true,
             }
-            console.log("profile id: " + userProfile.value.userId);
-            console.log("player id: " + playerId);
-            console.log("index: " + gameData.value.players[playerId].index);
           }
         }
 
@@ -811,7 +803,6 @@ export default {
         const aiPlayerProfiles = {};
 
         for (const id of Object.keys(gameData.value.ai_players)) {
-          // console.log(id);
           aiPlayerProfiles[id] = {
             name: gameData.value.ai_players[id].name,
             index: gameData.value.ai_players[id].index,
@@ -825,15 +816,9 @@ export default {
         // 展开并合并所有玩家信息
         players.value = playerProfiles;
         aiPlayers.value = aiPlayerProfiles;
-        // console.log("GameInterfaceInit: Done!!!");
-        // console.log(JSON.stringify(players.value, null, 2));
-        // console.log(JSON.stringify(aiPlayers.value, null, 2));
         initialized = true;
 
         // TODO: 添加对玩家自身信息的初始化
-      }
-      else {
-        console.log("Already initialized, passing...")
       }
 
 
@@ -851,12 +836,11 @@ export default {
       //       'stopped updating game data.', result.errors);
       // }
       if (!game){
-        console.log("gameData is false");
+        console.error("gameData is false");
       }
       else {
         const prev_phase = gameData.value.current_phase;
         gameData.value = game
-        console.log(prev_phase+  " " + gameData.value.current_phase)
         if (prev_phase !== gameData.value.current_phase){
           timerSeconds.value = gameData.value.phase_timer[gameData.value.current_phase]
         }
@@ -871,7 +855,6 @@ export default {
     async function select(title, content, time, players, alive_as_target = false) {
       // players: List[str], str为序号
       selectablePhaseAction.value = content;
-      console.log("selectedplayerbefore: " + selectedPlayer.value);
 
       selectableIndices.value = [];
       if (alive_as_target){  // 选择所有活着的人，除了自己
@@ -885,15 +868,9 @@ export default {
       else {  // 当前列表中的人
         for (const index of players){
           selectableIndices.value.push(Number(index));
-          console.log("choose able players: " + index)
         }
       }
 
-
-      // 显示结束按钮，显示计时器
-      console.log(selectableIndices.value)
-      console.log("phase start: " + selectablePhaseAction.value + "time: " + time);
-      console.log("phase: " + selectablePhaseAction.value + "indices: " + selectableIndices.value);
 
       // 等待函数
 
@@ -903,7 +880,6 @@ export default {
         if (confirmed.value){
           selectableIndices.value = [];
           confirmed.value = false;
-          console.log("selectedplayerafter: " + selectedPlayer.value);
           let tmp = selectedPlayer.value;
           selectedPlayer.value = -1
           selectablePhaseAction.value = ""
@@ -913,7 +889,6 @@ export default {
         }
       }
 
-      // console.log("phase end: " + gameData.value.current_phase);
       // 不能再选了
 
       // 如果没选中，返回-1
@@ -991,7 +966,6 @@ export default {
       if (poison_num === -1){
         actionToSend.poison = null;
       }
-      console.log(JSON.stringify(actionToSend));
       sendMessage(actionToSend,
         "game"
       );
@@ -999,7 +973,6 @@ export default {
     function handleTalkEnd(){
       // 不能确定成功发过去了，所以等待服务器回消息再改为false
       // talkStart.value = false;
-      console.log("talk actual end")
       const actionToSend = {
         type: "talk_end",
         player: currentPlayer.value.index,
@@ -1059,8 +1032,6 @@ export default {
           targetDict[message.targets[wolf]].push(wolf);
         }
       }
-      console.log("syncTargets" + JSON.stringify(message.targets));
-      console.log("syncTargetsProcessed" + JSON.stringify(targetDict));
       syncTargets.value = targetDict;
 
     }
@@ -1111,7 +1082,6 @@ export default {
       if(roleInfo.value.role === "Witch"){
         roleInfo.value.role_skills = message.role_skills;
         sendNotification("女巫请行动", "action", "请选择使用解药和毒药");
-        // console.log("phase: " + selectablePhase.value + "indices: " + selectableIndices.value);
         let cure_target = -1, poison_target = -1;
 
         if (roleInfo.value.role_skills.cure_count && message.cure_target){
@@ -1220,14 +1190,6 @@ export default {
 
     function handleDayDeathInfo(message) {
       // 处理白天死掉的人
-      // let line = message.victims.join("号，");
-      // if (line === ""){
-      //   sendSystemMessage("今天白天没有人出局");
-      // }
-      // else {
-      //   sendSystemMessage("白天" + line + "号玩家出局了");
-      // }
-      // console.log("line: " + line);
       for (const victim of message.victims){
         if (victim === currentPlayer.value.index){
           sendNotification("你在这个白天死去了", "death",
@@ -1334,7 +1296,6 @@ export default {
           dayDeathInfoCleanup();
           gameEndCleanup();
           roomCleanupCleanup();
-          console.log('WebSocket listeners cleaned up');
         });
     }
 
@@ -1412,7 +1373,6 @@ export default {
     },
      // 过滤消息，确保死亡玩家可以看到所有消息，活着的玩家不能看到死亡者的消息
     filteredMessages() {
-      console.log('filteredMessages 被计算');
       if (this.isDead) {
         return this.messages;
       }
@@ -1464,42 +1424,16 @@ export default {
         this.selectedPlayer = index;
       }
 
-      // console.log("selectables: " + this.selectableIndices);
-      //
-      // console.log("selected number " + this.selectedPlayer);
 
     },
 
     confirmTarget(){
       // 确认选择
       this.confirmed = true;
-      // console.log("confirm selected player: " + this.selectedPlayer)
     },
 
-    // 使用技能的方法
-    useAbility(ability) {
-      if (ability.hasCount && ability.count > 0) {
-        ability.count--;
-        // 这里添加使用技能的具体逻辑
-        console.log(`使用技能: ${ability.name}`);
-      } else if (!ability.hasCount) {
-        // 无限次数技能的使用逻辑
-        console.log(`使用技能: ${ability.name}`);
-      }
-    },
-    // 可以设置一个动态方法来更新当前玩家名字,后续优化接口
-    getRecipientLabel(recipients) {
-      if (recipients === 'all') {
-        return '所有人';
-      } else if (recipients === 'team') {
-        return '团队';
-      } else if (recipients === 'dead') {
-        return '死亡';
-      }
-      else{
-        return '未知';
-      }
-    },
+
+
 
     toggleSidebar(type) {
       if (type === 'menu') {

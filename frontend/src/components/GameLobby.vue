@@ -2091,12 +2091,10 @@ export default {
 
   methods: {
     // 需要复制
-    handleSearchComplete(users) {
-      console.log('搜索完成:', users);
+    handleSearchComplete() {
     },
 
-    handleFriendRequestSent(userId) {
-      console.log('好友请求已发送给用户:', userId);
+    handleFriendRequestSent() {
     },
     async handleLogout() {
       // Show confirmation dialog
