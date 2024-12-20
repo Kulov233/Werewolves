@@ -2226,54 +2226,6 @@ export default {
   },
 
 
-  inviteFriend(friendId) {
-    // 邀请好友加入游戏的逻辑
-    console.log('Inviting friend:', friendId);
-    // 这里应该调用后端API发送游戏邀请
-  },
-
-  showFriendMenu(friend) {
-    // 显示好友操作菜单的逻辑
-    console.log('Show menu for friend:', friend.name);
-    // 这里可以实现一个包含删除好友、屏蔽等操作的下拉菜单
-  },
-
-  handleNewFriendRequest(request) {
-    this.friendRequests.unshift({
-      id: request.id,
-      name: request.name,
-      avatar: request.avatar,
-      time: '刚刚'
-    });
-  },
-
-  updateFriendStatus(friend) {
-    // 更新好友状态
-    const onlineFriend = this.onlineFriends.find(f => f.id === friend.id);
-    const offlineFriend = this.offlineFriends.find(f => f.id === friend.id);
-
-    if (friend.isOnline) {
-      if (offlineFriend) {
-        // 从离线列表移动到在线列表
-        this.offlineFriends = this.offlineFriends.filter(f => f.id !== friend.id);
-        this.onlineFriends.push({
-          ...offlineFriend,
-          status: '在线'
-        });
-      }
-    } else {
-      if (onlineFriend) {
-        // 从在线列表移动到离线列表
-        this.onlineFriends = this.onlineFriends.filter(f => f.id !== friend.id);
-        this.offlineFriends.push({
-          ...onlineFriend,
-          lastSeen: '刚刚离线'
-        });
-      }
-    }
-  },
-
-
     showChangeAvatar() {
       this.isHoveringAvatar = true;
     },
@@ -2533,9 +2485,6 @@ export default {
       this.showHistory = false;
     },
 
-    friendRecord() {
-      alert("好友记录功能！");
-    },
     toggleCreateRoom() {
       this.showCreateRoomPanel = !this.showCreateRoomPanel;
       // 添加延迟以确保动画效果同步
@@ -3462,10 +3411,6 @@ export default {
   border-bottom: 1px solid #eee;
 }
 
-.search-friend {
-  display: flex;
-  gap: 8px;
-}
 
 .search-friend input {
   flex: 1;
