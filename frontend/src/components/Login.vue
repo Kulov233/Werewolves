@@ -173,7 +173,7 @@ function draw() {
   canvas.height = canvas_height;
   // 字符集
   var sCode =
-    "A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z,1,2,3,4,5,6,7,8,9,0,q,w,e,r,t,y,u,i,o,p,a,s,d,f,g,h,j,k,l,z,x,c,v,b,n,m";
+    "A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z,q,w,e,r,t,y,u,i,o,p,a,s,d,f,g,h,j,k,l,z,x,c,v,b,n,m";
   var aCode = sCode.split(",");
   var aLength = aCode.length; // 获取到数组的长度
   for (let i = 0; i <= 3; i++) { // 使用 let 声明 i
@@ -234,7 +234,6 @@ function draw() {
   }
 
   yanma.value = show_num.join("");
-  alert(yanma.value)
   return show_num;
 }
 
@@ -307,7 +306,7 @@ const disabled = computed(() => {
 
 const onFinish = async (values) => {
   // 验证码验证
-  if (ver_code.value !== yanma.value) {
+  if (ver_code.value.toUpperCase() !== yanma.value.toUpperCase()) {
     await showConfirmDialog("验证码错误！", "");
     return;
   }
@@ -321,6 +320,7 @@ const onFinish = async (values) => {
 
     localStorage.setItem("access_token", access);
     localStorage.setItem("refresh_token", refresh);
+    localStorage.setItem('isLoggedIn', 'true');
 
     await showConfirmDialog("登录成功！", "", true, "confirm_login");
   } catch (error) {

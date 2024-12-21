@@ -52,14 +52,14 @@
                             alt="房主头像"
                             class="large-avatar"/>
                         <div class="profile-info">
-                            <h4>{{ userProfile.name }}</h4>
-                            <span class="profile-status" :class="{'online': userProfile.isOnline}">
-                            {{ userProfile.isOnline ? '在线' : '离线' }}
+                            <h4>{{ hostProfile.name }}</h4>
+                            <span class="profile-status" :class="{'online': hostProfile.isOnline}">
+                            {{ hostProfile.isOnline ? '在线' : '离线' }}
                             </span>
                         </div>
                         </div>
                         <div class="profile-stats">
-                        <div v-for="(stat, index) in userProfile.stats"
+                        <div v-for="(stat, index) in hostProfile.stats"
                             :key="index"
                             class="stat-item">
                             <span class="stat-value">{{ stat.value }}</span>
@@ -68,20 +68,17 @@
                         </div>
                         <div class="profile-actions">
                         <button class="action-btn add-friend-btn"
-                                @click="sendFriendRequest(userProfile.userId)"
-                                :disabled="userProfile.isFriend">
+                                @click="sendFriendRequest(hostProfile.userId)"
+                                :disabled="hostProfile.isFriend">
                             <img src="@/assets/addFriend.svg" alt="加好友" class="action-icon"/>
-                            {{ userProfile.isFriend ? '已是好友' : '加好友' }}
+                            {{ hostProfile.isFriend ? '已是好友' : '加好友' }}
                         </button>
-                        <button class="action-btn report-btn" @click="reportUser(userProfile.userId)">
-                            <img src="@/assets/report.svg" alt="举报" class="action-icon"/>
-                            举报
-                        </button>
+
                         </div>
                         <div class="recent-games">
                         <h5>最近对战</h5>
                         <div class="game-list">
-                            <div v-for="game in userProfile.recentGames"
+                            <div v-for="game in hostProfile.recentGames"
                                 :key="game.id"
                                 class="game-item">
                             <span class="game-result" :class="game.result">
@@ -122,13 +119,13 @@
                         class="large-avatar"/>
                     <div class="profile-info">
                         <h4>{{ member.name }}</h4>
-                        <span class="profile-status" :class="{'online': userProfile.isOnline}">
-                        {{ userProfile.isOnline ? '在线' : '离线' }}
+                        <span class="profile-status" :class="{'online': member.isOnline}">
+                        {{ member.isOnline ? '在线' : '离线' }}
                         </span>
                     </div>
                     </div>
                     <div class="profile-stats">
-                    <div v-for="(stat, index) in userProfile.stats"
+                    <div v-for="(stat, index) in member.stats"
                         :key="index"
                         class="stat-item">
                         <span class="stat-value">{{ stat.value }}</span>
@@ -138,19 +135,16 @@
                     <div class="profile-actions">
                     <button class="action-btn add-friend-btn"
                             @click="sendFriendRequest(member.userId)"
-                            :disabled="userProfile.isFriend">
+                            :disabled="member.isFriend">
                         <img src="@/assets/addFriend.svg" alt="加好友" class="action-icon"/>
-                        {{ userProfile.isFriend ? '已是好友' : '加好友' }}
+                        {{ member.isFriend ? '已是好友' : '加好友' }}
                     </button>
-                    <button class="action-btn report-btn" @click="reportUser(member.userId)">
-                        <img src="@/assets/report.svg" alt="举报" class="action-icon"/>
-                        举报
-                    </button>
+
                     </div>
                     <div class="recent-games">
                     <h5>最近对战</h5>
                     <div class="game-list">
-                        <div v-for="game in userProfile.recentGames"
+                        <div v-for="game in member.recentGames"
                             :key="game.id"
                             class="game-item">
                         <span class="game-result" :class="game.result">
@@ -726,7 +720,9 @@ export default {
           name: ownerProfile.name,
           avatar: ownerProfile.avatar,
           isOnline: ownerProfile.isOnline,
-          stats: ownerProfile.stats
+          stats: ownerProfile.stats,
+          isFriend: ownerProfile.isFriend,
+          userId: ownerProfile.id,
         };
       }
 
@@ -829,8 +825,59 @@ export default {
 
     // 检查是否是好友
     const checkIsFriend = (userId) => {
+      // 首先检查是否是自己
+      if (userId === userProfile.value.userId) {
+        return true;  // 如果是自己，返回true表示"已是好友"状态
+      }
+      // 其他情况检查是否在好友列表中
       return onlineFriends.value.some(friend => friend.id === userId) ||
              offlineFriends.value.some(friend => friend.id === userId);
+    };
+
+    // 显示对话框
+    const showConfirmDialog = (title, message, showConfirm = false, action = '') => {
+      dialogTitle.value = title;
+      dialogMessage.value = message;
+      dialogShowConfirm.value = showConfirm;
+      currentDialogAction.value = action;
+      showDialog.value = true;
+    };
+
+    const sendFriendRequest = async (targetId) => {
+      try {
+        const response = await api.post('/api/accounts/friends/add/',
+            {
+              player: userProfile.value.userId,
+              target: targetId
+            },
+            {
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+
+        if (response.data.status === 'success') {
+          showConfirmDialog('成功', '已发送好友请求');
+          return {
+            success: true,
+            message: '好友请求已发送'
+          };
+        } else {
+          showConfirmDialog('提示', response.data.message);
+          return {
+            success: false,
+            message: response.data.message
+          };
+        }
+      } catch (error) {
+        console.error('发送好友请求失败:', error);
+        showConfirmDialog('错误', error.response?.data?.message || '发送好友请求失败');
+        return {
+          success: false,
+          message: error.response?.data?.message || '发送好友请求失败'
+        };
+      }
     };
 
     // 处理邀请的函数
@@ -910,7 +957,7 @@ export default {
               ? avatarResponse.data.avatar_url
               : require('@/assets/profile-icon.png'),
             isOnline: true, // 这里可以从websocket获取在线状态
-            isFriend: false, // 这里可以从好友列表判断
+            isFriend: checkIsFriend(userId), // 这里可以从好友列表判断
             stats: [
               { label: '游戏场数', value: userData.profile.wins + userData.profile.loses },
               { label: '胜率', value: calculateWinRate(userData.profile.games) },
@@ -1378,6 +1425,8 @@ export default {
 
 
     return {
+      checkIsFriend,
+      sendFriendRequest,
       router,
       showInviteDialog,
       searchResults,

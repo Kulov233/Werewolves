@@ -25,26 +25,26 @@ const routes = [
     path: '/GameInterface',
     name: 'GameInterface',
     component: GameInterface,
-    meta: { requiresAuth: false }
+    meta: { requiresAuth: true }
   },
   {
     path: '/GameLobby',
     name: 'GameLobby',
     component: GameLobby,
-    meta: { requiresAuth: false }
+    meta: { requiresAuth: true }
   },
   {
     path: '/test',
     name: 'test',
     component: test,
-    meta: { requiresAuth: false }
+    meta: { requiresAuth: true }
   },
   {
     path: '/GameRoom/:id?',
     name: 'GameRoom',
     component: Room,
     props: true, // 允许通过 props 传递参数
-    meta: { requiresAuth: false }
+    meta: { requiresAuth: true }
   }
 ];
 

@@ -14,7 +14,7 @@
                 class="avatar0"
                 @click.stop="showPlayerProfile(player.userId, player)"
               />
-              <p>{{ index + 1 }}号{{" "}}{{ player.name }}<span v-if="player.userId === currentPlayer.index"> (你)</span></p>
+              <p>{{ index + 1 }}号{{" "}}{{ player.name }}<span v-if="player.userId === currentPlayer.userId"> (你)</span></p>
               <!-- 添加个人资料卡弹窗 -->
               <transition name="profile">
                 <div v-if="selectedProfileId === player.userId" class="profile-card" @click.stop>
@@ -43,10 +43,6 @@
                             :disabled="selectedProfile.isFriend">
                       <img src="@/assets/addFriend.svg" alt="加好友" class="action-icon"/>
                       {{ selectedProfile.isFriend ? '已是好友' : '加好友' }}
-                    </button>
-                    <button class="action-btn report-btn" @click="reportUser(selectedProfile.userId)">
-                      <img src="@/assets/report.svg" alt="举报" class="action-icon"/>
-                      举报
                     </button>
                   </div>
                   <div class="recent-games">
@@ -132,7 +128,7 @@
                       <div class="message-sender">
                         <p>
                           {{ message.senderid }}号{{" "}}{{ message.sendername }}
-                          <span v-if="message.senderid === currentPlayer.index"> (你)</span>
+                          <span v-if="message.senderid === currentPlayer.userId"> (你)</span>
                         </p>
                       </div>
                     </span>
@@ -240,6 +236,7 @@
       :message="dialogMessage"
       :showConfirm="dialogShowConfirm"
       @confirm="handleDialogConfirm"
+      @cancel="handleDialogCancel"
     />
       <!-- 系统通知组件 -->
       <SystemNotice
@@ -448,6 +445,137 @@ export default {
 
 
   setup() {
+    const onlineFriends = ref( []);
+    const offlineFriends = ref( []);
+
+
+    // 处理弹窗取消
+    const handleDialogCancel = () => {
+      showDialog.value = false;
+    };
+
+    // 检查是否是好友
+    const checkIsFriend = (userId) => {
+      // 统一转换为字符串进行比较
+      const targetId = String(userId);
+
+      // 检查是否是自己
+      if (targetId === String(userProfile.value.userId)) {
+        return true;
+      }
+
+      // 检查好友列表，确保类型一致
+      return onlineFriends.value.some(friend => String(friend.id) === targetId) ||
+             offlineFriends.value.some(friend => String(friend.id) === targetId);
+    };
+
+    // 显示对话框
+    const showConfirmDialog = (title, message, showConfirm = false, action = '') => {
+      dialogTitle.value = title;
+      dialogMessage.value = message;
+      dialogShowConfirm.value = showConfirm;
+      currentDialogAction.value = action;
+      showDialog.value = true;
+    };
+
+    const sendFriendRequest = async (targetId) => {
+      try {
+        const response = await api.post('/api/accounts/friends/add/',
+            {
+              player: userProfile.value.userId,
+              target: targetId
+            },
+            {
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+
+        if (response.data.status === 'success') {
+          showConfirmDialog('成功', '已发送好友请求');
+          return {
+            success: true,
+            message: '好友请求已发送'
+          };
+        } else {
+          showConfirmDialog('提示', response.data.message);
+          return {
+            success: false,
+            message: response.data.message
+          };
+        }
+      } catch (error) {
+        console.error('发送好友请求失败:', error);
+        showConfirmDialog('错误', error.response?.data?.message || '发送好友请求失败');
+        return {
+          success: false,
+          message: error.response?.data?.message || '发送好友请求失败'
+        };
+      }
+    };
+
+    const handleOnlineFriends = (message) => {
+      // 刷新在线好友
+      const onlineList = message.friends;
+      const allFriendsList = [...onlineFriends.value, ...offlineFriends.value];
+      onlineFriends.value = [];
+      offlineFriends.value = [];
+      for (const friend of allFriendsList) {
+        if (onlineList.indexOf(friend.id) !== -1) {
+          // 如果在线
+          friend.lastSeen = "在线";
+          onlineFriends.value.push(friend);
+        } else {
+          friend.lastSeen = "离线";
+          offlineFriends.value.push(friend);
+        }
+      }
+    };
+
+    // 获取好友列表
+    const fetchFriendsList = async () => {
+      try {
+        const response = await api.get('/api/accounts/friends/list/');
+        const friendIds = response.data.friends;
+
+        // 获取每个好友的详细信息
+        const friendsDetails = await Promise.all(
+            friendIds.map(async (friendId) => {
+              try {
+                const userResponse = await api.get(`/api/accounts/public_info/${friendId}/`);
+                const avatarResponse = await api.get(`/api/accounts/avatar/${friendId}/`);
+
+                return {
+                  id: friendId,
+                  name: userResponse.data.username,
+                  avatar: avatarResponse.status === 200
+                      ? avatarResponse.data.avatar_url
+                      : require('@/assets/profile-icon.png'),
+                  status: '在线', // 目前都显示为在线
+                  lastSeen: '在线'
+                };
+              } catch (error) {
+                console.error('获取好友信息失败:', error);
+                return null;
+              }
+            })
+        );
+
+        // 过滤掉获取失败的好友信息
+        onlineFriends.value = friendsDetails.filter(friend => friend !== null);
+        offlineFriends.value = [];
+        // 更新在线状态
+        sendMessage({
+          action: "get_friends"
+        });
+        onType('online_friends', handleOnlineFriends);
+
+      } catch (error) {
+        console.error('获取好友列表失败:', error);
+      }
+    };
+
 
     const { proxy } = getCurrentInstance();
     const $translate = (text) => proxy.$translate(text);
@@ -477,7 +605,7 @@ export default {
           name: player.name,
           avatar: player.avatar,
           isOnline: true,
-          isFriend: false,
+          isFriend: true,
           stats: [
             { label: '身份', value: 'AI玩家' },
           ],
@@ -594,8 +722,9 @@ export default {
 
     
     const currentPlayer = ref({
-      index: "6",
-      name: "apifox",
+      userId: "",      // 添加 userId 字段
+      index: "",       // 游戏中的序号
+      name: "",
       alive: true,
       online: true
     });
@@ -758,11 +887,11 @@ export default {
               ? avatarResponse.data.avatar_url
               : require('@/assets/profile-icon.png'),
             isOnline: true, // 这里可以从websocket获取在线状态
-            isFriend: false, // 这里可以从好友列表判断
+            isFriend: checkIsFriend(userId), // 这里可以从好友列表判断
             stats: [
               { label: '游戏场数', value: userData.profile.wins + userData.profile.loses },
               { label: '胜率', value: calculateWinRate(userData.profile.games) },
-              { label: '评分', value: userData.profile.rating || 0 }
+              //{ label: '评分', value: userData.profile.rating || 0 }
             ],
             recentGames: (userData.profile.recent_games || []).map((game, index) => ({
               id: index.toString(),
@@ -813,11 +942,12 @@ export default {
 
           if (String(userProfile.value.userId) === String(playerId)){
             currentPlayer.value = {
+              userId: playerId,  // 添加 userId
               index: gameData.value.players[playerId].index,
               name: profile.name,
               alive: true,
-              online: true,
-            }
+              online: true
+            };
           }
         }
 
@@ -1336,6 +1466,7 @@ export default {
         // 这里使用游戏房间的连接，而不是大厅连接
         connectToGame(roomId);
       }
+      fetchFriendsList();
 
     });
 
@@ -1352,6 +1483,7 @@ export default {
 
 
     return{
+      sendFriendRequest,
       selectedProfileId,
       selectedProfile,
       showPlayerProfile,
@@ -1381,6 +1513,7 @@ export default {
       currentNotification,
       closeNotification,
       handleDialogConfirm,
+      handleDialogCancel,
       showDialog,
       dialogTitle,
       dialogMessage,

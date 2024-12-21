@@ -396,10 +396,6 @@
               <span class="stat-number">{{userProfile.stats[1].value}}</span>
               <span class="stat-label">胜率</span>
             </div>
-            <div class="stat-card">
-              <span class="stat-number">{{avgRating}}</span>
-              <span class="stat-label">平均评分</span>
-            </div>
 
           </div>
 
@@ -577,10 +573,6 @@
                                 :disabled="selectedProfile.isFriend">
                           <img src="@/assets/addFriend.svg" alt="加好友" class="action-icon"/>
                           {{ selectedProfile.isFriend ? '已是好友' : '加好友' }}
-                        </button>
-                        <button class="action-btn report-btn" @click="reportUser(selectedProfile.userId)">
-                          <img src="@/assets/report.svg" alt="举报" class="action-icon"/>
-                          举报
                         </button>
                       </div>
                       <div class="recent-games">
@@ -911,42 +903,6 @@ export default {
       timeFilter: 'all',
       resultFilter: 'all',
       timeSort: 'desc', // 新增：默认从近到远排序
-      gameHistory: [
-        {
-          id: 1,
-          result: 'win',
-          date: '2024-12-15 14:30',
-          roleIcon: require('@/assets/wolf.svg'),
-          role: 'Werewolf',
-          rating: 4.9,
-          duration: '25分钟',
-          goodTeam: [
-            { id: 1, name: '玩家1', avatar: require('@/assets/profile-icon.png') },
-            { id: 2, name: '玩家2', avatar: require('@/assets/profile-icon.png') }
-          ],
-          badTeam: [
-            { id: 3, name: '玩家3', avatar: require('@/assets/profile-icon.png') },
-            { id: 4, name: '玩家4', avatar: require('@/assets/profile-icon.png') }
-          ]
-        },
-        {
-          id: 2,
-          result: 'lose',
-          date: '2024-12-07 13:15',
-          roleIcon: require('@/assets/villager.svg'),
-          role: 'Villager',
-          rating: 4.7,
-          duration: '30分钟',
-          goodTeam: [
-            { id: 5, name: '玩家5', avatar: require('@/assets/profile-icon.png') },
-            { id: 6, name: '玩家6', avatar: require('@/assets/profile-icon.png') }
-          ],
-          badTeam: [
-            { id: 7, name: '玩家7', avatar: require('@/assets/profile-icon.png') },
-            { id: 8, name: '玩家8', avatar: require('@/assets/profile-icon.png') }
-          ]
-        }
-      ],
 
       showNoResultsMessage: false,
       filteredRooms: [],
@@ -1383,13 +1339,13 @@ export default {
     };
 
     const checkIsFriend = (userId) => {
-      if (onlineFriends.value.some(friend => friend.id === userId)) {
-        return true;
+      // 首先检查是否是自己
+      if (userId === userProfile.value.userId) {
+        return true;  // 如果是自己，返回true表示"已是好友"状态
       }
-      //if (offlineFriends.value.some(friend => friend.id === userId)) {
-      //  return true;
-      //}
-      return false;
+      // 其他情况检查是否在好友列表中
+      return onlineFriends.value.some(friend => friend.id === userId) ||
+             offlineFriends.value.some(friend => friend.id === userId);
     };
 
     const handleSearch = async (keyword) => {
@@ -1596,6 +1552,8 @@ export default {
 
           // 清空 localStorage
           localStorage.clear();
+          localStorage.removeItem('isLoggedIn');
+          localStorage.removeItem('lastPath');
 
           // 回到登录界面
           router.push('/login');
@@ -1641,11 +1599,24 @@ export default {
 
         // 如果已经在房间中，直接跳转到房间页面
         if (isInRoom(roomId)) {
-          router.push({
-            name: 'GameRoom',
-            params: { id: roomId }
-          });
-          return;
+          // 获取当前房间数据
+          const currentRoom = Rooms.value.find(r => r.id === roomId);
+          if (currentRoom) {
+            // 更新当前房间ID
+            currentRoomID.value = roomId;
+            localStorage.setItem('currentRoomID', roomId);
+
+            // 存储房间数据和用户信息到 Vuex
+            await store.dispatch('saveRoomData', currentRoom);
+            await store.dispatch('saveUserProfile', userProfile.value);
+            await store.dispatch('saveOnlineFriends', onlineFriends.value);
+            await store.dispatch('saveOfflineFriends', offlineFriends.value);
+            router.push({
+              name: 'GameRoom',
+              params: {id: roomId}
+            });
+            return;
+          }
         }
 
         // 发送加入房间的 websocket 消息
@@ -2451,6 +2422,7 @@ export default {
         this.showHistorySidebar = !this.showHistorySidebar;
         this.showMenuSidebar = false;
         this.showFriendsSidebar = false;
+
       } else if (type === 'invites') {
       this.showInvitesSidebar = !this.showInvitesSidebar;
       this.showMenuSidebar = false;
@@ -2465,6 +2437,7 @@ export default {
       this.closeHistorySidebar();
       this.closePlayerDetails();
       this.closeHistory();
+      this.showInvitesSidebar = false;
     },
 
     closeMenuSidebar() {
@@ -2949,7 +2922,6 @@ export default {
   border-radius: 50%;
   background: transparent;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  overflow: hidden;
 }
 
 .header-actions .icon-btn::before {
@@ -3548,7 +3520,7 @@ export default {
 /* 历史记录侧边栏 */
 .stats-cards {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 12px;
   padding: 20px;
   background: #f8f9fa;
@@ -4417,7 +4389,7 @@ export default {
 
 .profile-actions {
   display: flex;
-  gap: 8px;
+  justify-content: center;
   margin-bottom: 16px;
 }
 

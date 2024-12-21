@@ -1,15 +1,5 @@
 <template>
   <div id="app">
-    <nav class="navigation">
-      <router-link 
-        v-for="route in navigationRoutes" 
-        :key="route.path"
-        :to="route.path"
-        class="nav-link"
-        active-class="active">
-        {{ route.label }}
-      </router-link>
-    </nav>
 
     <!-- 添加加载状态指示器 -->
     <div v-if="isLoading" class="loading-overlay">
@@ -33,6 +23,7 @@
   </div>
 </template>
 
+
 <script>
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
@@ -43,7 +34,6 @@ export default {
   setup() {
     const router = useRouter();
     const isLoading = ref(false);
-    // 定义需要缓存的组件名称列表
     const cachedViews = ref(['GameLobby', 'GameRoom', 'GameInterface']);
 
     const navigationRoutes = [
@@ -55,9 +45,34 @@ export default {
       { path: '/test', label: '测试页面' },
     ];
 
+    // 检查登录状态
+    const checkLoginStatus = () => {
+      // 从localStorage获取登录状态
+      const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+      //const lastPath = localStorage.getItem('lastPath');
+
+      if (!isLoggedIn) {
+        // 未登录时重定向到登录页
+        router.replace('/login');
+      } //else if (lastPath && lastPath !== '/login' && lastPath !== '/register') {
+        //// 已登录且存在上次访问路径时，跳转到上次访问的路径
+        //router.replace(lastPath);
+      //}
+      else {
+        // 已登录但没有上次访问路径时，跳转到大厅
+        router.replace('/GameLobby');
+      }
+    };
+
     // 优化路由加载处理
     router.beforeEach(async (to, from, next) => {
       isLoading.value = true;
+
+      // 保存当前路径（排除登录和注册页面）
+      if (to.path !== '/login' && to.path !== '/register') {
+        localStorage.setItem('lastPath', to.path);
+      }
+
       // 确保组件加载完成
       if (to.matched.length) {
         try {
@@ -77,23 +92,18 @@ export default {
     });
 
     router.afterEach(() => {
-      // 减少延迟时间
       setTimeout(() => {
         isLoading.value = false;
       }, 100);
     });
 
-    // 处理组件激活事件
     const handleActivated = () => {
       isLoading.value = false;
     };
 
     onMounted(() => {
-      // 确保初始路由正确加载
-      const currentRoute = router.currentRoute.value;
-      if (currentRoute.name) {
-        router.replace(currentRoute);
-      }
+      // 在组件挂载时检查登录状态
+      checkLoginStatus();
     });
 
     return {
