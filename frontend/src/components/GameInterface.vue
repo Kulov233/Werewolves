@@ -110,10 +110,10 @@
       <GamePhase :phase="$translate(gameData.current_phase)" />
         <div class="chat-box" ref="chatBox" @scroll="handleScroll">
           <div class="chat-messages">
-            <div  v-for="message in messages" :key="message.senderid"
-                   :class="['message', { 'system-message': message.senderid === 0 }]">
+            <div  v-for="message in messages" :key="message.senderindex"
+                   :class="['message', { 'system-message': message.senderindex === 0 }]">
                 <!-- 系统消息使用不同的样式 -->
-                <template v-if="message.senderid === 0">
+                <template v-if="message.senderindex === 0">
                   <div class="system-message-content">
                     <div class="system-message-text">{{ message.text }}</div>
                   </div>
@@ -127,8 +127,8 @@
                     <span class="recipient-label">
                       <div class="message-sender">
                         <p>
-                          {{ message.senderid }}号{{" "}}{{ message.sendername }}
-                          <span v-if="message.senderid === currentPlayer.userId"> (你)</span>
+                          {{ message.senderindex }}号{{" "}}{{ message.sendername }}
+                          <span v-if="message.senderindex === currentPlayer.userId"> (你)</span>
                         </p>
                       </div>
                     </span>
@@ -425,8 +425,6 @@ export default {
       showMenuSidebar: false, // 控制侧边栏的显示与否
       showFriendsSidebar: false,
       showHistorySidebar: false,
-
-      isDead: false, // 当前玩家是否死亡
 
       playerDetailsTop: 0,  // 玩家详情框的top位置
       playerDetailsLeft: 0,  // 玩家详情框的left位置
@@ -741,8 +739,9 @@ export default {
     const confirmed = ref(false);
     const isDayTime = ref(true);
     // 当前为你的发言阶段
-    // TODO: 允许发言
     const talkStart = ref(false);
+    // 你是否死亡
+    const isDead = ref(false);
 
     const currentNotification = ref(null);  // 当前显示的通知
 
@@ -750,7 +749,7 @@ export default {
     function sendSystemMessage(content) {
       // 创建聊天消息
       const chatMessage = {
-        senderid: 0,
+        senderindex: 0,
         sendername: "系统信息: ",
         avatar: require('@/assets/head.png'),
         text: content,
@@ -851,6 +850,7 @@ export default {
           sendNotification("你在这个晚上被杀死了", "death",
               "接下来你可以与其他死亡玩家聊天，静待阵营胜利");
           talkStart.value = true;
+          isDead.value = true;
         }
       }
     }
@@ -1006,7 +1006,7 @@ export default {
     const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
     // 投票用工具函数
-    async function select(title, content, time, players, alive_as_target = false) {
+    async function select(title, content, time, players, alive_as_target = false, select_self = false) {
       // players: List[str], str为序号
       selectablePhaseAction.value = content;
 
@@ -1014,7 +1014,7 @@ export default {
       if (alive_as_target){  // 选择所有活着的人，除了自己
         for (const player of [...Object.values(gameData.value.players), ...Object.values(gameData.value.ai_players)]){
 
-          if (player.alive && player.index !== currentPlayer.value.index){
+          if (player.alive && ((player.index !== currentPlayer.value.index) || select_self)){
             selectableIndices.value.push(Number(player.index));
           }
         }
@@ -1089,7 +1089,7 @@ export default {
       if (gameData.value.current_phase === "Werewolf" && roleInfo.value.role === "Werewolf") {
         // 这里可能会被执行多次，所以要保证时间不会过长
         const killVoteTarget = await select("选择要杀死的目标", "杀死",
-            gameData.value.phase_timer[gameData.value.current_phase] - timeElapsed.value, null, true);
+            gameData.value.phase_timer[gameData.value.current_phase] - timeElapsed.value, null, true, true);
         handleKillVote(killVoteTarget);
       }
     }
@@ -1286,7 +1286,7 @@ export default {
       const speaker = [...Object.values(players.value), ...Object.values(aiPlayers.value)][Number(message.source) - 1]
 
       const newMessage = {
-        senderid: Number(message.source),
+        senderindex: Number(message.source),
         sendername: speaker.name,
         avatar: speaker.avatar,
         text: message.message,
@@ -1301,7 +1301,7 @@ export default {
       const speaker = [...Object.values(players.value), ...Object.values(aiPlayers.value)][Number(message.source) - 1]
 
       const newMessage = {
-        senderid: Number(message.source),
+        senderindex: Number(message.source),
         sendername: speaker.name,
         avatar: speaker.avatar,
         text: message.message,
@@ -1351,6 +1351,7 @@ export default {
           sendNotification("你在这个白天死去了", "death",
           "接下来你可以与其他死亡玩家聊天，静待阵营胜利");
           talkStart.value = true;
+          isDead.value = true;
         }
       }
     }
@@ -1489,6 +1490,7 @@ export default {
       showPlayerProfile,
 
       talkStart,
+      isDead,
       messages,
       isGameConnected,
       isLobbyConnected,
@@ -1534,13 +1536,7 @@ export default {
         ? require('@/assets/sun.svg')
         : require('@/assets/night.svg');
     },
-     // 过滤消息，确保死亡玩家可以看到所有消息，活着的玩家不能看到死亡者的消息
-    filteredMessages() {
-      if (this.isDead) {
-        return this.messages;
-      }
-      return this.messages.filter(msg => msg.recipients !== 'dead');
-    },
+
     formattedTime() {
       const minutes = Math.floor(this.timerSeconds / 60);
       const seconds = this.timerSeconds % 60;
@@ -1651,7 +1647,7 @@ export default {
         // 只有在自己的阶段才能说话
         // 创建消息对象
         // const newMessage = {
-        //   senderid: this.currentPlayer.index, // 假设当前玩家是“你”
+        //   senderindex: this.currentPlayer.index, // 假设当前玩家是“你”
         //   sendername: this.currentPlayer.name,
         //   avatar: require('@/assets/head.png'),
         //   text: this.userMessage,
@@ -1661,14 +1657,20 @@ export default {
         // 将消息推送到消息列表
         // 这里先不推了，等到服务器正常返回更新的时候再推上去
         // this.messages.push(newMessage);
-        this.sendMessage({
-          type: "talk_content",
-          content: this.userMessage,
-        }, "game")
-
+        if (this.isDead){
+          this.sendMessage({
+            type: "talk_content_dead",
+            content: this.userMessage,
+          }, "game")
+        }
+        else {
+          this.sendMessage({
+            type: "talk_content",
+            content: this.userMessage,
+          }, "game")
+        }
         // 清空输入框
         this.userMessage = "";
-
       }
     },
 
@@ -1705,13 +1707,7 @@ export default {
         window.scrollTo(0, 0);
       }
     },
-    isDead(newVal) {
-      if (newVal) {
-        this.messageRecipient = "dead"; // 死亡玩家自动选择“死亡”频道
-      } else {
-        this.messageRecipient = "all";  // 活着的玩家可以选择所有人频道
-      }
-    },
+
   }
 };
 </script>
