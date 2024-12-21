@@ -7,7 +7,7 @@
     </div>
 
     <!-- 修改路由视图处理 -->
-    <div class="router-view-container">
+    <div :class="['router-view-container', { 'no-padding': $route.path === '/GameInterface' }]">
       <router-view v-slot="{ Component, route }">
         <transition name="fade" mode="out-in">
           <keep-alive :include="cachedViews">
@@ -186,7 +186,11 @@ export default {
 }
 
 .router-view-container {
-  padding-top: 80px;
+  padding-top: 2.5%;
+}
+
+.router-view-container.no-padding {
+  padding-top: 0;
 }
 
 .fade-enter-active,
