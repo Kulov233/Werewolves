@@ -2986,4 +2986,193 @@ textarea.setting-control {
   color: #2563eb;
   font-weight: 500;
 }
+
+:root {
+  --base-unit: min(1vh, 1vw);
+  --min-width: 320px;
+  --max-width: 1920px;
+}
+
+/* 顶部工具栏 */
+.top-bar {
+  height: min(5vh, 60px);
+  min-height: 40px;
+  padding: min(10px, 1vw) min(20px, 2vw);
+}
+
+.icon-button {
+  margin-right: min(20px, 2vw);
+}
+
+/* 侧边栏 */
+.sidebar {
+  width: min(250px, 25vw);
+  min-width: 200px;
+  padding: min(20px, 2vw);
+}
+
+/* 房间容器 */
+.room-container {
+  padding: min(20px, 2vw);
+  gap: min(20px, 2vw);
+}
+
+/* 玩家头像和信息 */
+.player-avatar img {
+  width: min(64px, 6vw);
+  height: min(64px, 6vw);
+  min-width: 48px;
+  min-height: 48px;
+}
+
+.host-avatar img {
+  width: min(80px, 8vw);
+  height: min(80px, 8vw);
+  min-width: 60px;
+  min-height: 60px;
+}
+
+.members-grid {
+  gap: min(20px, 2vw);
+  padding: min(16px, 1.5vw);
+}
+
+/* 按钮样式 */
+.action-btn {
+  padding: min(12px, 1.2vw);
+  gap: min(8px, 0.8vw);
+  min-height: 40px;
+}
+
+.start-game-btn {
+  padding: min(16px, 1.5vw);
+  font-size: min(18px, 1.8vw);
+}
+
+/* 好友列表 */
+.friends-list {
+  width: min(400px, 30vw);
+  min-width: 280px;
+  padding: min(24px, 2.4vw);
+}
+
+.friend-avatar img {
+  width: min(48px, 4.8vw);
+  height: min(48px, 4.8vw);
+  min-width: 36px;
+  min-height: 36px;
+}
+
+/* 创建房间面板 */
+.create-room {
+  width: min(400px, 40vw);
+  min-width: 300px;
+  padding: min(24px, 2.4vw);
+}
+
+/* 标题和文本大小 */
+.room-title {
+  font-size: min(32px, 3.2vw);
+}
+
+.room-description {
+  font-size: min(16px, 1.6vw);
+}
+
+.section-title {
+  font-size: min(20px, 2vw);
+}
+
+/* 个人资料卡 */
+.profile-card {
+  width: min(240px, 25vw);
+  min-width: 200px;
+}
+
+.large-avatar {
+  width: min(80px, 8vw) !important;
+  height: min(80px, 8vw) !important;
+  min-width: 60px !important;
+  min-height: 60px !important;
+}
+
+/* 角色配置部分 */
+.role-count-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(120px, 15vw), 1fr));
+  gap: min(12px, 1.2vw);
+}
+
+/* 女巫道具部分 */
+.witch-items-grid {
+  gap: min(16px, 1.6vw);
+}
+
+/* 按钮和图标大小 */
+.action-icon {
+  width: min(14px, 1.4vw);
+  height: min(14px, 1.4vw);
+  min-width: 12px;
+  min-height: 12px;
+}
+
+.btn-icon {
+  width: min(20px, 2vw);
+  height: min(20px, 2vw);
+  min-width: 16px;
+  min-height: 16px;
+}
+
+/* 响应式布局调整 */
+@media (max-width: 768px) {
+  .room-container {
+    flex-direction: column;
+  }
+
+  .friends-list {
+    width: 100%;
+  }
+
+  .create-room {
+    width: 100%;
+  }
+
+  .role-count-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .witch-items-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 确保内容不会过小 */
+.setting-control {
+  min-height: min(40px, 4vh);
+  padding: min(10px, 1vw);
+}
+
+textarea.setting-control {
+  min-height: min(80px, 8vh);
+}
+
+.form-group {
+  margin-bottom: min(20px, 2vh);
+}
+
+/* 动作按钮最小尺寸 */
+.invite-btn {
+  min-height: 36px;
+  padding: min(8px, 0.8vw) min(16px, 1.6vw);
+}
+
+.refresh-btn {
+  min-width: 32px;
+  min-height: 32px;
+}
+
+/* 设置面板间距 */
+.settings-section {
+  padding: min(20px, 2vw);
+  margin-bottom: min(24px, 2.4vh);
+}
 </style>
