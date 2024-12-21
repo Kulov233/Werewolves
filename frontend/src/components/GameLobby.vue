@@ -2480,7 +2480,7 @@ export default {
 };
 </script>
 
-  <style scoped>
+<style scoped>
 
 /* 横向工具栏样式 */
 .top-bar {
@@ -4886,4 +4886,124 @@ textarea.text-input {
   background-color: #3a8ee6;
 }
 
-  </style>
+
+/* 添加响应式布局和最小尺寸控制 */
+/* 顶部工具栏的最小高度控制 */
+.top-bar {
+  min-height: 48px;
+  max-height: 64px;
+}
+
+/* 搜索栏响应式布局 */
+.search-bar {
+  min-width: 280px;
+  max-width: 800px;
+  min-height: 40px;
+}
+
+/* 房间卡片最小尺寸控制 */
+.room-card {
+  min-width: 280px;
+  min-height: 200px;
+  max-width: 400px;
+}
+
+/* 侧边栏最小宽度控制 */
+.sidebar {
+  min-width: 250px;
+  max-width: 400px;
+}
+
+/* 创建房间面板尺寸控制 */
+.create-room {
+  min-width: 320px;
+  max-width: 500px;
+  min-height: 400px;
+}
+
+/* 个人资料卡片尺寸控制 */
+.profile-card {
+  min-width: 200px;
+  max-width: 300px;
+}
+
+/* 统一图标尺寸控制 */
+.icon, .action-icon, .info-icon {
+  min-width: 16px;
+  min-height: 16px;
+  max-width: 32px;
+  max-height: 32px;
+}
+
+/* 按钮最小尺寸控制 */
+.join-button, .create-room-button, .action-btn {
+  min-height: 36px;
+  min-width: 80px;
+}
+
+/* 文本输入框最小尺寸 */
+.text-input, .select-input {
+  min-height: 36px;
+  min-width: 200px;
+}
+
+/* 使用相对单位的全局设置 */
+html {
+  font-size: 16px; /* 基准字体大小 */
+}
+
+body {
+  min-width: 320px; /* 移动设备最小宽度 */
+}
+
+/* 响应式字体大小 */
+h2 {
+  font-size: clamp(1.2rem, 2vw, 1.5rem);
+}
+
+h3 {
+  font-size: clamp(1rem, 1.5vw, 1.2rem);
+}
+
+p, span, div {
+  font-size: clamp(0.875rem, 1vw, 1rem);
+}
+
+/* 响应式布局断点 */
+@media screen and (max-width: 768px) {
+  .room-cards {
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  }
+
+  .search-bar {
+    width: 90%;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .room-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    width: 100%;
+  }
+}
+
+/* 确保模态框和弹出层始终可见 */
+.modal, .popup {
+  min-width: 280px;
+  max-width: 90vw;
+  min-height: 200px;
+  max-height: 90vh;
+}
+
+/* 防止内容溢出 */
+* {
+  max-width: 100%;
+  box-sizing: border-box;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+</style>
