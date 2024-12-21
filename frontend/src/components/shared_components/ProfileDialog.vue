@@ -84,9 +84,8 @@
           <div v-else class="password-form">
             <div class="form-section">
               <label>当前密码</label>
-              <input
-                v-model="currentPassword"
-                type="password"
+              <a-input-password
+                v-model:value="currentPassword"
                 placeholder="输入当前密码"
                 class="form-input"
               />
@@ -94,9 +93,8 @@
 
             <div class="form-section">
               <label>新密码</label>
-              <input
-                v-model="newPassword"
-                type="password"
+              <a-input-password
+                v-model:value="newPassword"
                 placeholder="输入新密码"
                 class="form-input"
               />
@@ -104,9 +102,8 @@
 
             <div class="form-section">
               <label>确认新密码</label>
-              <input
-                v-model="confirmPassword"
-                type="password"
+              <a-input-password
+                v-model:value="confirmPassword"
                 placeholder="再次输入新密码"
                 class="form-input"
               />
@@ -250,7 +247,7 @@ export default {
       }
 
       emit('update-password', {
-        currentPassword: currentPassword.value,
+        oldPassword: currentPassword.value,
         newPassword: newPassword.value
       });
 
@@ -663,4 +660,29 @@ export default {
 .profile-dialog {
   transition: transform 0.3s ease;
 }
+
+/* 密码输入框样式 */
+:deep(.ant-input-password) {
+  background-color: var(--input-bg, #fff);
+  border-radius: 6px;
+}
+
+:deep(.ant-input-password input) {
+  background-color: var(--input-bg, #fff);
+  color: var(--input-color, #000);
+}
+
+:deep(.ant-input-password-icon) {
+  color: var(--svg-color, #333);
+}
+
+:deep(.ant-input-password:hover) {
+  border-color: #409eff;
+}
+
+:deep(.ant-input-password:focus-within) {
+  border-color: #409eff;
+  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2);
+}
+
 </style>

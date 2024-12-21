@@ -94,15 +94,28 @@
           />
       </a-button>
     </a-col>
+      <ConfirmDialog
+      :show="showDialog"
+      :title="dialogTitle"
+      :message="dialogMessage"
+      :showConfirm="dialogShowConfirm"
+      @confirm="handleDialogConfirm"
+      @cancel="handleDialogCancel"
+    />
   </a-row>
+
+
 
 </template>
 
 <script setup>
-import { onMounted, ref } from "vue";
+
+import {onMounted, ref} from "vue";
 import { reactive, computed } from 'vue';
 import { useRouter } from 'vue-router';
+
 import axios from 'axios';
+import ConfirmDialog from "@/components/shared_components/ConfirmDialog.vue";
 
 // 控制主题的状态
 let isDarkMode = false; // 默认是白色主题
@@ -160,7 +173,7 @@ function draw() {
   canvas.height = canvas_height;
   // 字符集
   var sCode =
-    "A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z,1,2,3,4,5,6,7,8,9,0,q,w,e,r,t,y,u,i,o,p,a,s,d,f,g,h,j,k,l,z,x,c,v,b,n,m";
+    "A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z,q,w,e,r,t,y,u,i,o,p,a,s,d,f,g,h,j,k,l,z,x,c,v,b,n,m";
   var aCode = sCode.split(",");
   var aLength = aCode.length; // 获取到数组的长度
   for (let i = 0; i <= 3; i++) { // 使用 let 声明 i
@@ -221,7 +234,6 @@ function draw() {
   }
 
   yanma.value = show_num.join("");
-  alert(yanma.value)
   return show_num;
 }
 
@@ -242,6 +254,41 @@ const formErrors = reactive({
 });
 
 
+// 弹窗相关的状态
+const showDialog = ref(false);
+const dialogTitle = ref('');
+const dialogMessage = ref('');
+const dialogShowConfirm = ref(true);
+const currentDialogAction = ref('');
+ // 显示对话框
+const showConfirmDialog = async(title, message, showConfirm = false, action = '') => {
+  dialogTitle.value = title;
+  dialogMessage.value = message;
+  dialogShowConfirm.value = showConfirm;
+  currentDialogAction.value = action;
+  showDialog.value = true;
+};
+
+const handleDialogConfirm = async () => {
+  showDialog.value = false;
+  if (currentDialogAction.value === "confirm_login") {
+    router.push("/GameLobby");
+  }
+  currentDialogAction.value = '';
+};
+
+// 处理对话框取消
+const handleDialogCancel = async () => {
+  showDialog.value = false;
+  if (currentDialogAction.value === "confirm_login") {
+    router.push("/GameLobby");
+  }
+  currentDialogAction.value = '';
+};
+
+
+
+
 
 const resetUsernameOrEmailState = () => {
   formStatus.username_or_email = '';
@@ -259,8 +306,8 @@ const disabled = computed(() => {
 
 const onFinish = async (values) => {
   // 验证码验证
-  if (ver_code.value !== yanma.value) {
-    alert("验证码错误！");
+  if (ver_code.value.toUpperCase() !== yanma.value.toUpperCase()) {
+    await showConfirmDialog("验证码错误！", "");
     return;
   }
   try {
@@ -269,14 +316,13 @@ const onFinish = async (values) => {
       password: values.password,
     });
 
-    const { access, refresh, message } = response.data;
-    console.log(message);
+    const { access, refresh } = response.data;
 
     localStorage.setItem("access_token", access);
     localStorage.setItem("refresh_token", refresh);
+    localStorage.setItem('isLoggedIn', 'true');
 
-    alert("登录成功！");
-    router.push("/GameLobby");
+    await showConfirmDialog("登录成功！", "", true, "confirm_login");
   } catch (error) {
     if (error.response && error.response.status === 401) {
       const errors = error.response.data;
@@ -285,7 +331,7 @@ const onFinish = async (values) => {
         formErrors[field] = message;
       }
     } else {
-      alert("发生错误，请稍后再试。");
+      await showConfirmDialog("发生错误，请稍后再试。", "");
     }
   }
 };

@@ -96,25 +96,28 @@ export default {
   props: {
     seconds: {
       type: Number,
-      required: true
+      required: true,
+      default: 0,
     },
     initialSeconds: {
       type: Number,
-      required: true
+      required: true,
+      default: 1 ,
     }
   },
   computed: {
     formattedMinutes() {
-      const minutes = Math.floor(this.seconds / 60);
+      const minutes = Math.floor(Math.max(0, this.seconds) / 60);
       return String(minutes).padStart(2, '0');
     },
     formattedSeconds() {
-      const remainingSeconds = this.seconds % 60;
+      const remainingSeconds = Math.max(0, this.seconds) % 60;
       return String(remainingSeconds).padStart(2, '0');
     },
     progressWidth() {
-      const progress = this.seconds / this.initialSeconds;
-      return 252 * progress;
+      if (!this.initialSeconds) return 0;
+      const progress = Math.max(0, Math.min(1, this.seconds / this.initialSeconds));
+      return Math.max(0, Math.min(292, 292 * progress));
     }
   }
 }

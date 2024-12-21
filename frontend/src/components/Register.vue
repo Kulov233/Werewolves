@@ -93,13 +93,24 @@
           />
       </a-button>
     </a-col>
+
+    <ConfirmDialog
+    :show="showDialog"
+    :title="dialogTitle"
+    :message="dialogMessage"
+    :showConfirm="dialogShowConfirm"
+    @confirm="handleDialogConfirm"
+    @cancel="handleDialogCancel"
+  />
   </a-row>
+
 </template>
 
 <script setup>
 import axios from "axios";
-import {computed, reactive} from "vue";
+import {computed, reactive, ref} from "vue";
 import { useRouter } from 'vue-router';
+import ConfirmDialog from "@/components/shared_components/ConfirmDialog.vue";
 const router = useRouter();
 
 // 控制主题的状态
@@ -133,6 +144,39 @@ const toggleTheme = () => {
     
   }
 };
+
+// 弹窗相关的状态
+const showDialog = ref(false);
+const dialogTitle = ref('');
+const dialogMessage = ref('');
+const dialogShowConfirm = ref(true);
+const currentDialogAction = ref('');
+ // 显示对话框
+const showConfirmDialog = async (title, message, showConfirm = false, action = '') => {
+  dialogTitle.value = title;
+  dialogMessage.value = message;
+  dialogShowConfirm.value = showConfirm;
+  currentDialogAction.value = action;
+  showDialog.value = true;
+};
+
+const handleDialogConfirm = async () => {
+  showDialog.value = false;
+  if (currentDialogAction.value === "register_success") {
+    router.push("/login");
+  }
+  currentDialogAction.value = '';
+};
+
+// 处理对话框取消
+const handleDialogCancel = async () => {
+  showDialog.value = false;
+  if (currentDialogAction.value === "register_success") {
+    router.push("/login");
+  }
+  currentDialogAction.value = '';
+};
+
 
 const goToLogin = () => {
   router.push('/login');
@@ -204,7 +248,7 @@ const onFinish = async (values) => {
     const response = await axios.post("http://localhost:8000/api/accounts/register/", requestData);
 
     // 注册成功的响应
-    alert(response.data.message || "注册成功！");
+    await showConfirmDialog(response.data.message || "注册成功！", "", "register_success");
     // 清空表单
     Object.keys(formState).forEach(key => formState[key] = "");
     Object.keys(formStatus).forEach(key => formStatus[key] = "");
@@ -224,7 +268,7 @@ const onFinish = async (values) => {
       }
     } else {
       // 其他错误，例如网络错误
-      alert("发生错误，请稍后再试。");
+      showConfirmDialog("发生错误，请稍后再试。", "");
     }
   }
 };

@@ -2,56 +2,6 @@
     <div class="game-container"
          @click="closeALL">
 
-  
-      <!-- 顶部菜单栏 -->
-      <div class="top-bar">
-        <button class="icon-button left" @click.stop="toggleSidebar('menu')">
-          <img class="icon" src="@/assets/menu.svg" alt="Menu" />
-        </button>
-        <!-- 右侧按钮组 -->
-        <div class="right-buttons">
-          <button class="icon-button" @click.stop="toggleSidebar('friends')">
-            <img class="icon" src="@/assets/friends.svg" alt="Friends" />
-          </button>
-          <button class="icon-button" @click.stop="toggleSidebar('history')">
-            <img class="icon" src="@/assets/history.svg" alt="History" />
-          </button>
-        </div>
-      </div>
-
-      <!-- 左侧滑出菜单 -->
-      <transition name="slide-left">
-        <div v-if="showMenuSidebar" class="sidebar menu-sidebar" @click.stop>
-          <div class="sidebar-content">
-            <h3>菜单内容</h3>
-            <p>这里是一些内容。</p>
-            <button @click="toggleSidebar('menu')">关闭</button>
-          </div>
-        </div>
-      </transition>
-
-      <!-- 右侧滑出菜单 Friends -->
-      <transition name="slide-right">
-        <div v-if="showFriendsSidebar" class="sidebar friends-sidebar" @click.stop>
-          <div class="sidebar-content">
-            <h3>朋友列表</h3>
-            <p>这里显示朋友的信息。</p>
-            <button @click="toggleSidebar('friends')">关闭</button>
-          </div>
-        </div>
-      </transition>
-
-      <!-- 右侧滑出菜单 History -->
-      <transition name="slide-right">
-        <div v-if="showHistorySidebar" class="sidebar history-sidebar" @click.stop>
-          <div class="sidebar-content">
-            <h3>历史记录</h3>
-            <p>这里显示历史记录信息。</p>
-            <button @click="toggleSidebar('history')">关闭</button>
-          </div>
-        </div>
-      </transition>
-
       <!-- 左侧玩家列表 -->
       <div class="player-list" v-if="Boolean(players && aiPlayers)">
         <!-- 使用 Object.values() 将对象的值转换为数组，并确保通过 .value 访问 ref 的值 -->
@@ -62,10 +12,54 @@
                 :src="player.avatar"
                 alt="avatar"
                 class="avatar0"
-                @click.stop="showPlayerDetails(player, $event)"
+                @click.stop="showPlayerProfile(player.userId, player)"
               />
-              <p>{{ index + 1 }}号{{" "}}{{ player.name }}<span v-if="player.userId === currentPlayer.index"> (你)</span></p>
-
+              <p>{{ index + 1 }}号{{" "}}{{ player.name }}<span v-if="player.userId === currentPlayer.userId"> (你)</span></p>
+              <!-- 添加个人资料卡弹窗 -->
+              <transition name="profile">
+                <div v-if="selectedProfileId === player.userId" class="profile-card" @click.stop>
+                  <div class="profile-header">
+                     <img :src="selectedProfile.avatar"
+                        alt="头像"
+                        class="large-avatar"/>
+                    <div class="profile-info">
+                      <h4>{{ selectedProfile.name }}</h4>
+                      <span class="profile-status" :class="{'online': selectedProfile.isOnline}">
+                        {{ selectedProfile.isOnline ? '在线' : '离线' }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="profile-stats">
+                    <div v-for="(stat, index) in selectedProfile.stats"
+                        :key="index"
+                        class="stat-item">
+                      <span class="stat-value">{{ stat.value }}</span>
+                      <span class="stat-label">{{ stat.label }}</span>
+                    </div>
+                  </div>
+                  <div class="profile-actions">
+                    <button class="action-btn add-friend-btn"
+                            @click="sendFriendRequest(selectedProfile.userId)"
+                            :disabled="selectedProfile.isFriend">
+                      <img src="@/assets/addFriend.svg" alt="加好友" class="action-icon"/>
+                      {{ selectedProfile.isFriend ? '已是好友' : '加好友' }}
+                    </button>
+                  </div>
+                  <div class="recent-games">
+                    <h5>最近对战</h5>
+                    <div class="game-list">
+                      <div v-for="game in selectedProfile.recentGames"
+                          :key="game.id"
+                          class="game-item">
+                        <span class="game-result" :class="game.result">
+                          {{ game.result === 'win' ? '胜利' : '失败' }}
+                        </span>
+                        <span class="game-date">{{ game.date }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </transition>
               <!-- 同步目标显示 -->
               <div class="sync-targets-wrapper" v-if="syncTargets[String(index + 1)]">
                 <div class="sync-targets-content">
@@ -113,13 +107,13 @@
       <!-- 中间聊天框 -->
       <div class="chat-section">
         <!-- 当前阶段显示 -->
-      <GamePhase :phase="gameData.current_phase" />
+      <GamePhase :phase="$translate(gameData.current_phase)" />
         <div class="chat-box" ref="chatBox" @scroll="handleScroll">
           <div class="chat-messages">
-            <div  v-for="message in messages" :key="message.senderid"
-                   :class="['message', { 'system-message': message.senderid === 0 }]">
+            <div  v-for="message in messages" :key="message.senderindex"
+                   :class="['message', { 'system-message': message.senderindex === 0 }]">
                 <!-- 系统消息使用不同的样式 -->
-                <template v-if="message.senderid === 0">
+                <template v-if="message.senderindex === 0">
                   <div class="system-message-content">
                     <div class="system-message-text">{{ message.text }}</div>
                   </div>
@@ -133,8 +127,8 @@
                     <span class="recipient-label">
                       <div class="message-sender">
                         <p>
-                          {{ message.senderid }}号{{" "}}{{ message.sendername }}
-                          <span v-if="message.senderid === currentPlayer.index"> (你)</span>
+                          {{ message.senderindex }}号{{" "}}{{ message.sendername }}
+                          <span v-if="message.senderindex === currentPlayer.userId"> (你)</span>
                         </p>
                       </div>
                     </span>
@@ -158,11 +152,11 @@
 
         <!-- 输入框和发送按钮在聊天框外部 -->
         <div class="message-input-section">
-          <select v-model="messageRecipient" class="recipient-select">
-            <option value="all">所有人</option>
-            <option value="team">团队</option>
-            <option value="dead" v-if="isDead">死亡</option> <!-- 死亡玩家只能选择死亡 -->
-          </select>
+          <!-- 结束发言按钮 -->
+          <!-- TODO: 需要美化 -->
+          <button @click="handleTalkEnd" class="end-talk-button" v-if="talkStart">
+            <span class="button-text">结束发言</span>
+          </button>
           <input
             v-model="userMessage"
             @keyup.enter="sendChatMessage"
@@ -170,9 +164,11 @@
             class="message-input"
           />
           <!-- 图标按钮 -->
-          <button @click="sendChatMessage" class="send-button">
+          <button @click="sendChatMessage" class="send-button" :disabled="!talkStart">
             <img class="send-icon" src="@/assets/send.svg" alt="发送图标" /> <!-- 或者使用一个自定义图标图片 -->
           </button>
+
+
         </div>
       </div>
 
@@ -195,20 +191,13 @@
       <div class="role-info">
         <div class="role-item">
             <span class="label">你的身份：</span>
-            <span class="value">{{ roleInfo.role }}</span>
+            <span class="value" style="font-size: 1.3em; font-weight: bold;">{{ $translate(roleInfo.role) }}</span>
         </div>
         <div class="role-item">
             <span class="label">阵营目标：</span>
-<!--          TODO: 后端改好后这里改为roleInfo.objective-->
-            <span class="value">{{ objective }}</span>
+            <span class="value">{{ roleGoalsConfig[roleInfo.role] }}</span>
 
         </div>
-        <div class="role-item">
-            <span class="label">胜利条件：</span>
-<!--            <span class="value">{{ gameData.victory_condition }}</span>-->
-            <span class="value">{{ victoryCondition }}</span>
-        </div>
-
 
         <div class="role-item" v-if="roleInfo.teammates">
             <span class="label">存活队友：</span>
@@ -240,28 +229,6 @@
         </div>
     </div>
       </div>
-      <!-- 玩家详细信息弹出框 -->
-      
-       <div 
-        v-if="showDetails" 
-        class="player-details-box" 
-        :style="{ top: playerDetailsTop + 'px', left: playerDetailsLeft + 'px' }"
-        @click.stop
-        >
-        <div class="player-details">
-          <img :src="selectedShowPlayer.avatar" alt="avatar" class="avatar-modal" />
-          <h4>{{ selectedShowPlayer.name }}</h4>
-          <p>角色：{{ selectedShowPlayer.role }}</p>
-          <p>阵营：{{ selectedShowPlayer.team }}</p>
-          <p>状态：{{ selectedShowPlayer.isDead ? '已死亡' : '存活' }}</p>
-          <button class="btn-report" @click="reportPlayer(selectedShowPlayer)">
-            <img class="icon" src="@/assets/report.svg" alt="举报" />
-          </button>
-          <button class="btn-add-friend" @click="addFriend(selectedShowPlayer)">
-            <img class="icon" src="@/assets/addFriend.svg" alt="添加好友" />
-          </button>
-        </div>
-      </div>
       <!--  弹出查验结果   -->
       <ConfirmDialog
       :show="showDialog"
@@ -269,6 +236,7 @@
       :message="dialogMessage"
       :showConfirm="dialogShowConfirm"
       @confirm="handleDialogConfirm"
+      @cancel="handleDialogCancel"
     />
       <!-- 系统通知组件 -->
       <SystemNotice
@@ -281,9 +249,10 @@
     </div>
 
   </template>
-  
+
 <script>
 import {onMounted, ref, onUnmounted, onBeforeMount,} from 'vue';
+import { getCurrentInstance } from 'vue';
 import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';
 import { useWebSocket } from '@/composables/useWebSocket';
@@ -436,6 +405,14 @@ export default {
         ]
         // ... 可以继续添加其他角色的技能配置
       },
+      roleGoalsConfig: {
+        Werewolf: "杀死所有狼人之外的角色",
+        Prophet: "使用查验结果引导村民，放逐所有狼人",
+        Witch: "灵活利用解药与毒药，放逐所有狼人",
+        Villager: "分辨好人与狼人，放逐所有狼人",
+        Idiot: "引导他人投票将你放逐",
+        Guard: "保护好阵营关键角色，放逐所有狼人",
+      },
       userMessage: "",
 
 
@@ -448,8 +425,6 @@ export default {
       showMenuSidebar: false, // 控制侧边栏的显示与否
       showFriendsSidebar: false,
       showHistorySidebar: false,
-
-      isDead: false, // 当前玩家是否死亡
 
       playerDetailsTop: 0,  // 玩家详情框的top位置
       playerDetailsLeft: 0,  // 玩家详情框的left位置
@@ -468,6 +443,184 @@ export default {
 
 
   setup() {
+    const onlineFriends = ref( []);
+    const offlineFriends = ref( []);
+
+
+    // 处理弹窗取消
+    const handleDialogCancel = () => {
+      showDialog.value = false;
+    };
+
+    // 检查是否是好友
+    const checkIsFriend = (userId) => {
+      // 统一转换为字符串进行比较
+      const targetId = String(userId);
+
+      // 检查是否是自己
+      if (targetId === String(userProfile.value.userId)) {
+        return true;
+      }
+
+      // 检查好友列表，确保类型一致
+      return onlineFriends.value.some(friend => String(friend.id) === targetId) ||
+             offlineFriends.value.some(friend => String(friend.id) === targetId);
+    };
+
+    // 显示对话框
+    const showConfirmDialog = (title, message, showConfirm = false, action = '') => {
+      dialogTitle.value = title;
+      dialogMessage.value = message;
+      dialogShowConfirm.value = showConfirm;
+      currentDialogAction.value = action;
+      showDialog.value = true;
+    };
+
+    const sendFriendRequest = async (targetId) => {
+      try {
+        const response = await api.post('/api/accounts/friends/add/',
+            {
+              player: userProfile.value.userId,
+              target: targetId
+            },
+            {
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+
+        if (response.data.status === 'success') {
+          showConfirmDialog('成功', '已发送好友请求');
+          return {
+            success: true,
+            message: '好友请求已发送'
+          };
+        } else {
+          showConfirmDialog('提示', response.data.message);
+          return {
+            success: false,
+            message: response.data.message
+          };
+        }
+      } catch (error) {
+        console.error('发送好友请求失败:', error);
+        showConfirmDialog('错误', error.response?.data?.message || '发送好友请求失败');
+        return {
+          success: false,
+          message: error.response?.data?.message || '发送好友请求失败'
+        };
+      }
+    };
+
+    const handleOnlineFriends = (message) => {
+      // 刷新在线好友
+      const onlineList = message.friends;
+      const allFriendsList = [...onlineFriends.value, ...offlineFriends.value];
+      onlineFriends.value = [];
+      offlineFriends.value = [];
+      for (const friend of allFriendsList) {
+        if (onlineList.indexOf(friend.id) !== -1) {
+          // 如果在线
+          friend.lastSeen = "在线";
+          onlineFriends.value.push(friend);
+        } else {
+          friend.lastSeen = "离线";
+          offlineFriends.value.push(friend);
+        }
+      }
+    };
+
+    // 获取好友列表
+    const fetchFriendsList = async () => {
+      try {
+        const response = await api.get('/api/accounts/friends/list/');
+        const friendIds = response.data.friends;
+
+        // 获取每个好友的详细信息
+        const friendsDetails = await Promise.all(
+            friendIds.map(async (friendId) => {
+              try {
+                const userResponse = await api.get(`/api/accounts/public_info/${friendId}/`);
+                const avatarResponse = await api.get(`/api/accounts/avatar/${friendId}/`);
+
+                return {
+                  id: friendId,
+                  name: userResponse.data.username,
+                  avatar: avatarResponse.status === 200
+                      ? avatarResponse.data.avatar_url
+                      : require('@/assets/profile-icon.png'),
+                  status: '在线', // 目前都显示为在线
+                  lastSeen: '在线'
+                };
+              } catch (error) {
+                console.error('获取好友信息失败:', error);
+                return null;
+              }
+            })
+        );
+
+        // 过滤掉获取失败的好友信息
+        onlineFriends.value = friendsDetails.filter(friend => friend !== null);
+        offlineFriends.value = [];
+        // 更新在线状态
+        sendMessage({
+          action: "get_friends"
+        });
+        onType('online_friends', handleOnlineFriends);
+
+      } catch (error) {
+        console.error('获取好友列表失败:', error);
+      }
+    };
+
+
+    const { proxy } = getCurrentInstance();
+    const $translate = (text) => proxy.$translate(text);
+
+    const selectedProfileId = ref(null); // 当前选中的玩家ID
+    const selectedProfile = ref({
+      userId: '',
+      name: '',
+      avatar: '',
+      isOnline: false,
+      isFriend: false,
+      stats: [],
+      recentGames: []
+    });
+
+    const showPlayerProfile = async (playerId, player) => {
+      // 从使用序号改为使用userId
+      if (selectedProfileId.value === player.userId) {
+        selectedProfileId.value = null;
+        return;
+      }
+
+      // 如果是AI玩家，显示基本信息
+      if (player.isAI) {
+        selectedProfile.value = {
+          userId: player.userId, // AI的userId是uuid
+          name: player.name,
+          avatar: player.avatar,
+          isOnline: true,
+          isFriend: true,
+          stats: [
+            { label: '身份', value: 'AI玩家' },
+          ],
+          recentGames: []
+        };
+        selectedProfileId.value = player.userId;
+        return;
+      }
+
+      // 获取玩家资料
+      const profile = await fetchSelectedProfile(player.userId);
+      if (profile) {
+        selectedProfile.value = profile;
+        selectedProfileId.value = player.userId; // 存储userId而不是序号
+      }
+    };
+
 
     const hasUnreadMessages = ref(false);
     // 弹窗以及websocket建立
@@ -567,8 +720,9 @@ export default {
 
     
     const currentPlayer = ref({
-      index: "6",
-      name: "apifox",
+      userId: "",      // 添加 userId 字段
+      index: "",       // 游戏中的序号
+      name: "",
       alive: true,
       online: true
     });
@@ -585,23 +739,28 @@ export default {
     const confirmed = ref(false);
     const isDayTime = ref(true);
     // 当前为你的发言阶段
-    // TODO: 允许发言
     const talkStart = ref(false);
+    // 你是否死亡
+    const isDead = ref(false);
 
     const currentNotification = ref(null);  // 当前显示的通知
 
     // 添加处理通知的方法
-    function sendSystemMessage(content, type = 'info', subMessage = '', players = [] ) {
+    function sendSystemMessage(content) {
       // 创建聊天消息
       const chatMessage = {
-        senderid: 0,
-        sendername: "系统信息",
+        senderindex: 0,
+        sendername: "系统信息: ",
         avatar: require('@/assets/head.png'),
         text: content,
         recipients: "all"
       };
       messages.value.push(chatMessage);
 
+
+
+    }
+    function sendNotification(content, type = 'info', subMessage = '', players = []){
       // 创建新通知
       currentNotification.value = {
         type: type,
@@ -609,7 +768,6 @@ export default {
         subMessage: subMessage,
         players: players,
       };
-
     }
 
     // 关闭通知的方法
@@ -643,22 +801,23 @@ export default {
       const roleName = roleNames[roleInfo.value.role] || roleInfo.value.role;
       const description = roleDescriptions[roleInfo.value.role] || '';
 
-      sendSystemMessage(
-        `你的角色是：${roleName}`,
-        'role',
-        description,
-          [],
-      );
+      sendSystemMessage(`你的角色是：${roleName}`);
+      sendNotification(
+          '你的角色是：${roleName}',
+          'info',
+          description,
+      )
     }
     // 修改原有的系统消息处理方法
     function handleNightPhase(message) {
-      sendSystemMessage("天黑请闭眼", "night");
+      // sendSystemMessage("天黑请闭眼");
+      sendNotification("天黑请闭眼", "night")
       isDayTime.value = false;
       updateGame(message.game);
     }
 
     function handleDayPhase(message) {
-      sendSystemMessage("天亮请睁眼", "day");
+      sendNotification("天亮请睁眼", "day");
       isDayTime.value = true;
       updateGame(message.game);
     }
@@ -666,7 +825,7 @@ export default {
     function handleNightDeathInfo(message) {
       const victims = message.victims;
       if (victims.length === 0) {
-        sendSystemMessage("昨晚是平安夜", "death");
+        sendNotification("昨晚是平安夜", "death");
       } else {
         // 获取死亡玩家的信息
         const deadPlayers = victims.map(index => {
@@ -678,25 +837,38 @@ export default {
           };
         });
 
-        sendSystemMessage(
+        sendNotification(
           "昨晚以下玩家被杀害：",
           "death",
           "",
           deadPlayers
         );
       }
+
+      for (const victim of message.victims) {
+        if (victim === currentPlayer.value.index) {
+          sendNotification("你在这个晚上被杀死了", "death",
+              "接下来你可以与其他死亡玩家聊天，静待阵营胜利");
+          talkStart.value = true;
+          isDead.value = true;
+        }
+      }
     }
 
     //
-    function handleTalkStart() {
-      sendSystemMessage(
+    function handleTalkStart(message) {
+      if (currentPlayer.value.index === message.player){
+        talkStart.value = true;
+        sendNotification(
         `${currentPlayer.value.index}号玩家，轮到你发言`,
         "speak",
           "请在规定时间内发表意见",
         [],
-
       );
-      talkStart.value = true;
+      }
+      else {
+        sendSystemMessage("接下来请" + message.player + "号玩家发言：")
+      }
       gameData.value.current_phase = "Speak"
       timerSeconds.value = gameData.value.phase_timer[gameData.value.current_phase];
     }
@@ -715,11 +887,11 @@ export default {
               ? avatarResponse.data.avatar_url
               : require('@/assets/profile-icon.png'),
             isOnline: true, // 这里可以从websocket获取在线状态
-            isFriend: false, // 这里可以从好友列表判断
+            isFriend: checkIsFriend(userId), // 这里可以从好友列表判断
             stats: [
               { label: '游戏场数', value: userData.profile.wins + userData.profile.loses },
               { label: '胜率', value: calculateWinRate(userData.profile.games) },
-              { label: '评分', value: userData.profile.rating || 0 }
+              //{ label: '评分', value: userData.profile.rating || 0 }
             ],
             recentGames: (userData.profile.recent_games || []).map((game, index) => ({
               id: index.toString(),
@@ -743,10 +915,6 @@ export default {
 
     let initialized = false;
 
-    // 设置一个定时器，每过一段时间执行一次
-    // const intervalId = setInterval(() => {
-    //   console.log(Boolean(players.value && aiPlayers.value));
-    // }, 1000); // 这里设置为每1000毫秒（1秒）打印一次
 
 
     // 这里的信息以后就不动了
@@ -759,7 +927,6 @@ export default {
         // 获取并设置所有玩家信息
         const playerProfiles = {};
         for (const playerId of Object.keys(gameData.value.players)) {
-          // console.log(playerId);
           const profile = await fetchSelectedProfile(playerId);
           playerProfiles[playerId] = {
             index: gameData.value.players[playerId].index,
@@ -775,14 +942,12 @@ export default {
 
           if (String(userProfile.value.userId) === String(playerId)){
             currentPlayer.value = {
+              userId: playerId,  // 添加 userId
               index: gameData.value.players[playerId].index,
               name: profile.name,
               alive: true,
-              online: true,
-            }
-            console.log("profile id: " + userProfile.value.userId);
-            console.log("player id: " + playerId);
-            console.log("index: " + gameData.value.players[playerId].index);
+              online: true
+            };
           }
         }
 
@@ -792,7 +957,6 @@ export default {
         const aiPlayerProfiles = {};
 
         for (const id of Object.keys(gameData.value.ai_players)) {
-          // console.log(id);
           aiPlayerProfiles[id] = {
             name: gameData.value.ai_players[id].name,
             index: gameData.value.ai_players[id].index,
@@ -806,15 +970,9 @@ export default {
         // 展开并合并所有玩家信息
         players.value = playerProfiles;
         aiPlayers.value = aiPlayerProfiles;
-        // console.log("GameInterfaceInit: Done!!!");
-        // console.log(JSON.stringify(players.value, null, 2));
-        // console.log(JSON.stringify(aiPlayers.value, null, 2));
         initialized = true;
 
         // TODO: 添加对玩家自身信息的初始化
-      }
-      else {
-        console.log("Already initialized, passing...")
       }
 
 
@@ -832,12 +990,11 @@ export default {
       //       'stopped updating game data.', result.errors);
       // }
       if (!game){
-        console.log("gameData is false");
+        console.error("gameData is false");
       }
       else {
         const prev_phase = gameData.value.current_phase;
         gameData.value = game
-        console.log(prev_phase+  " " + gameData.value.current_phase)
         if (prev_phase !== gameData.value.current_phase){
           timerSeconds.value = gameData.value.phase_timer[gameData.value.current_phase]
         }
@@ -849,16 +1006,15 @@ export default {
     const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
     // 投票用工具函数
-    async function select(title, content, time, players, alive_as_target = false) {
+    async function select(title, content, time, players, alive_as_target = false, select_self = false) {
       // players: List[str], str为序号
       selectablePhaseAction.value = content;
-      console.log("selectedplayerbefore: " + selectedPlayer.value);
 
       selectableIndices.value = [];
       if (alive_as_target){  // 选择所有活着的人，除了自己
         for (const player of [...Object.values(gameData.value.players), ...Object.values(gameData.value.ai_players)]){
 
-          if (player.alive && player.index !== currentPlayer.value.index){
+          if (player.alive && ((player.index !== currentPlayer.value.index) || select_self)){
             selectableIndices.value.push(Number(player.index));
           }
         }
@@ -866,15 +1022,9 @@ export default {
       else {  // 当前列表中的人
         for (const index of players){
           selectableIndices.value.push(Number(index));
-          console.log("choose able players: " + index)
         }
       }
 
-
-      // 显示结束按钮，显示计时器
-      console.log(selectableIndices.value)
-      console.log("phase start: " + selectablePhaseAction.value + "time: " + time);
-      console.log("phase: " + selectablePhaseAction.value + "indices: " + selectableIndices.value);
 
       // 等待函数
 
@@ -884,7 +1034,6 @@ export default {
         if (confirmed.value){
           selectableIndices.value = [];
           confirmed.value = false;
-          console.log("selectedplayerafter: " + selectedPlayer.value);
           let tmp = selectedPlayer.value;
           selectedPlayer.value = -1
           selectablePhaseAction.value = ""
@@ -894,7 +1043,6 @@ export default {
         }
       }
 
-      console.log("phase end: " + gameData.value.current_phase);
       // 不能再选了
 
       // 如果没选中，返回-1
@@ -928,7 +1076,7 @@ export default {
       }
       sendMessage(actionToSend,
         "game")
-      if (gameData.value.current_phase === "Werewolf"){
+      if (gameData.value.current_phase === "Werewolf" && roleInfo.value.role === "Werewolf"){
         handleMultipleKillVotes();
       }
       else {
@@ -938,10 +1086,10 @@ export default {
     }
 
     async function handleMultipleKillVotes(){
-      if (roleInfo.value.role === "Werewolf") {
+      if (gameData.value.current_phase === "Werewolf" && roleInfo.value.role === "Werewolf") {
         // 这里可能会被执行多次，所以要保证时间不会过长
         const killVoteTarget = await select("选择要杀死的目标", "杀死",
-            gameData.value.phase_timer[gameData.value.current_phase] - timeElapsed.value, null, true);
+            gameData.value.phase_timer[gameData.value.current_phase] - timeElapsed.value, null, true, true);
         handleKillVote(killVoteTarget);
       }
     }
@@ -972,32 +1120,22 @@ export default {
       if (poison_num === -1){
         actionToSend.poison = null;
       }
-      console.log(JSON.stringify(actionToSend));
       sendMessage(actionToSend,
         "game"
       );
     }
+    function handleTalkEnd(){
+      // 不能确定成功发过去了，所以等待服务器回消息再改为false
+      // talkStart.value = false;
+      const actionToSend = {
+        type: "talk_end",
+        player: currentPlayer.value.index,
+      }
+      sendMessage(actionToSend,
+      "game")
+    }
 
-    // // 聊天说话
-    // function handleTalk(content){
-    //   sendMessage(
-    //       {
-    //         type: "talk_content",
-    //         content: content
-    //       }
-    //   )
-    // }
 
-    // // 主动结束发言
-    // function handleTalkEnd(){
-    //   sendMessage(
-    //       {
-    //         type: "talk_end",
-    //         player: this.currentPlayerId
-    //       }
-    //   )
-    // }
-    //
     // // 白天投票
     function handleVote(seq_num){
       const actionToSend = {
@@ -1013,6 +1151,7 @@ export default {
       )
     }
 
+
     /* WebSocket实时监听部分*/
     function handlePlayerJoined(message){
       // 有人加入，更新内容
@@ -1025,11 +1164,11 @@ export default {
 
     async function handleKillPhase(message) {
       // 处理Werewolf投票阶段
-
-      sendSystemMessage("狼人请行动", "action", "请选择要杀害的对象");
       gameData.value = message.game;
-
-      await handleMultipleKillVotes();
+      if (roleInfo.value.role === "Werewolf") {
+        sendNotification("狼人请行动", "action", "请选择要杀害的对象");
+        await handleMultipleKillVotes();
+      }
     }
 
     function handleWolfSync(message) {
@@ -1047,8 +1186,6 @@ export default {
           targetDict[message.targets[wolf]].push(wolf);
         }
       }
-      console.log("syncTargets" + JSON.stringify(message.targets));
-      console.log("syncTargetsProcessed" + JSON.stringify(targetDict));
       syncTargets.value = targetDict;
 
     }
@@ -1056,24 +1193,24 @@ export default {
     function handleKillResult(message) {
       // 处理刀人结果
       if (message.kill_result){
-        sendSystemMessage(message.kill_result + "号玩家被你们杀死");
+        sendNotification(message.kill_result + "号玩家被你们杀死");
+        // TODO: 是否要换个说法？因为不一定真死
       }
 
       updateGame(message.game)
     }
 
     function handleKillPhaseEnd(message) {
-      // 刀人阶段结束的同步。这里其实不应同步游戏信息，因为到第二天早上人才会死。
-      sendSystemMessage("狼人阶段结束");
+      // 刀人阶段结束的同步。
       updateGame(message.game);
     }
 
     async function handleCheckPhase(message) {
       // 处理Prophet查人阶段, 不能告诉他谁死了
-      sendSystemMessage("预言家请行动", "action", "请选择要查验的玩家");
-      updateGame(message.game);
-      if (roleInfo.value.role === "Prophet"){
 
+      updateGame(message.game);
+      if (roleInfo.value.role === "Prophet" && gameData.value.current_phase === "Prophet"){
+        sendNotification("预言家请行动", "action", "请选择要查验的玩家");
         const checkTarget = await select("选择要查验的目标", "查验",
             gameData.value.phase_timer[gameData.value.current_phase], null, true);
 
@@ -1084,14 +1221,13 @@ export default {
 
     function handleCheckResult(message) {
       // 处理查人结果
-      sendSystemMessage(message.target + "号玩家的身份为" + message.role );
+      sendNotification(message.target + "号玩家的身份为" +  $translate(message.role) );
 
     }
 
     function handleWitchPhase(message) {
       // 处理Witch阶段
       updateGame(message.game);
-      sendSystemMessage("女巫阶段开始");
       gameData.value.current_phase = message.game.current_phase;
     }
 
@@ -1099,11 +1235,10 @@ export default {
       // 处理Witch信息
       if(roleInfo.value.role === "Witch"){
         roleInfo.value.role_skills = message.role_skills;
-        sendSystemMessage("女巫请行动", "action", "请选择使用解药和毒药");
-        // console.log("phase: " + selectablePhase.value + "indices: " + selectableIndices.value);
+        sendNotification("女巫请行动", "action", "请选择使用解药和毒药");
         let cure_target = -1, poison_target = -1;
 
-        if (roleInfo.value.role_skills.cure_count){
+        if (roleInfo.value.role_skills.cure_count && message.cure_target){
           cure_target = await select("解药选择", "解救",
               gameData.value.phase_timer.Witch / 2, message.cure_target, false);
 
@@ -1142,21 +1277,31 @@ export default {
       // 处理发言阶段
       gameData.value = message.game;
 
-      sendSystemMessage("发言阶段开始");
+      sendNotification("发言阶段开始", "speak");
     }
 
     function handleTalkUpdate(message) {
       // 处理聊天消息更新
 
-      // 创建消息对象
-      // if (!message.source){
-      //   return;
-      // }
-      const speaker = [...Object.values(players), ...Object.values(aiPlayers)][Number(message.source)]
-      // console.log("source: " + message.source);
-      // console.log("speaker: " + speaker);
+      const speaker = [...Object.values(players.value), ...Object.values(aiPlayers.value)][Number(message.source) - 1]
+
       const newMessage = {
-        senderid: Number(message.source),
+        senderindex: Number(message.source),
+        sendername: speaker.name,
+        avatar: speaker.avatar,
+        text: message.message,
+        recipients: "all" // 死亡玩家只能发送给"dead"
+      };
+
+      messages.value.push(newMessage);
+    }
+
+    function handleTalkUpdateDead(message) {
+      // 处理聊天消息更新
+      const speaker = [...Object.values(players.value), ...Object.values(aiPlayers.value)][Number(message.source) - 1]
+
+      const newMessage = {
+        senderindex: Number(message.source),
         sendername: speaker.name,
         avatar: speaker.avatar,
         text: message.message,
@@ -1166,26 +1311,23 @@ export default {
       // 将消息推送到消息列表
       messages.value.push(newMessage);
 
-      // 检查是否需要显示未读消息提示
-      const chatBox = this.$refs.chatBox;
-      if (chatBox && (chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight > 100)) {
-        hasUnreadMessages.value = true;
-      }
 
     }
 
-    function handleTalkEndByServer() {
+    function handleTalkEndByServer(message) {
       // 处理服务器发过来的聊天结束
       // this.userMessage = "";  // 没必要直接清空
       // TODO: 消息按钮重新变成灰的
-      sendSystemMessage(currentPlayer.value.index + "号玩家，你的发言时间结束。")
-      talkStart.value = false;
+      if (currentPlayer.value.index === message.player){
+        sendNotification("你的发言时间结束。", "speak")
+        talkStart.value = false;
+      }
     }
 
     async function handleVotePhase(message) {
       // 处理投票阶段
       updateGame(message.game)
-      sendSystemMessage("投票阶段开始，请选择你要放逐的玩家");
+      sendNotification("投票阶段开始，请选择你要放逐的玩家", "vote");
       const target = await select("投票放逐", "放逐", gameData.value.phase_timer[gameData.value.current_phase],
           null, true);
       handleVote(target);
@@ -1193,55 +1335,69 @@ export default {
 
     function handleVoteResult(message) {
       // 处理投票结果
-      if (message.result === null){
-        sendSystemMessage("投票结果: 由于出现平票，没有人被放逐");
+      if (!message.result){
+        sendNotification("投票结果: 由于出现平票，没有人被放逐", "vote");
       }
       else {
-        sendSystemMessage("投票结果: "+ message.result + "号玩家被放逐");
+        sendNotification("投票结果: "+ message.result + "号玩家被放逐", "death");
       }
 
     }
 
     function handleDayDeathInfo(message) {
       // 处理白天死掉的人
-      let line = message.victims.join("号，");
-      if (line === ""){
-        sendSystemMessage("今天白天没有人出局");
+      for (const victim of message.victims){
+        if (victim === currentPlayer.value.index){
+          sendNotification("你在这个白天死去了", "death",
+          "接下来你可以与其他死亡玩家聊天，静待阵营胜利");
+          talkStart.value = true;
+          isDead.value = true;
+        }
       }
-      else {
-        sendSystemMessage("白天" + line + "号玩家出局了");
-      }
-      console.log("line: " + line);
-
     }
 
     function handleGameEnd(message) {
       // 处理游戏结束
+      // TODO: 有空可以再改个胜利/失败界面
       if (message.end){
         if (message.victory[roleInfo.value.role]){
           if (roleInfo.value.role === "Werewolf") {
-            sendSystemMessage("游戏结束！狼人获胜！");
+            sendNotification("游戏结束，狼人获胜！", "Night",
+                "狼人们成功杀死村民与守护者，占领了村庄……从此屈膝于血月之下。");
           } else if (roleInfo.value.role === "Idiot") {
-            sendSystemMessage("游戏结束！白痴获胜！");
+            sendNotification("游戏结束，白痴获胜！", "Day",
+              "愚者看似游于争斗之外，但博弈中棋子们却均投出如此无用之票，命运是否在向他们展示，生命不过一场游戏？");
           } else {
-            sendSystemMessage("游戏结束！好人阵营获胜！");
+            sendNotification("游戏结束，好人阵营获胜！", "Day",
+              "恭喜，您成功地守护了村庄免受狼人威胁！……继往圣之绝学，为万世开太平。");
           }
         } else {
           if (roleInfo.value.role === "Werewolf") {
-            sendSystemMessage("游戏结束！好人阵营获胜！你的阵营失败了……再接再厉！");
+            sendNotification("游戏结束，好人阵营获胜。你的阵营失败了……再接再厉！", "day",
+            "狼人们一一被发现后被驱逐，亦或是被女巫的毒药杀害。但复仇的时刻会来的……总有一天。");
           } else if (roleInfo.value.role === "Idiot") {
             // If Idiot loses, either werewolf or villagers won
             if (message.victory["Werewolf"]) {
-              sendSystemMessage("游戏结束！狼人获胜！你的阵营失败了……再接再厉！");
+              sendNotification("游戏结束，狼人获胜。你失败了……再接再厉！", "night",
+              "可惜的是，愚者还没来得及展示所有人的愚蠢，就被狼人杀害了。毕竟，人死了又能说出什么来呢？");
             } else {
-              sendSystemMessage("游戏结束！好人阵营获胜！你的阵营失败了……再接再厉！");
+              sendNotification("游戏结束，好人阵营获胜。你失败了……再接再厉！", "day",
+              "你看着村民的狂欢，他们似乎已不在意你的存在。也罢，也罢。如此得过且过，也算一幸事。");
             }
           } else {
-            sendSystemMessage("游戏结束！狼人获胜！你的阵营失败了……再接再厉！");
+            sendNotification("游戏结束，狼人获胜！你的阵营失败了……再接再厉！", "night",
+            "狼人将村民与守护者们屠戮殆尽，村庄沦为怪物们的巢穴。但我们仍相信人类的勇气、胆识与正义，邪不压正，它们总有被消灭的一天。");
           }
         }
+        // 游戏结束的聊天室
+        talkStart.value = true;
       }
       // TODO: 展示所有人的角色并留两分钟复盘
+    }
+
+    function handleRoomCleanup(){
+      sendNotification("游戏结束，返回大厅", "info",)
+      router.push('/GameLobby')
     }
 
     const setupWebsocketListeners = () => {
@@ -1262,12 +1418,14 @@ export default {
         const nightDeathInfoCleanup = onType('night_death_info', handleNightDeathInfo);
         const talkPhaseCleanup = onType('talk_phase', handleTalkPhase);
         const talkUpdateCleanup = onType('talk_update', handleTalkUpdate);
+        const talkUpdateDeadCleanup = onType('talk_update_dead', handleTalkUpdateDead);
         const talkStartCleanup = onType('talk_start', handleTalkStart);
         const talkEndCleanup = onType('talk_end', handleTalkEndByServer);
         const votePhaseCleanup = onType('vote_phase', handleVotePhase);
         const voteResultCleanup = onType('vote_result', handleVoteResult);
         const dayDeathInfoCleanup = onType('day_death_info', handleDayDeathInfo);
         const gameEndCleanup = onType('game_end', handleGameEnd);
+        const roomCleanupCleanup = onType('room_cleanup', handleRoomCleanup)
 
         // 返回清理函数
         onUnmounted(() => {
@@ -1287,13 +1445,14 @@ export default {
           nightDeathInfoCleanup();
           talkPhaseCleanup();
           talkUpdateCleanup();
+          talkUpdateDeadCleanup();
           talkStartCleanup();
           talkEndCleanup();
           votePhaseCleanup();
           voteResultCleanup();
           dayDeathInfoCleanup();
           gameEndCleanup();
-          console.log('WebSocket listeners cleaned up');
+          roomCleanupCleanup();
         });
     }
 
@@ -1308,6 +1467,7 @@ export default {
         // 这里使用游戏房间的连接，而不是大厅连接
         connectToGame(roomId);
       }
+      fetchFriendsList();
 
     });
 
@@ -1324,11 +1484,19 @@ export default {
 
 
     return{
+      sendFriendRequest,
+      selectedProfileId,
+      selectedProfile,
+      showPlayerProfile,
+
+      talkStart,
+      isDead,
       messages,
       isGameConnected,
       isLobbyConnected,
       connectToGame,
       sendMessage,
+      handleTalkEnd,
       gameData,
       userProfile,
       players,
@@ -1347,6 +1515,7 @@ export default {
       currentNotification,
       closeNotification,
       handleDialogConfirm,
+      handleDialogCancel,
       showDialog,
       dialogTitle,
       dialogMessage,
@@ -1367,14 +1536,7 @@ export default {
         ? require('@/assets/sun.svg')
         : require('@/assets/night.svg');
     },
-     // 过滤消息，确保死亡玩家可以看到所有消息，活着的玩家不能看到死亡者的消息
-    filteredMessages() {
-      console.log('filteredMessages 被计算');
-      if (this.isDead) {
-        return this.messages;
-      }
-      return this.messages.filter(msg => msg.recipients !== 'dead');
-    },
+
     formattedTime() {
       const minutes = Math.floor(this.timerSeconds / 60);
       const seconds = this.timerSeconds % 60;
@@ -1414,43 +1576,23 @@ export default {
 
     targetPlayer(index) {
       // 投票选中目标玩家的逻辑
-      this.selectedPlayer = index;
-      // console.log("selectables: " + this.selectableIndices);
-      //
-      // console.log("selected number " + this.selectedPlayer);
+      if (this.selectedPlayer === index){
+        this.selectedPlayer = -1;
+      }
+      else {
+        this.selectedPlayer = index;
+      }
+
 
     },
 
     confirmTarget(){
       // 确认选择
       this.confirmed = true;
-      // console.log("confirm selected player: " + this.selectedPlayer)
     },
 
-    // 使用技能的方法
-    useAbility(ability) {
-      if (ability.hasCount && ability.count > 0) {
-        ability.count--;
-        // 这里添加使用技能的具体逻辑
-        console.log(`使用技能: ${ability.name}`);
-      } else if (!ability.hasCount) {
-        // 无限次数技能的使用逻辑
-        console.log(`使用技能: ${ability.name}`);
-      }
-    },
-    // 可以设置一个动态方法来更新当前玩家名字,后续优化接口
-    getRecipientLabel(recipients) {
-      if (recipients === 'all') {
-        return '所有人';
-      } else if (recipients === 'team') {
-        return '团队';
-      } else if (recipients === 'dead') {
-        return '死亡';
-      }
-      else{
-        return '未知';
-      }
-    },
+
+
 
     toggleSidebar(type) {
       if (type === 'menu') {
@@ -1474,6 +1616,7 @@ export default {
       this.closeFriendsSidebar();
       this.closeHistorySidebar();
       this.closePlayerDetails();
+      this.selectedProfileId = null;
     },
 
     closeMenuSidebar() {
@@ -1500,10 +1643,11 @@ export default {
 
     sendChatMessage() {
 
-      if (this.userMessage.trim()) {
+      if (this.userMessage.trim() && this.talkStart) {
+        // 只有在自己的阶段才能说话
         // 创建消息对象
         // const newMessage = {
-        //   senderid: this.currentPlayer.index, // 假设当前玩家是“你”
+        //   senderindex: this.currentPlayer.index, // 假设当前玩家是“你”
         //   sendername: this.currentPlayer.name,
         //   avatar: require('@/assets/head.png'),
         //   text: this.userMessage,
@@ -1513,14 +1657,20 @@ export default {
         // 将消息推送到消息列表
         // 这里先不推了，等到服务器正常返回更新的时候再推上去
         // this.messages.push(newMessage);
-        this.sendMessage({
-          type: "talk_content",
-          content: this.userMessage,
-        }, "game")
-
+        if (this.isDead){
+          this.sendMessage({
+            type: "talk_content_dead",
+            content: this.userMessage,
+          }, "game")
+        }
+        else {
+          this.sendMessage({
+            type: "talk_content",
+            content: this.userMessage,
+          }, "game")
+        }
         // 清空输入框
         this.userMessage = "";
-
       }
     },
 
@@ -1557,13 +1707,7 @@ export default {
         window.scrollTo(0, 0);
       }
     },
-    isDead(newVal) {
-      if (newVal) {
-        this.messageRecipient = "dead"; // 死亡玩家自动选择“死亡”频道
-      } else {
-        this.messageRecipient = "all";  // 活着的玩家可以选择所有人频道
-      }
-    },
+
   }
 };
 </script>
@@ -1716,6 +1860,8 @@ p {
   overflow-y: auto;
   border-radius: 15px;
 }
+
+
 
 /* 聊天框 */
 .chat-box {
@@ -1892,53 +2038,59 @@ p {
   gap: 10px; 
 }
 
-.recipient-select {
-  padding: 8px 30px 8px 12px;  /* 左边内边距用于文本，右边留出空间给箭头 */
-  font-size: 14px;
-  border: 1px solid #ccc;
-  border-radius: 25px; /* 更圆的边角 */
-  background-color: var(--background-color);
-  color: #333;
-  outline: none; /* 去除默认的聚焦边框 */
+/* 结束发言按钮样式 */
+.end-talk-button {
+  background: linear-gradient(135deg, #ff4d4d 0%, #ff0000 100%);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 25px;
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
-  transition: border-color 0.3s ease, background-color 0.3s ease; /* 平滑过渡效果 */
-}
-
-.recipient-select:focus {
-  border-color: #007bff; /* 聚焦时改变边框颜色 */
-  background-color: #fff; /* 聚焦时改变背景颜色 */
-}
-
-.recipient-select option {
-  background-color: var(--background-color);
-  color: #333;
-  padding: 10px;
-}
-
-.recipient-select::-ms-expand {
-  display: none; /* 隐藏 IE 下拉箭头 */
-}
-
-.recipient-select::after {
-  content: '\f078'; /* 使用Font Awesome的下拉箭头图标 */
-  font-family: 'FontAwesome';
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  pointer-events: none; /* 确保箭头不可点击 */
-}
-
-/* 自定义下拉箭头 */
-.recipient-select {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 15px;
+  box-shadow: 0 4px 12px rgba(255, 0, 0, 0.2);
   position: relative;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
-.recipient-select option:hover {
-  background-color: #f1f1f1; /* 选项悬停时改变背景 */
+.end-talk-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transform: translateX(-100%);
+  transition: transform 0.6s;
 }
 
-/* 输入框 */
+.end-talk-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(255, 0, 0, 0.3);
+}
+
+.end-talk-button:hover::before {
+  transform: translateX(100%);
+}
+
+.end-talk-button:active {
+  transform: translateY(1px);
+  box-shadow: 0 2px 8px rgba(255, 0, 0, 0.2);
+}
+
+.button-text {
+  margin-right: 5px;
+  letter-spacing: 0.5px;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+}
+
 .message-input {
   border: 1px solid #ccc;
   border-radius: 15px;
@@ -1968,6 +2120,28 @@ p {
   width: 40px;  /* 设置图标的宽度 */
   height: 40px; /* 设置图标的高度 */
   transition: transform 0.3s ease;
+  filter: brightness(0); /* 将图标变为黑色 */
+}
+
+.send-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: #f0f0f0;
+  transform: none;
+  transition: all 0.3s ease;
+  border: 1px solid #ddd;
+}
+
+.send-button:disabled img {
+  filter: grayscale(100%);
+  opacity: 0.6;
+  transform: none;
+}
+
+.send-button:disabled:hover {
+  background-color: #f0f0f0;
+  transform: none;
+  box-shadow: none;
 }
 .send-button:hover{
   background-color: #aaa;
@@ -2021,7 +2195,7 @@ p {
     color: #555; 
     text-align: center; 
     flex: 1;
-    font-size: 1.1em;
+    font-size: 1.0em;
 }
 
 .role-abilities {
@@ -2348,6 +2522,10 @@ p {
 .confirm-button:hover .confirm-icon {
   transform: scale(1.05);
 }
+
+
+
+
 /* 玩家容器样式优化 */
 .player-container {
   position: relative;
@@ -2360,10 +2538,223 @@ p {
   width: 100%;
 }
 
+
+
+/* 添加资料卡动画 */
+.profile-enter-active,
+.profile-leave-active {
+  transition: all 0.3s ease;
+}
+
+.profile-enter-from,
+.profile-leave-to {
+  opacity: 0;
+  transform: translateX(-10px);
+}
+
+/* 个人资料卡样式 */
+/* 确保资料卡不会被其他元素遮挡 */
+.profile-card {
+  position: absolute;
+  left: 70px;
+  top: 150px;
+  transform: translateY(-50%);
+  width: 240px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 16px;
+  z-index: 1000;
+}
+
+
+/* 调整箭头位置，让它指向头像 */
+.profile-card::before {
+  content: '';
+  position: absolute;
+  top: 30px; /* 调整箭头垂直位置以对齐头像 */
+  left: -8px; /* 将箭头放在左侧 */
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  transform: rotate(45deg);
+  box-shadow: -2px 2px 5px rgba(0, 0, 0, 0.04);
+  z-index: -1;
+}
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  background: #fff ;
+}
+
+.large-avatar {
+  width: 80px !important;
+  height: 80px !important;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.profile-info {
+  flex: 1;
+}
+
+.profile-info h4 {
+  margin: 0 0 4px;
+  font-size: 0.95em;
+  color: #2c3e50;
+}
+
+.profile-status {
+  display: inline-block;
+  padding: 2px 6px;
+  background: #ecf5ff;
+  color: #409eff;
+  border-radius: 12px;
+  font-size: 0.85em;
+}
+
+.profile-status.online {
+  background: #ecf5ff;
+  color: #409eff;
+}
+
+.profile-stats {
+  display: flex;
+  justify-content: space-around;
+  padding: 12px 0;
+  border-top: 1px solid #eee;
+  border-bottom: 1px solid #eee;
+  margin-bottom: 16px;
+}
+
+.stat-item {
+  text-align: center;
+}
+
+.stat-value {
+  display: block;
+  font-size: 1em;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.stat-label {
+  font-size: 0.75em;
+  color: #666;
+}
+
+.profile-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.action-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.8em;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background-color: transparent;
+}
+
+.add-friend-btn {
+  background-color: transparent;
+  color: #333;
+}
+
+.add-friend-btn:disabled {
+  cursor: not-allowed;
+}
+
+.report-btn {
+  background-color: transparent;
+  color: red;
+}
+
+/* 禁用状态下保持相同的悬停效果 */
+.add-friend-btn:hover,
+.add-friend-btn:disabled:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.1);
+  background-color: #f5f5f5;
+}
+
+.action-icon {
+  width: 14px;
+  height: 14px;
+  opacity: 0.9;
+}
+
+.action-btn img {
+  width: 24px;
+  height: 24px;
+}
+
+.report-btn:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.1);
+  background-color: #fff1f0;
+}
+
+.recent-games {
+  background: #f8fafc;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.recent-games h5 {
+  margin: 0 0 8px;
+  color: #2c3e50;
+  font-size: 0.85em;
+}
+
+.game-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px;
+  background: #fff;
+  border-radius: 4px;
+  font-size: 0.8em;
+  margin-bottom: 4px;
+}
+
+.game-result {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.game-result.win {
+  background: #f0f9eb;
+  color: #67c23a;
+}
+
+.game-result.lose {
+  background: #fef0f0;
+  color: #f56c6c;
+}
+
+.game-date {
+  color: #666;
+  font-size: 0.85em;
+}
+
 /* 同步目标包装器 */
 .sync-targets-wrapper {
   position: absolute;
-  top: -30px;
+  top: 5%;  /* 将位置改为父元素的底部 */
   left: 60px;
   z-index: 5;
 }

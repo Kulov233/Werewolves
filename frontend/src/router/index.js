@@ -1,12 +1,12 @@
 import { createRouter, createWebHistory } from 'vue-router';
 
 // 路由组件导入
-const GameInterface = () => import('../components/GameInterface.vue');
-const Login = () => import('@/components/Login.vue');
-const Register = () => import('@/components/Register.vue');
-const Search = () => import('@/components/GameLobby.vue');
-const Room = () => import('@/components/GameRoom.vue');
-const test = () => import('@/components/test.vue');
+import GameInterface from '../components/GameInterface.vue';
+import Login from '@/components/Login.vue';
+import Register from '@/components/Register.vue';
+import GameLobby from '@/components/GameLobby.vue';
+import Room from '@/components/GameRoom.vue';
+import test from '@/components/test.vue';
 // 路由配置
 const routes = [
   {
@@ -25,26 +25,26 @@ const routes = [
     path: '/GameInterface',
     name: 'GameInterface',
     component: GameInterface,
-    meta: { requiresAuth: false }
+    meta: { requiresAuth: true }
   },
   {
     path: '/GameLobby',
     name: 'GameLobby',
-    component: Search,
-    meta: { requiresAuth: false }
+    component: GameLobby,
+    meta: { requiresAuth: true }
   },
   {
     path: '/test',
     name: 'test',
     component: test,
-    meta: { requiresAuth: false }
+    meta: { requiresAuth: true }
   },
   {
     path: '/GameRoom/:id?',
     name: 'GameRoom',
     component: Room,
     props: true, // 允许通过 props 传递参数
-    meta: { requiresAuth: false }
+    meta: { requiresAuth: true }
   }
 ];
 
@@ -54,15 +54,36 @@ const router = createRouter({
   routes
 });
 
-// 路由守卫
+// 添加路由解析守卫
+router.beforeResolve(async (to, from, next) => {
+  try {
+    // 确保异步组件已加载
+    if (to.matched.length) {
+      await Promise.all(
+        to.matched.map(record => {
+          const { component } = record;
+          if (typeof component === 'function') {
+            return component();
+          }
+          return Promise.resolve();
+        })
+      );
+    }
+    next();
+  } catch (error) {
+    next(false);
+  }
+});
+
 router.beforeEach((to, from, next) => {
   const isAuthenticated = localStorage.getItem('access_token');
-  
+
   if (to.meta.requiresAuth && !isAuthenticated) {
     next({ name: 'Login' });
   } else {
     next();
   }
 });
+
 
 export default router;
