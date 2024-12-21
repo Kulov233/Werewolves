@@ -382,7 +382,14 @@ def get_vote_result(room_id):
     if len(players_with_max_votes) > 1 or len(players_with_max_votes) == 0:
         pass
     else:
-        if max_votes > game_data["max_players"] / 2:
+        players = {**game_data["players"], **game_data["ai_players"]}
+        alive_players = 0
+
+        for _, data in players.items():
+            if data['alive']:
+                alive_players += 1
+
+        if max_votes > alive_players:
             vote_result = players_with_max_votes[0]
             game_data["voted_victims_info"].append(vote_result)
 

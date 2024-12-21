@@ -756,12 +756,12 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                         "action_history": [], # 敏感
                         "phase_timer": {
                             "Initialize": 1,
-                            "Werewolf": 40,
+                            "Werewolf": 60,
                             "Prophet": 40,
-                            "Witch": 40,
+                            "Witch": 60,
                             "Day": 3,
-                            "Speak": 40,
-                            "Vote": 40,
+                            "Speak": 60,
+                            "Vote": 60,
                             "End": 3,
                             "Cleanup": 120
                         },
