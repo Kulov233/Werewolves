@@ -785,7 +785,7 @@ import axios from 'axios';
 const router = useRouter();
 // 创建axios实例
 const api = axios.create({
-  baseURL: 'http://localhost:8000'
+  baseURL: '/'
 });
 
 // 添加请求拦截器
@@ -817,7 +817,7 @@ api.interceptors.response.use(
       try {
         // 使用refresh token获取新的access token
         const refreshToken = localStorage.getItem('refresh_token');
-        const response = await axios.post('http://localhost:8000/api/accounts/token/refresh/', {
+        const response = await axios.post('api/accounts/token/refresh/', {
           refresh: refreshToken
         });
 
@@ -1798,7 +1798,7 @@ export default {
           userId: data.id,
           name: data.username,
           signature: data.profile.bio || "点击编辑个性签名",
-          avatar: `http://localhost:8000${data.profile.avatar}`,
+          avatar: `${data.profile.avatar}`,
           isOnline: true,
           isFriend: true,
           games:gameHistory,
@@ -1829,7 +1829,7 @@ export default {
 
         if (response.status === 200) {
           // 更新头像URL
-          userProfile.value.avatar = `http://localhost:8000${response.data.avatar}`;
+          userProfile.value.avatar = `http://app:8000${response.data.avatar}`;
           return true;
         }
         return false;
@@ -1882,7 +1882,7 @@ export default {
           userId: data.id,
           name: data.username,
           signature: data.profile.bio,
-          avatar: `http://localhost:8000${data.profile.avatar}`,
+          avatar: `http://app:8000${data.profile.avatar}`,
           isOnline: true,
           isFriend: checkIsFriend(userId),
           stats: [

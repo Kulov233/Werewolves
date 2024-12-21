@@ -140,7 +140,7 @@ def initialize(room_id):
         game_data = game_cache.get(f"room:{room_id}")
 
         # 读取游戏配置
-        with open('backend/game/game_config.json', 'r') as file:
+        with open('game/game_config.json', 'r') as file:
             configs = json.load(file)
             if str(game_data['max_players']) in configs:
                 game_config = configs[str(game_data['max_players'])]

@@ -24,7 +24,7 @@ urlpatterns = [
     path('api/accounts/', include('accounts.urls')), # 引入 accounts 的接口
 ]
 
-# TODO: 转为生产环境时迁移到 nginx
+# 转为生产环境时迁移到 nginx
 # 用于保存用户头像，仅在开发环境中启用
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

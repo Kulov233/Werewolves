@@ -453,7 +453,7 @@ import debounce from 'lodash/debounce';
 
 // 创建axios实例
 const api = axios.create({
-  baseURL: 'http://localhost:8000'
+  baseURL: '/'
 });
 
 // 添加请求拦截器
@@ -485,7 +485,7 @@ api.interceptors.response.use(
       try {
         // 使用refresh token获取新的access token
         const refreshToken = localStorage.getItem('refresh_token');
-        const response = await axios.post('http://localhost:8000/api/token/refresh/', {
+        const response = await axios.post('api/token/refresh/', {
           refresh: refreshToken
         });
 
@@ -776,7 +776,7 @@ export default {
     // 搜索
     const handleSearch = async (keyword) => {
       try {
-        const response = await api.get('/api/accounts/search/', {
+        const response = await api.get('api/accounts/search/', {
           params: { keyword }
         });
 
@@ -784,7 +784,7 @@ export default {
           const users = await Promise.all(
             response.data.users.map(async (user) => {
               try {
-                const avatarResponse = await api.get(`/api/accounts/avatar/${user.id}/`);
+                const avatarResponse = await api.get(`api/accounts/avatar/${user.id}/`);
                 return {
                   id: user.id,
                   username: user.username,
@@ -845,7 +845,7 @@ export default {
 
     const sendFriendRequest = async (targetId) => {
       try {
-        const response = await api.post('/api/accounts/friends/add/',
+        const response = await api.post('api/accounts/friends/add/',
             {
               player: userProfile.value.userId,
               target: targetId
@@ -945,8 +945,8 @@ export default {
     // 获取选中的人信息
     const fetchSelectedProfile = async (userId) => {
       try {
-        const avatarResponse = await api.get(`/api/accounts/avatar/${userId}/`);
-        const userResponse = await api.get(`/api/accounts/public_info/${userId}/`);
+        const avatarResponse = await api.get(`api/accounts/avatar/${userId}/`);
+        const userResponse = await api.get(`api/accounts/public_info/${userId}/`);
 
         if (userResponse.status === 200) {
           const userData = userResponse.data;
@@ -1337,15 +1337,15 @@ export default {
     // 获取好友列表
     const fetchFriendsList = async () => {
       try {
-        const response = await api.get('/api/accounts/friends/list/');
+        const response = await api.get('api/accounts/friends/list/');
         const friendIds = response.data.friends;
 
         // 获取每个好友的详细信息
         const friendsDetails = await Promise.all(
             friendIds.map(async (friendId) => {
               try {
-                const userResponse = await api.get(`/api/accounts/public_info/${friendId}/`);
-                const avatarResponse = await api.get(`/api/accounts/avatar/${friendId}/`);
+                const userResponse = await api.get(`api/accounts/public_info/${friendId}/`);
+                const avatarResponse = await api.get(`api/accounts/avatar/${friendId}/`);
 
                 return {
                   id: friendId,
