@@ -70,6 +70,31 @@ def ensure_player_is_alive():
 
     return decorator
 
+def ensure_player_is_dead():
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(consumer, *args, **kwargs):
+            room_id = consumer.scope['url_route']['kwargs']['room_id']
+            game_data = await consumer.get_game_data_from_cache(room_id)
+            if game_data is None:
+                await consumer.send(text_data=json.dumps({
+                    "type": "error",
+                    "message": "房间不存在。"
+                }))
+                return
+            user_id = str(consumer.scope['user'].id)
+            is_alive = game_data['players'][user_id]['alive']
+            if is_alive:
+                await consumer.send(text_data=json.dumps({
+                    "type": "error",
+                    "message": "你还活着，不能进行此操作。"
+                }))
+                return
+            return await func(consumer, *args, **kwargs)
+        return wrapper
+
+    return decorator
+
 
 # Channel: room:{room_id}
 # noinspection PyUnresolvedReferences
@@ -79,6 +104,7 @@ class GameConsumer(AsyncWebsocketConsumer):
         self.game_cache = caches['game_cache']
         self.lobby_cache = caches['lobby_cache']
         self.room_timeout = 3600
+        self.status_update_interval = 30  # 用户在线状态更新间隔[s]
 
     # noinspection PyUnresolvedReferences
     @with_game_data_lock(timeout=5)
@@ -121,10 +147,20 @@ class GameConsumer(AsyncWebsocketConsumer):
                         self.channel_name
                     )
 
+                await self.accept()
+
+                if bool(await self.is_user_online(user_id)):
+                    await self.send(text_data=json.dumps({
+                        "type": "warning",
+                        "message": "您似乎已经有一个活跃连接，请确保没有重复连接。"
+                    }))
+
                 game_data['players'][user_id]['online'] = True
                 await self.update_game_data_in_cache(room_id, game_data)
 
-                await self.accept()
+                await self.set_online_status(user_id)
+                # 启动定期更新状态的任务
+                self.status_update_task = asyncio.create_task(self.update_online_status())
 
                 # await self.send(text_data=json.dumps({
                 #     "type": "game_info",
@@ -148,6 +184,12 @@ class GameConsumer(AsyncWebsocketConsumer):
     async def disconnect(self, close_code):
         room_id = self.scope['url_route']['kwargs']['room_id']
         user_id = str(self.scope['user'].id)
+
+        # 清除在线状态
+        await self.remove_online_status(user_id)
+        # 取消状态更新任务
+        if hasattr(self, 'status_update_task'):
+            self.status_update_task.cancel()
 
         await self.channel_layer.group_discard(f"room_{room_id}", self.channel_name)
         await self.channel_layer.group_discard(f"room_{room_id}_user_{user_id}", self.channel_name)
@@ -182,6 +224,8 @@ class GameConsumer(AsyncWebsocketConsumer):
                 await self.handle_witch_action(data)
             elif action == "talk_content":
                 await self.handle_talk_content(data)
+            elif action == "talk_content_dead":
+                await self.handle_talk_content_dead(data)
             elif action == "talk_end":
                 await self.handle_talk_end(data)
             elif action == "vote":
@@ -430,6 +474,25 @@ class GameConsumer(AsyncWebsocketConsumer):
             "all": f"{index} 号玩家说：“{content}”。"
         })
 
+    @ensure_player_is_dead()
+    @with_game_data_lock(timeout=5)
+    async def handle_talk_content_dead(self, data):
+        # 获取房间 ID
+        room_id = self.scope['url_route']['kwargs']['room_id']
+
+        # 获取用户 ID
+        user_id = str(self.scope['user'].id)
+
+        game_data = await self.get_game_data_from_cache(room_id)
+
+        index = game_data['players'][user_id]['index']
+
+        content = data.get("content")
+
+        # 广播发言
+        await self.broadcast_talk_message_dead(room_id, index, content)
+
+
     @ensure_player_is_alive()
     @with_game_data_lock(timeout=5)
     async def handle_talk_end(self, data):
@@ -462,6 +525,7 @@ class GameConsumer(AsyncWebsocketConsumer):
             return
 
         # 取消定时器
+        from .tasks import end_current_phase
         await sync_to_async(end_current_phase)(room_id)
 
     @ensure_player_is_alive()
@@ -520,41 +584,40 @@ class GameConsumer(AsyncWebsocketConsumer):
 
     @classmethod
     async def broadcast_game_update(cls, room_id, event_type, game_data):
-        # TODO: 去掉注释
-        # try:
-        channel_layer = get_channel_layer()
+        try:
+            channel_layer = get_channel_layer()
 
-        public_game_data = copy.deepcopy(game_data)
+            public_game_data = copy.deepcopy(game_data)
 
-        # TODO: 去掉敏感信息
-        keys_to_remove = ["roles_for_humans_first", "victory_conditions", "game_specified_prompt", "victims_info",
-                          "poisoned_victims_info", "voted_victims_info", "werewolves_targets", "votes", "action_history", "phase_transitions"]
+            # 去掉敏感信息
+            keys_to_remove = ["roles_for_humans_first", "victory_conditions", "game_specified_prompt", "victims_info",
+                              "poisoned_victims_info", "voted_victims_info", "werewolves_targets", "votes", "action_history", "phase_transitions"]
 
-        for key in keys_to_remove:
-            public_game_data.pop(key, None)
+            for key in keys_to_remove:
+                public_game_data.pop(key, None)
 
-        keys_to_remove_in_players = ["role", "role_skills"]
+            keys_to_remove_in_players = ["role", "role_skills"]
 
-        for player in public_game_data['players']:
-            for key in keys_to_remove_in_players:
-                public_game_data['players'][player].pop(key, None)
+            for player in public_game_data['players']:
+                for key in keys_to_remove_in_players:
+                    public_game_data['players'][player].pop(key, None)
 
-        for ai_player in public_game_data['ai_players']:
-            for key in keys_to_remove_in_players:
-                public_game_data['ai_players'][ai_player].pop(key, None)
+            for ai_player in public_game_data['ai_players']:
+                for key in keys_to_remove_in_players:
+                    public_game_data['ai_players'][ai_player].pop(key, None)
 
-        # print(public_game_data)
+            # print(public_game_data)
 
-        await channel_layer.group_send(
-            f"room_{room_id}",
-            {
-                "type": "game_message",
-                "event": event_type,
-                "game": public_game_data
-            }
-        )
-        # except Exception as e:
-        #     print(f"广播消息时出错：{e}")
+            await channel_layer.group_send(
+                f"room_{room_id}",
+                {
+                    "type": "game_message",
+                    "event": event_type,
+                    "game": public_game_data
+                }
+            )
+        except Exception as e:
+            print(f"广播消息时出错：{e}")
 
     async def role_info(self, event):
         role_info = event.get("role_info")
@@ -854,6 +917,39 @@ class GameConsumer(AsyncWebsocketConsumer):
         except Exception as e:
             print(f"广播玩家发言时出错：{e}")
 
+    async def talk_update_dead(self, event):
+        source = event.get("source")
+        message = event.get("message")
+
+        """
+        {
+          "type": "talk_update_dead",
+          "source": "5",
+          "message": "我会喷火，你会吗？"
+        }
+        """
+
+        await self.send(text_data=json.dumps({
+            "type": "talk_update_dead",
+            "source": source,
+            "message": message
+        }))
+
+    async def broadcast_talk_message_dead(self, room_id: str, source: str, message: str):
+        try:
+            channel_layer = get_channel_layer()
+
+            await channel_layer.group_send(
+                f"room_{room_id}_dead",
+                {
+                    "type": "talk_update_dead",
+                    "source": source,
+                    "message": message
+                }
+            )
+        except Exception as e:
+            print(f"广播玩家发言时出错：{e}")
+
     async def talk_start(self, event):
         player = event.get("player")
 
@@ -1026,6 +1122,29 @@ class GameConsumer(AsyncWebsocketConsumer):
         except Exception as e:
             print(f"广播白天死亡玩家时出错：{e}")
 
+    async def join_dead_group(self, event):
+        room_id = event.get('room_id')
+
+        await self.channel_layer.group_add(
+            f"room_{room_id}_dead",
+            self.channel_name
+        )
+
+    @classmethod
+    async def add_player_to_dead_group(cls, room_id: str, user_id: str):
+        try:
+            channel_layer = get_channel_layer()
+
+            await channel_layer.group_send(
+                f"room_{room_id}_user_{user_id}",
+                {
+                    "type": "join_dead_group",
+                    "room_id": room_id
+                }
+            )
+        except Exception as e:
+            print(f"将玩家加入死亡玩家群组时出错：{e}")
+
     async def not_connected(self, event):
         event_type = event.get("event")
         message = event.get("message")
@@ -1055,6 +1174,9 @@ class GameConsumer(AsyncWebsocketConsumer):
             print(f"广播消息时出错：{e}")
 
     async def should_disconnect(self, event):
+        await self.send(text_data=json.dumps({
+            "type": "room_cleanup"
+        }))
         await self.close()
 
     @classmethod
@@ -1072,6 +1194,33 @@ class GameConsumer(AsyncWebsocketConsumer):
         except Exception as e:
             print(f"发送退出房间指示时出错：{e}")
 
+    # 定期更新在线状态
+    # noinspection PyUnresolvedReferences
+    async def update_online_status(self):
+        while True:
+            user_id = self.scope["user"].id
+            await self.set_online_status(user_id)
+            await asyncio.sleep(self.status_update_interval)
+
+    # 设置用户在线状态
+    @database_sync_to_async
+    def set_online_status(self, user_id):
+        self.game_cache.set(
+            f"user_online:{user_id}",
+            True,
+            timeout=self.status_update_interval * 2
+        )
+
+    # 移除用户在线状态
+    @database_sync_to_async
+    def remove_online_status(self, user_id):
+        self.game_cache.delete(f"user_online:{user_id}")
+
+    # 检查用户是否在线
+    @classmethod
+    @database_sync_to_async
+    def is_user_online(cls, user_id):
+        return bool(caches['game_cache'].get(f"user_online:{user_id}"))
 
     # 从缓存中获取房间信息
     @database_sync_to_async

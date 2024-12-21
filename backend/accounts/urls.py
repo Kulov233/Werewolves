@@ -21,4 +21,16 @@ urlpatterns = [
     path('avatar/upload/', AvatarUploadView.as_view(), name='upload_avatar'),
     # 更新用户简介视图，最大 100 字符
     path('bio/update/', BioUpdateView.as_view(), name='update_bio'),
+    # 获取好友列表
+    path('friends/list/', FriendListView.as_view(), name='friend-list'),
+    # 发送好友请求
+    path('friends/add/', FriendAddView.as_view(), name='friend-add'),
+    # 处理好友请求
+    path('friends/requests/', FriendRequestView.as_view(), name='friend-requests'),
+    # 删除好友
+    path('friends/delete/', FriendDeleteView.as_view(), name='friend-delete'),
+    # 搜索用户
+    path('search/', UserSearchView.as_view(), name='user-search'),
+    # 修改密码
+    path('password/change/', PasswordChangeView.as_view(), name='password-change'),
 ]
