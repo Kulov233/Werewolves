@@ -186,7 +186,7 @@ export default {
 }
 
 .router-view-container {
-  padding-top: 5%;
+  padding-top: 4%;
 }
 
 .router-view-container.no-padding {
