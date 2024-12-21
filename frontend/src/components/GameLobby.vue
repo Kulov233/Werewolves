@@ -1793,6 +1793,7 @@ export default {
           duration: `${game.duration}分钟`,
         }));
 
+
         userProfile.value = {
           userId: data.id,
           name: data.username,
@@ -2229,6 +2230,8 @@ export default {
 
       const success = await this.updateAvatar(file);
       if (success) {
+        // 更新头像后立即刷新用户信息
+        await this.fetchUserInfo();
         alert('头像上传成功！');
       } else {
         alert('上传头像失败，请重试');
