@@ -1335,7 +1335,7 @@ export default {
 
     function handleVoteResult(message) {
       // 处理投票结果
-      if (message.result === null){
+      if (!message.result){
         sendNotification("投票结果: 由于出现平票，没有人被放逐", "vote");
       }
       else {
