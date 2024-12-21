@@ -9,7 +9,7 @@ from .prompts import PromptGenerator
 
 config_list = [
     {
-        'model': 'glm-4-air',
+        'model': 'glm-4-plus',
         'api_key': ZHIPUAI_API_KEY,  # 输入用户自己的api_key
         'base_url': 'https://open.bigmodel.cn/api/paas/v4/',
         'api_type': 'openai'
@@ -58,7 +58,7 @@ class AIPlayer():
 
     def create(self, messages_to_send) -> str:
         response = self.client.chat.completions.create(
-            model="glm-4-air",
+            model="glm-4-plus",
             messages=messages_to_send,
             stream=False,
             temperature=0.6)
@@ -115,7 +115,7 @@ class AIPlayer():
             }
         ]
         response = self.client.chat.completions.create(
-            model="glm-4-air",  # 请填写您要调用的模型名称
+            model="glm-4-plus",  # 请填写您要调用的模型名称
             messages=prompt,
             tools=tools,
             tool_choice="auto",
@@ -158,7 +158,7 @@ class AIPlayer():
             }
         ]
         response = self.client.chat.completions.create(
-            model="glm-4-air",  # 请填写您要调用的模型名称
+            model="glm-4-plus",  # 请填写您要调用的模型名称
             messages=prompt,
             tools=tools,
             tool_choice="auto",
@@ -200,7 +200,7 @@ class AIPlayer():
             }
         ]
         response = self.client.chat.completions.create(
-            model="glm-4-air",  # 请填写您要调用的模型名称
+            model="glm-4-plus",  # 请填写您要调用的模型名称
             messages=prompt,
             tools=tools,
             tool_choice="auto",
@@ -278,7 +278,7 @@ class AIPlayer():
         if tools:
             prompt = self.prompt_generator.witch_prompt(self.messages, special_info, tool_prompt)
             response = self.client.chat.completions.create(
-                model="glm-4-air",
+                model="glm-4-plus",
                 messages=prompt,
                 tools=tools,
                 tool_choice="auto",
