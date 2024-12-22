@@ -3074,7 +3074,7 @@ p {
   gap: 10px;
   z-index: 1;
   margin-top: -60px;
-  margin-bottom: 30px;
+  margin-bottom: 38px;
   width: 100%;
 }
 
