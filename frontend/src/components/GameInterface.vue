@@ -1153,8 +1153,10 @@ export default {
       // 不能确定成功发过去了，所以等待服务器回消息再改为false
       // talkStart.value = false;
 
-      if (gameEnd.value){
+      if (gameEnd.value || isDead.value){
         handleRoomCleanup();
+        router.push('/GameLobby');
+        return;
       }
 
       const actionToSend = {
@@ -1434,6 +1436,7 @@ export default {
 
     function handleRoomCleanup(){
       sendNotification("游戏结束，返回大厅", "info",)
+      wait(1000);
       router.push('/GameLobby')
     }
 
@@ -1572,7 +1575,7 @@ export default {
   computed: {
 
     returnButtonText: function() {
-      return this.gameEnd ? '返回大厅' : '结束发言';
+      return (this.gameEnd || this.isDead) ? '返回大厅' : '结束发言';
     },
 
     currentIcon() {
