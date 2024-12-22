@@ -1822,7 +1822,7 @@ export default {
 
         if (response.status === 200) {
           // 更新头像URL
-          userProfile.value.avatar = `http://app:8000${response.data.avatar}`;
+          userProfile.value.avatar = `${response.data.avatar}`;
           return true;
         }
         return false;
@@ -1878,7 +1878,7 @@ export default {
           userId: data.id,
           name: data.username,
           signature: data.profile.bio,
-          avatar: `http://app:8000${data.profile.avatar}`,
+          avatar: `${data.profile.avatar}`,
           isOnline: true,
           isFriend: checkIsFriend(userId),
           stats: [

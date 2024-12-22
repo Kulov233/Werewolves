@@ -80,6 +80,13 @@ REST_FRAMEWORK = {
     ),
 }
 
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=2),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+}
+
 ROOT_URLCONF = 'app.urls'
 
 TEMPLATES = [
