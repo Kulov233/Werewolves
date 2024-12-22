@@ -1291,11 +1291,11 @@ export default {
       // 处理Witch操作结果
       let line = ""
       if (message.cure){
-        roleInfo.value.cure_count -= 1;
+        roleInfo.value.role_skills.cure_count -= 1;
         line += "你选择对" + message.cure + "号玩家使用解药";
       }
       if (message.poison){
-        roleInfo.value.poison_count -= 1;
+        roleInfo.value.role_skills.poison_count -= 1;
         line += "你选择对" + message.poison + "号玩家使用毒药";
       }
       if (line !== ""){
