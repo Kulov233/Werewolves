@@ -371,16 +371,22 @@ def get_vote_result(room_id):
         "all": vote_result_str
     })
 
+    print(f"{room_id}中的投票结果：{votes}")
+
     # 获取最高票数
     max_votes = max(votes.values(), default=0)
 
     # 获取最高票数的玩家
     players_with_max_votes = [player for player, count in votes.items() if count == max_votes]
 
+    print(f"{room_id}中的最高票数：{max_votes}，玩家：{players_with_max_votes}")
+
     # 如果有多个玩家最高票数，则不放逐
     # TODO: 计算比例？
     if len(players_with_max_votes) > 1 or len(players_with_max_votes) == 0:
-        pass
+        game_data["action_history"].append({
+            "all": "投票结果：平票，没有人被放逐。"
+        })
     else:
         players = {**game_data["players"], **game_data["ai_players"]}
         alive_players = 0
@@ -392,6 +398,14 @@ def get_vote_result(room_id):
         if max_votes >= alive_players / 2:
             vote_result = players_with_max_votes[0]
             game_data["voted_victims_info"].append(vote_result)
+            print(f"{room_id}中的投票结果：{vote_result}号玩家被放逐。")
+            game_data["action_history"].append({
+                "all": f"投票结果：{vote_result}号玩家被放逐。"
+            })
+        else:
+            game_data["action_history"].append({
+                "all": "投票结果：票数不足，没有人被放逐。"
+            })
 
     game_cache.set(f"room:{room_id}", game_data)
 
@@ -584,6 +598,7 @@ def handle_phase_timed_out(room_id: str, current_phase: str):
         elif current_phase == 'Vote':
             # 结算投票
             get_vote_result(room_id)
+            game_data = game_cache.get(f"room:{room_id}")
             async_to_sync(GameConsumer.broadcast_game_update)(room_id, 'vote_phase_end', game_data)
             # async_to_sync(GameConsumer.broadcast_day_death_info)(room_id, game_data["voted_victims_info"])
             async_to_sync(GameConsumer.broadcast_vote_result)(room_id, game_data["voted_victims_info"][0] if len(game_data["voted_victims_info"]) == 1 else None)
@@ -936,7 +951,7 @@ def start_phase(room_id: str, phase: str):
                 from django.contrib.auth.models import User
                 for user_id, data in game_data["players"].items():
                     user = User.objects.get(id=user_id)
-                    user.userprofile.add_game_record(game_data['starts_at'], victory_result[data['role']], data['role'])
+                    user.userprofile.add_game_record(game_data['starts_at'], victory[data['role']], data['role'])
                     async_to_sync(GameConsumer.add_player_to_dead_group)(room_id, user_id)
 
         # 2. 设置阶段结束定时器
