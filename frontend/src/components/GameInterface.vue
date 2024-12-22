@@ -286,7 +286,7 @@ import axios from 'axios';
 import ConfirmDialog from "@/components/shared_components/ConfirmDialog.vue";
 
 
-const router = useRouter();
+
 // 创建axios实例
 const api = axios.create({
   baseURL: '/'
@@ -465,6 +465,7 @@ export default {
 
 
   setup() {
+    const router = useRouter();
     const onlineFriends = ref( []);
     const offlineFriends = ref( []);
 
