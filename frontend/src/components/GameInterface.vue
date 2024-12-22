@@ -358,7 +358,7 @@ export default {
           {
             id: 'cure',
             name: '解药',
-            icon: 'medicine.svg',
+            icon: 'cure.svg',
             description: '可以救活一名被杀的玩家',
             hasCount: true,
             count: 1
@@ -366,7 +366,7 @@ export default {
           {
             id: 'poison',
             name: '毒药',
-            icon: 'medicine.svg',
+            icon: 'poison.svg',
             description: '可以毒死一名玩家',
             hasCount: true,
             count: 1
@@ -377,7 +377,7 @@ export default {
           {
             id: 'check',
             name: '查验',
-            icon: 'kill.svg',
+            icon: 'prophet.svg',
             description: '每晚可以查验一名玩家的身份',
             hasCount: false
           }
