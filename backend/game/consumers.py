@@ -84,7 +84,7 @@ def ensure_player_is_dead():
                 return
             user_id = str(consumer.scope['user'].id)
             is_alive = game_data['players'][user_id]['alive']
-            if is_alive:
+            if is_alive and not game_data["should_cleanup"]:
                 await consumer.send(text_data=json.dumps({
                     "type": "error",
                     "message": "你还活着，不能进行此操作。"
@@ -1174,10 +1174,13 @@ class GameConsumer(AsyncWebsocketConsumer):
             print(f"广播消息时出错：{e}")
 
     async def should_disconnect(self, event):
-        await self.send(text_data=json.dumps({
-            "type": "room_cleanup"
-        }))
-        await self.close()
+        try:
+            await self.send(text_data=json.dumps({
+                "type": "room_cleanup"
+            }))
+            await self.close()
+        except Exception as e:
+            pass
 
     @classmethod
     async def handle_should_disconnect(cls, room_id, user_id):

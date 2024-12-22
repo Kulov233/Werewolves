@@ -756,12 +756,12 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                         "action_history": [], # 敏感
                         "phase_timer": {
                             "Initialize": 1,
-                            "Werewolf": 60,
-                            "Prophet": 40,
-                            "Witch": 60,
+                            "Werewolf": 40,
+                            "Prophet": 20,
+                            "Witch": 40,
                             "Day": 3,
                             "Speak": 60,
-                            "Vote": 60,
+                            "Vote": 40,
                             "End": 3,
                             "Cleanup": 120
                         },
@@ -774,9 +774,9 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                         "Initialize": "Werewolf",
                         "Werewolf": "Prophet",
                         "Prophet": "Witch",
-                        "Witch": "End_Night",
-                        "End_Night": "Day",
-                        "Day": speaking_phases[0],
+                        "Witch": "Day",
+                        "Day": "End_Night",
+                        "End_Night": speaking_phases[0],
                     }
                     for i in range(room_data["max_players"] - 1):
                         room_data_in_game["phase_transitions"][speaking_phases[i]] = speaking_phases[i + 1]
