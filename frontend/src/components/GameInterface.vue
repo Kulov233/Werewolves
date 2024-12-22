@@ -1155,6 +1155,7 @@ export default {
 
       if (gameEnd.value){
         handleRoomCleanup();
+        return;
       }
 
       const actionToSend = {
@@ -1434,6 +1435,7 @@ export default {
 
     function handleRoomCleanup(){
       sendNotification("游戏结束，返回大厅", "info",)
+      wait(1000);
       router.push('/GameLobby')
     }
 
