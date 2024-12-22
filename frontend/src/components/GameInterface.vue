@@ -2931,4 +2931,124 @@ p {
 .confirm-button:not(:disabled) {
   animation: pulse 2s infinite;
 }
+
+:root {
+  --base-unit: min(1vh, 1vw);
+  --min-width: 320px;
+  --max-width: 1920px;
+}
+
+/* 头像相关 */
+.avatar0, .avatar1 {
+  width: min(50px, 4vw);
+  height: min(50px, 4vw);
+  min-width: 40px;
+  min-height: 40px;
+}
+
+.avatar-modal {
+  width: min(60px, 5vw);
+  height: min(60px, 5vw);
+  min-width: 45px;
+  min-height: 45px;
+}
+
+/* 游戏容器 */
+.game-container {
+  min-height: 600px;
+  height: 100vh;
+  padding: calc(var(--base-unit) * 2);
+}
+
+.player-list {
+  width: min(18%, 300px);
+  min-width: 200px;
+}
+
+.chat-section {
+  width: min(60%, 800px);
+  min-width: 300px;
+}
+
+/* 聊天框相关 */
+.chat-box {
+  height: min(500px, 50vh);
+  min-height: 300px;
+}
+
+.message-input-section {
+  min-height: 50px;
+  height: min(60px, 6vh);
+}
+
+.message {
+  padding: min(12px, 1.5vw);
+  margin-bottom: min(10px, 1vh);
+}
+
+/* 侧边栏 */
+.sidebar {
+  width: min(250px, 25vw);
+  min-width: 200px;
+  height: calc(95vh - 20px);
+  min-height: 400px;
+}
+
+/* 个人资料卡 */
+.profile-card {
+  width: min(240px, 25vw);
+  min-width: 200px;
+}
+
+.large-avatar {
+  width: min(80px, 8vw) !important;
+  height: min(80px, 8vw) !important;
+  min-width: 60px !important;
+  min-height: 60px !important;
+}
+
+/* 按钮相关 */
+.confirm-button {
+  width: min(140px, 12vw);
+  height: min(50px, 5vh);
+  min-width: 100px;
+  min-height: 40px;
+}
+
+.end-talk-button {
+  padding: min(12px, 1.5vw) min(24px, 2vw);
+  min-width: 100px;
+  min-height: 35px;
+}
+
+/* 标题和文字大小 */
+.phase_header {
+  font-size: min(48px, 4vw);
+  min-height: 40px;
+}
+
+h3 {
+  font-size: min(1.5em, 3vw);
+}
+
+h5, h6 {
+  font-size: min(1.1em, 2vw);
+}
+
+p {
+  font-size: min(1.2em, 2vw);
+}
+
+/* 工具栏 */
+.top-bar {
+  height: min(5vh, 60px);
+  min-height: 40px;
+}
+
+.sun-moon-icon-img {
+  width: min(100px, 8vw);
+  height: min(100px, 8vw);
+  min-width: 60px;
+  min-height: 60px;
+}
 </style>
