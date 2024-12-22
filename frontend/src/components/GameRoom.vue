@@ -533,30 +533,30 @@ const ROLE_CONFIGS = {
   },
   8: {
     roles: {
-      Werewolf: 2,
+      Werewolf: 3,
       Prophet: 1,
       Witch: 1,
       Idiot: 1,
-      Villager: 3
+      Villager: 2
     },
     witchItems: { cure: 1, poison: 1 },
     priorityRoles: ["Witch", "Idiot"]
   },
   12: {
     roles: {
-      Werewolf: 3,
+      Werewolf: 4,
       Prophet: 1,
       Witch: 1,
-      Villager: 7
+      Villager: 6
     },
     witchItems: { cure: 2, poison: 2 }
   },
   16: {
     roles: {
-      Werewolf: 4,
+      Werewolf: 6,
       Prophet: 1,
       Witch: 1,
-      Villager: 10
+      Villager: 8
     },
     witchItems: { cure: 2, poison: 2 }
   }
