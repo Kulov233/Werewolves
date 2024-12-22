@@ -28,19 +28,13 @@
           <div class="sidebar-content">
             <!-- 个人信息头部 -->
             <div class="profile-header-menu">
-              <div class="profile-avatar" @click="toggleAvatarEdit" @mouseenter="showChangeAvatar" @mouseleave="hideChangeAvatar">
-                <img :src="userProfile.avatar" alt="用户头像" />
-                <!-- 头像编辑遮罩 -->
-                <div class="avatar-overlay" v-show="isHoveringAvatar">
-                  <input type="file"
-                        @change="handleAvatarChange"
-                        accept="image/*"
-                        class="avatar-input"
-                        ref="avatarInput">
-                  <div class="avatar-edit-text">更换头像</div>
-                </div>
-                <div class="online-status" :class="{ 'is-online': userProfile.isOnline }"></div>
-              </div>
+              <div class="profile-avatar" @click="showProfileDialog = true" @mouseenter="showChangeAvatar" @mouseleave="hideChangeAvatar">
+  <img :src="userProfile.avatar" alt="用户头像" />
+  <div class="avatar-overlay" v-show="isHoveringAvatar">
+    <div class="avatar-edit-text">更换头像</div>
+  </div>
+  <div class="online-status" :class="{ 'is-online': userProfile.isOnline }"></div>
+</div>
               <div class="profile-basic">
                 <h3 class="profile-name">{{ userProfile.name }}</h3>
                 <!-- 个性签名编辑区 -->
@@ -942,7 +936,6 @@ export default {
       isHoveringAvatar: false,
       isEditingSignature: false,
       tempSignature: "",
-      isEditingAvatar: false,
 
       //userProfile: null,
 
@@ -2208,17 +2201,17 @@ export default {
       this.isHoveringAvatar = false;
     },
 
-    toggleAvatarEdit() {
-      this.isEditingAvatar = !this.isEditingAvatar;
-      if (this.isEditingAvatar) {
-        this.$nextTick(() => {
-          this.$refs.avatarInput.click();
-        });
-      }
-    },
+    // toggleAvatarEdit() {
+    //   this.isEditingAvatar = !this.isEditingAvatar;
+    //   if (this.isEditingAvatar) {
+    //     this.$nextTick(() => {
+    //       this.$refs.avatarInput.click();
+    //     });
+    //   }
+    // },
 
-    async handleAvatarChange(event) {
-      const file = event.target.files[0];
+    // GameLobby.vue 修改后的方法
+    async handleAvatarChange(file) {  // 直接接收 file 对象
       if (!file) return;
 
       if (!file.type.startsWith('image/')) {
@@ -2233,11 +2226,7 @@ export default {
 
       const success = await this.updateAvatar(file);
       if (success) {
-        // 更新头像后立即刷新用户信息
         await this.fetchUserInfo();
-        alert('头像上传成功！');
-      } else {
-        alert('上传头像失败，请确保图片大小不超过5MB，并重试。');
       }
     },
 
