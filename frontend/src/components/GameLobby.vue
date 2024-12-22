@@ -1840,6 +1840,7 @@ export default {
     };
 
     // 更新个性签名
+    // 在 updateSignature 中统一处理提示
     const updateSignature = async (newSignature) => {
       try {
         const response = await api.put('/api/accounts/bio/update/', {
@@ -1848,11 +1849,13 @@ export default {
 
         if (response.status === 200) {
           userProfile.value.signature = response.data.bio;
+          showConfirmDialog('成功', '个性签名更新成功');  // 使用统一的提示方式
           return true;
         }
         return false;
       } catch (error) {
         console.error('更新个性签名失败:', error);
+        showConfirmDialog('错误', '更新个性签名失败，请重试');
         return false;
       }
     };
@@ -2234,10 +2237,11 @@ export default {
         await this.fetchUserInfo();
         alert('头像上传成功！');
       } else {
-        alert('上传头像失败，请重试');
+        alert('上传头像失败，请确保图片大小不超过5MB，并重试。');
       }
     },
 
+    // 移除 saveSignature 方法中的提示
     async saveSignature() {
       if (!this.userProfile.tempSignature.trim()) {
         alert('个性签名不能为空！');
@@ -2248,9 +2252,7 @@ export default {
       if (success) {
         this.userProfile.signature = this.userProfile.tempSignature;
         this.userProfile.isEditingSignature = false;
-        alert('个性签名更新成功！');
-      } else {
-        alert('更新个性签名失败，请重试');
+        // 移除这里的 alert
       }
     },
 
