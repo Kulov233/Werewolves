@@ -177,7 +177,7 @@
           <!-- 结束发言按钮 -->
           <!-- TODO: 需要美化 -->
           <button @click="handleTalkEnd" class="end-talk-button" v-if="talkStart">
-            <span class="button-text">结束发言</span>
+            <span class="button-text"> {{returnButtonText}} </span>
           </button>
           <input
             v-model="userMessage"
@@ -467,6 +467,8 @@ export default {
   setup() {
     const onlineFriends = ref( []);
     const offlineFriends = ref( []);
+
+    const gameEnd = ref(false);
 
 
     // 处理弹窗取消
@@ -1149,6 +1151,11 @@ export default {
     function handleTalkEnd(){
       // 不能确定成功发过去了，所以等待服务器回消息再改为false
       // talkStart.value = false;
+
+      if (gameEnd.value){
+        handleRoomCleanup();
+      }
+
       const actionToSend = {
         type: "talk_end",
         player: currentPlayer.value.index,
@@ -1386,6 +1393,7 @@ export default {
     function handleGameEnd(message) {
       // 处理游戏结束
       // TODO: 有空可以再改个胜利/失败界面
+
       if (message.end){
         if (message.victory[roleInfo.value.role]){
           if (roleInfo.value.role === "Werewolf") {
@@ -1418,6 +1426,9 @@ export default {
         }
         // 游戏结束的聊天室
         talkStart.value = true;
+        gameData.value.current_phase = "Cleanup";
+        timerSeconds.value = gameData.value.phase_timer[gameData.value.current_phase];
+        gameEnd.value = true;
       }
       // TODO: 展示所有人的角色并留两分钟复盘
     }
@@ -1512,6 +1523,7 @@ export default {
 
     return{
       currentSpeakingPlayer,
+      gameEnd,
 
       sendFriendRequest,
       selectedProfileId,
@@ -1559,6 +1571,10 @@ export default {
   },
 
   computed: {
+
+    returnButtonText: function() {
+      return this.gameEnd ? '返回大厅' : '结束发言';
+    },
 
     currentIcon() {
       return this.isDayTime
