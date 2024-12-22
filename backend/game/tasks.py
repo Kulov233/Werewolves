@@ -389,7 +389,7 @@ def get_vote_result(room_id):
             if data['alive']:
                 alive_players += 1
 
-        if max_votes > alive_players:
+        if max_votes >= alive_players / 2:
             vote_result = players_with_max_votes[0]
             game_data["voted_victims_info"].append(vote_result)
 
