@@ -735,7 +735,8 @@ export default {
           Day: 3,
           Speak: 40,
           Vote: 40,
-          End: 3
+          End: 3,
+          Cleanup: 120,
       }
     })
 
@@ -1193,7 +1194,7 @@ export default {
 
     async function handleKillPhase(message) {
       // 处理Werewolf投票阶段
-      gameData.value = message.game;
+      updateGame(message.game);
       if (roleInfo.value.role === "Werewolf") {
         sendNotification("狼人请行动", "action", "请选择要杀害的对象");
         await handleMultipleKillVotes();
@@ -1225,8 +1226,6 @@ export default {
         sendNotification(message.kill_result + "号玩家被你们杀死");
         // TODO: 是否要换个说法？因为不一定真死
       }
-
-      updateGame(message.game)
     }
 
     function handleKillPhaseEnd(message) {
@@ -1690,7 +1689,7 @@ export default {
 
       if (this.userMessage.trim() && this.talkStart) {
         // 把消息发到服务器
-        if (this.isDead){
+        if (this.isDead || this.gameEnd){
           this.sendMessage({
             type: "talk_content_dead",
             content: this.userMessage,
