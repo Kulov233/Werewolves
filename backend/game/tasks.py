@@ -456,8 +456,10 @@ def check_victory(room_id):
             for role, _ in game_data["roles"].items()
         }
         result["victory"]["Villager"] = True
-        result["victory"]["Prophet"] = True
-        result["victory"]["Witch"] = True
+        if "Prophet" in game_data["roles"]:
+            result["victory"]["Prophet"] = True
+        if "Witch" in game_data["roles"]:
+            result["victory"]["Witch"] = True
         result["victory_side"] = "Good"
         result["reveal_role"] = {}
         for _, data in players.items():
@@ -583,7 +585,8 @@ def handle_phase_timed_out(room_id: str, current_phase: str):
             # 结算投票
             get_vote_result(room_id)
             async_to_sync(GameConsumer.broadcast_game_update)(room_id, 'vote_phase_end', game_data)
-            async_to_sync(GameConsumer.broadcast_day_death_info)(room_id, game_data["voted_victims_info"])
+            # async_to_sync(GameConsumer.broadcast_day_death_info)(room_id, game_data["voted_victims_info"])
+            async_to_sync(GameConsumer.broadcast_vote_result)(room_id, game_data["voted_victims_info"][0] if len(game_data["voted_victims_info"]) == 1 else None)
 
             # 更新存活状态
             players = {**game_data["players"], **game_data["ai_players"]}
