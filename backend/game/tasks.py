@@ -518,6 +518,13 @@ def handle_phase_timed_out(room_id: str, current_phase: str):
         # 1. 获取下一个阶段
         next_phase = phase_transitions[current_phase]
 
+        if next_phase == "Prophet" and "Prophet" not in game_data["roles"]:
+            next_phase = phase_transitions[next_phase]
+
+        # 如果不存在女巫，跳过女巫阶段
+        if next_phase == "Witch" and "Witch" not in game_data["roles"]:
+            next_phase = phase_transitions[next_phase]
+
         # 对于玩家发言，跳过死亡的玩家
         if next_phase.startswith("Speak_"):
             found = False
