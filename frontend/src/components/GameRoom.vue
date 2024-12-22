@@ -103,7 +103,7 @@
                 class="player-avatar"
                 @click.stop="!member.isAI && showProfile(member.id)">
                 <img :src="member.avatar" :alt="member.name" />
-                <span class="player-name">{{ member.name }}</span>
+                <span class="player-name">{{ displayName(member.name) }}</span>
                 <button v-if="isHost && (member.isAI || !member.isAI)"
                         class="kick-button"
                         @click.stop="member.isAI ? removeAIPlayer(member.id) : handleKickMember(member.id)">×</button>
@@ -1614,6 +1614,19 @@ export default {
   },
 
   methods: {
+
+    displayName(name) {
+      if (typeof name === 'string') {
+        return name;
+      } else if (typeof name === 'object' && name !== null && 'name' in name) {
+        return name.name;
+      } else {
+        // 如果name既不是字符串也不是包含name属性的对象，可以返回一个默认值或者错误信息
+        return 'Invalid name';
+      }
+    },
+
+
     // 显示玩家资料
     showProfile(playerId) {
       if (playerId === 'host') {

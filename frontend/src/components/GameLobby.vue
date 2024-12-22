@@ -29,12 +29,12 @@
             <!-- 个人信息头部 -->
             <div class="profile-header-menu">
               <div class="profile-avatar" @click="showProfileDialog = true" @mouseenter="showChangeAvatar" @mouseleave="hideChangeAvatar">
-  <img :src="userProfile.avatar" alt="用户头像" />
-  <div class="avatar-overlay" v-show="isHoveringAvatar">
-    <div class="avatar-edit-text">更换头像</div>
-  </div>
-  <div class="online-status" :class="{ 'is-online': userProfile.isOnline }"></div>
-</div>
+                <img :src="userProfile.avatar" alt="用户头像" />
+                <div class="avatar-overlay" v-show="isHoveringAvatar">
+                  <div class="avatar-edit-text">更换头像</div>
+                </div>
+                <div class="online-status" :class="{ 'is-online': userProfile.isOnline }"></div>
+              </div>
               <div class="profile-basic">
                 <h3 class="profile-name">{{ userProfile.name }}</h3>
                 <!-- 个性签名编辑区 -->

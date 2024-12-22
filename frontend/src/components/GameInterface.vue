@@ -5,9 +5,9 @@
       <!-- 左侧玩家列表 -->
       <div class="player-list" v-if="Boolean(players && aiPlayers)">
         <!-- 使用 Object.values() 将对象的值转换为数组，并确保通过 .value 访问 ref 的值 -->
-        <div v-for="(player, index) in [...Object.values(players), ...Object.values(aiPlayers)]" :key="index"
+        <div v-for="(player, index) in [...Object.values(players), ...Object.values(aiPlayers)].sort((a, b) => a.index - b.index)" :key="index"
              :class="['player-container', { 'selected-player': index + 1 === selectedPlayer }]">
-            <div class="player" :class="{ 'dead': ![...Object.values(gameData.players), ...Object.values(gameData.ai_players)][index].alive }">
+            <div class="player" :class="{ 'dead': ![...Object.values(gameData.players), ...Object.values(gameData.ai_players)].sort((a, b) => a.index - b.index)[index].alive }">
               <img
                 :src="player.avatar"
                 alt="avatar"
@@ -16,7 +16,7 @@
               />
               <div class="player-name-container">
                 <p>
-                  {{ index + 1 }}号{{" "}}{{ player.name }}
+                  {{ player.index }}号{{" "}}{{ player.name }}
                   <span v-if="player.userId === currentPlayer.userId"> (你)</span>
                 </p>
                   <!-- 发言提示 -->
@@ -99,7 +99,7 @@
 
             <!-- 操作按钮 -->
             <button
-              v-if="Boolean(selectableIndices.indexOf(index + 1) !== -1 && selectablePhaseAction !== '')"
+              v-if="Boolean(selectableIndices.indexOf(index + 1) !== -1 && selectablePhaseAction !== '' && !isDead)"
               class="target-button"
               @click.stop="targetPlayer(index + 1)"
             >
@@ -114,7 +114,7 @@
       <!-- 确认选择按钮 -->
       <div
         class="confirm-button"
-        v-if="selectablePhaseAction !== ''"
+        v-if="selectablePhaseAction !== '' && !isDead"
         @click="confirmTarget"
       >
         确认选择
@@ -1009,14 +1009,7 @@ export default {
 
     // 工具函数，用于阶段转换时更新信息; 要求为GameData类型
     function updateGame(game){
-      // const result = validateGame(game)
-      // if (result){
-      //   gameData.value
-      // }
-      // else {
-      //   console.error('Validation errors: GameData validate failed; ' +
-      //       'stopped updating game data.', result.errors);
-      // }
+
       if (!game){
         console.error("gameData is false");
       }
@@ -1026,6 +1019,7 @@ export default {
         if (prev_phase !== gameData.value.current_phase){
           timerSeconds.value = gameData.value.phase_timer[gameData.value.current_phase]
         }
+
       }
 
     }
@@ -1311,7 +1305,8 @@ export default {
     function handleTalkUpdate(message) {
       // 处理聊天消息更新
 
-      const speaker = [...Object.values(players.value), ...Object.values(aiPlayers.value)][Number(message.source) - 1]
+      const speaker = [...Object.values(players.value), ...Object.values(aiPlayers.value)]
+          .sort((a, b) => a.index - b.index)[Number(message.source) - 1];
 
       const newMessage = {
         senderindex: Number(message.source),
@@ -1326,7 +1321,8 @@ export default {
 
     function handleTalkUpdateDead(message) {
       // 处理聊天消息更新
-      const speaker = [...Object.values(players.value), ...Object.values(aiPlayers.value)][Number(message.source) - 1]
+      const speaker = [...Object.values(players.value), ...Object.values(aiPlayers.value)]
+          .sort((a, b) => a.index - b.index)[Number(message.source) - 1]
 
       const newMessage = {
         senderindex: Number(message.source),
@@ -1677,19 +1673,7 @@ export default {
     sendChatMessage() {
 
       if (this.userMessage.trim() && this.talkStart) {
-        // 只有在自己的阶段才能说话
-        // 创建消息对象
-        // const newMessage = {
-        //   senderindex: this.currentPlayer.index, // 假设当前玩家是“你”
-        //   sendername: this.currentPlayer.name,
-        //   avatar: require('@/assets/head.png'),
-        //   text: this.userMessage,
-        //   recipients: this.isDead ? "dead" : this.messageRecipient // 死亡玩家只能发送给"dead"
-        // };
-
-        // 将消息推送到消息列表
-        // 这里先不推了，等到服务器正常返回更新的时候再推上去
-        // this.messages.push(newMessage);
+        // 把消息发到服务器
         if (this.isDead){
           this.sendMessage({
             type: "talk_content_dead",
