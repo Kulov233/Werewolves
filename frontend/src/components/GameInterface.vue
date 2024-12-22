@@ -177,7 +177,7 @@
           <!-- 结束发言按钮 -->
           <!-- TODO: 需要美化 -->
           <button @click="handleTalkEnd" class="end-talk-button" v-if="talkStart">
-            <span class="button-text">结束发言</span>
+            <span class="button-text"> {{returnButtonText}} </span>
           </button>
           <input
             v-model="userMessage"
@@ -465,8 +465,12 @@ export default {
 
 
   setup() {
+    const router = useRouter();
+
     const onlineFriends = ref( []);
     const offlineFriends = ref( []);
+
+    const gameEnd = ref(false);
 
 
     // 处理弹窗取消
@@ -733,7 +737,8 @@ export default {
           Day: 3,
           Speak: 40,
           Vote: 40,
-          End: 3
+          End: 3,
+          Cleanup: 120,
       }
     })
 
@@ -1149,6 +1154,13 @@ export default {
     function handleTalkEnd(){
       // 不能确定成功发过去了，所以等待服务器回消息再改为false
       // talkStart.value = false;
+
+      if (gameEnd.value || isDead.value){
+        handleRoomCleanup();
+        router.push('/GameLobby');
+        return;
+      }
+
       const actionToSend = {
         type: "talk_end",
         player: currentPlayer.value.index,
@@ -1186,7 +1198,7 @@ export default {
 
     async function handleKillPhase(message) {
       // 处理Werewolf投票阶段
-      gameData.value = message.game;
+      updateGame(message.game);
       if (roleInfo.value.role === "Werewolf") {
         sendNotification("狼人请行动", "action", "请选择要杀害的对象");
         await handleMultipleKillVotes();
@@ -1218,8 +1230,6 @@ export default {
         sendNotification(message.kill_result + "号玩家被你们杀死");
         // TODO: 是否要换个说法？因为不一定真死
       }
-
-      updateGame(message.game)
     }
 
     function handleKillPhaseEnd(message) {
@@ -1386,6 +1396,7 @@ export default {
     function handleGameEnd(message) {
       // 处理游戏结束
       // TODO: 有空可以再改个胜利/失败界面
+
       if (message.end){
         if (message.victory[roleInfo.value.role]){
           if (roleInfo.value.role === "Werewolf") {
@@ -1418,12 +1429,16 @@ export default {
         }
         // 游戏结束的聊天室
         talkStart.value = true;
+        gameData.value.current_phase = "Cleanup";
+        timerSeconds.value = gameData.value.phase_timer[gameData.value.current_phase];
+        gameEnd.value = true;
       }
       // TODO: 展示所有人的角色并留两分钟复盘
     }
 
     function handleRoomCleanup(){
       sendNotification("游戏结束，返回大厅", "info",)
+      wait(1000);
       router.push('/GameLobby')
     }
 
@@ -1512,6 +1527,7 @@ export default {
 
     return{
       currentSpeakingPlayer,
+      gameEnd,
 
       sendFriendRequest,
       selectedProfileId,
@@ -1559,6 +1575,10 @@ export default {
   },
 
   computed: {
+
+    returnButtonText: function() {
+      return (this.gameEnd || this.isDead) ? '返回大厅' : '结束发言';
+    },
 
     currentIcon() {
       return this.isDayTime
@@ -1674,7 +1694,7 @@ export default {
 
       if (this.userMessage.trim() && this.talkStart) {
         // 把消息发到服务器
-        if (this.isDead){
+        if (this.isDead || this.gameEnd){
           this.sendMessage({
             type: "talk_content_dead",
             content: this.userMessage,

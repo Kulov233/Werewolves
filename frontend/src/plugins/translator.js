@@ -24,6 +24,8 @@ const translations = {
   'End_Night': '夜晚结束',
   'Day': '白天',
   'Waiting': '等待中',
+  'Vote': '投票',
+  'Cleanup': '结束复盘',
 
   // 其他游戏相关术语
   'online': '在线',
