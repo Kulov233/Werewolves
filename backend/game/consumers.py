@@ -665,7 +665,7 @@ class GameConsumer(AsyncWebsocketConsumer):
             if role_info['role'] == "Werewolf":
                 # 将狼人加入狼人私有频道
                 await channel_layer.group_send(
-                    f"room_{room_id}",
+                    f"room_{room_id}_user_{user_id}",
                     {
                         "type": "join_werewolf_group",
                         "room_id": room_id
