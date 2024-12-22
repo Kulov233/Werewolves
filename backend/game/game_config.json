@@ -22,7 +22,7 @@
         "cure_count": 1,
         "poison_count": 1
         },
-      "roles_for_humans_first": ["Witch", "Prophet"]
+      "roles_for_humans_first": ["Witch", "Prophet", "Werewolf"]
     },
     "8": {
       "roles": ["Werewolf", "Werewolf", "Prophet", "Witch", "Idiot", "Villager", "Villager", "Villager"],
@@ -35,7 +35,7 @@
         "cure_count": 1,
         "poison_count": 1
         },
-      "roles_for_humans_first": ["Witch", "Idiot"]
+      "roles_for_humans_first": ["Witch", "Idiot", "Prophet", "Werewolf"]
     },
     "12": {
       "roles": ["Werewolf", "Werewolf", "Werewolf", "Prophet", "Witch", "Villager", "Villager", "Villager", "Villager", "Villager", "Villager", "Villager"],

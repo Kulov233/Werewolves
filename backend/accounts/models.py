@@ -7,18 +7,31 @@ import os
 from django.db.models import JSONField
 
 
-# 将用户上传的头像重命名为用户的 ID
 def user_directory_path(instance, filename):
     # 获取文件的扩展名
     _, ext = os.path.splitext(filename)
-    # 将文件名设置为用户的 ID
-    filename = f"{instance.user.id}{ext}"
-    # 指定文件的上传目录为 avatars/
-    path = os.path.join('avatars', filename)
-    # 检测文件名是否已存在
-    if os.path.exists(os.path.join('media', path)):
-        os.remove(os.path.join('media', path)) # TODO: 如果用户上传了以不同扩展名的同名文件，原有文件不会被删除，不过这个问题不大
-    return path
+    # 基础文件名为用户ID
+    base_filename = str(instance.user.id)
+    # 基础路径为 avatars/
+    base_path = 'avatars'
+
+    # 新文件的相对路径
+    new_path = os.path.join(base_path, f"{base_filename}{ext}")
+
+    # 在保存新文件前，尝试删除该用户的所有旧头像
+    media_root = os.path.join('media', base_path)
+    if os.path.exists(media_root):
+        # 遍历media/avatars目录查找该用户的所有旧头像
+        for old_file in os.listdir(media_root):
+            # 检查文件名是否以用户ID开头（排除其他用户的头像）
+            if old_file.startswith(base_filename + '.'):
+                try:
+                    os.remove(os.path.join(media_root, old_file))
+                except OSError:
+                    # 如果删除失败，继续执行，不影响新文件上传
+                    pass
+
+    return new_path
 
 # 好友请求模型
 class FriendRequest(models.Model):
