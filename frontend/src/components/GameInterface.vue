@@ -5,16 +5,34 @@
       <!-- 左侧玩家列表 -->
       <div class="player-list" v-if="Boolean(players && aiPlayers)">
         <!-- 使用 Object.values() 将对象的值转换为数组，并确保通过 .value 访问 ref 的值 -->
-        <div v-for="(player, index) in [...Object.values(players), ...Object.values(aiPlayers)]" :key="index"
+        <div v-for="(player, index) in [...Object.values(players), ...Object.values(aiPlayers)].sort((a, b) => a.index - b.index)" :key="index"
              :class="['player-container', { 'selected-player': index + 1 === selectedPlayer }]">
-            <div class="player" :class="{ 'dead': ![...Object.values(gameData.players), ...Object.values(gameData.ai_players)][index].alive }">
+            <div class="player" :class="{ 'dead': ![...Object.values(gameData.players), ...Object.values(gameData.ai_players)].sort((a, b) => a.index - b.index)[index].alive }">
               <img
                 :src="player.avatar"
                 alt="avatar"
                 class="avatar0"
                 @click.stop="showPlayerProfile(player.userId, player)"
               />
-              <p>{{ index + 1 }}号{{" "}}{{ player.name }}<span v-if="player.userId === currentPlayer.userId"> (你)</span></p>
+              <div class="player-name-container">
+                <p>
+                  {{ player.index }}号{{" "}}{{ player.name }}
+                  <span v-if="player.userId === currentPlayer.userId"> (你)</span>
+                </p>
+                  <!-- 发言提示 -->
+                  <div
+                    v-if="gameData.current_phase === 'Speak' && String(index + 1) === currentSpeakingPlayer"
+                    class="speaking-status"
+                  >
+                    <img
+                      src="@/assets/speaking.svg"
+                      alt="speaking"
+                      class="speaking-icon"
+                    />
+                    <span class="speaking-indicator-text">发言中</span>
+                  </div>
+
+              </div>
               <!-- 添加个人资料卡弹窗 -->
               <transition name="profile">
                 <div v-if="selectedProfileId === player.userId" class="profile-card" @click.stop>
@@ -81,7 +99,7 @@
 
             <!-- 操作按钮 -->
             <button
-              v-if="Boolean(selectableIndices.indexOf(index + 1) !== -1 && selectablePhaseAction !== '')"
+              v-if="Boolean(selectableIndices.indexOf(index + 1) !== -1 && selectablePhaseAction !== '' && !isDead)"
               class="target-button"
               @click.stop="targetPlayer(index + 1)"
             >
@@ -96,7 +114,7 @@
       <!-- 确认选择按钮 -->
       <div
         class="confirm-button"
-        v-if="selectablePhaseAction !== ''"
+        v-if="selectablePhaseAction !== '' && !isDead"
         @click="confirmTarget"
       >
         确认选择
@@ -107,7 +125,11 @@
       <!-- 中间聊天框 -->
       <div class="chat-section">
         <!-- 当前阶段显示 -->
-      <GamePhase :phase="$translate(gameData.current_phase)" />
+        <div class="phase-display">
+          <div class="phase-text">
+            <GamePhase :phase="$translate(gameData.current_phase)" />
+          </div>
+        </div>
         <div class="chat-box" ref="chatBox" @scroll="handleScroll">
           <div class="chat-messages">
             <div  v-for="message in messages" :key="message.senderindex"
@@ -358,7 +380,7 @@ export default {
           {
             id: 'cure',
             name: '解药',
-            icon: 'medicine.svg',
+            icon: 'cure.svg',
             description: '可以救活一名被杀的玩家',
             hasCount: true,
             count: 1
@@ -366,7 +388,7 @@ export default {
           {
             id: 'poison',
             name: '毒药',
-            icon: 'medicine.svg',
+            icon: 'poison.svg',
             description: '可以毒死一名玩家',
             hasCount: true,
             count: 1
@@ -377,7 +399,7 @@ export default {
           {
             id: 'check',
             name: '查验',
-            icon: 'kill.svg',
+            icon: 'prophet.svg',
             description: '每晚可以查验一名玩家的身份',
             hasCount: false
           }
@@ -727,6 +749,9 @@ export default {
       online: true
     });
 
+    // 添加当前发言玩家的响应式引用
+    const currentSpeakingPlayer = ref(null);
+
     // 计时器
     const timerSeconds = ref(10);
     // 一个用于管理select里面时间长度的变量，如果到时间结束会变成0（重置），点击结束则是会变成剩余时间
@@ -857,6 +882,9 @@ export default {
 
     //
     function handleTalkStart(message) {
+
+      currentSpeakingPlayer.value = message.player;
+
       if (currentPlayer.value.index === message.player){
         talkStart.value = true;
         sendNotification(
@@ -981,14 +1009,7 @@ export default {
 
     // 工具函数，用于阶段转换时更新信息; 要求为GameData类型
     function updateGame(game){
-      // const result = validateGame(game)
-      // if (result){
-      //   gameData.value
-      // }
-      // else {
-      //   console.error('Validation errors: GameData validate failed; ' +
-      //       'stopped updating game data.', result.errors);
-      // }
+
       if (!game){
         console.error("gameData is false");
       }
@@ -998,6 +1019,7 @@ export default {
         if (prev_phase !== gameData.value.current_phase){
           timerSeconds.value = gameData.value.phase_timer[gameData.value.current_phase]
         }
+
       }
 
     }
@@ -1283,7 +1305,8 @@ export default {
     function handleTalkUpdate(message) {
       // 处理聊天消息更新
 
-      const speaker = [...Object.values(players.value), ...Object.values(aiPlayers.value)][Number(message.source) - 1]
+      const speaker = [...Object.values(players.value), ...Object.values(aiPlayers.value)]
+          .sort((a, b) => a.index - b.index)[Number(message.source) - 1];
 
       const newMessage = {
         senderindex: Number(message.source),
@@ -1298,7 +1321,8 @@ export default {
 
     function handleTalkUpdateDead(message) {
       // 处理聊天消息更新
-      const speaker = [...Object.values(players.value), ...Object.values(aiPlayers.value)][Number(message.source) - 1]
+      const speaker = [...Object.values(players.value), ...Object.values(aiPlayers.value)]
+          .sort((a, b) => a.index - b.index)[Number(message.source) - 1]
 
       const newMessage = {
         senderindex: Number(message.source),
@@ -1322,6 +1346,9 @@ export default {
         sendNotification("你的发言时间结束。", "speak")
         talkStart.value = false;
       }
+
+      currentSpeakingPlayer.value = null; // 清除当前发言玩家
+
     }
 
     async function handleVotePhase(message) {
@@ -1484,6 +1511,8 @@ export default {
 
 
     return{
+      currentSpeakingPlayer,
+
       sendFriendRequest,
       selectedProfileId,
       selectedProfile,
@@ -1644,19 +1673,7 @@ export default {
     sendChatMessage() {
 
       if (this.userMessage.trim() && this.talkStart) {
-        // 只有在自己的阶段才能说话
-        // 创建消息对象
-        // const newMessage = {
-        //   senderindex: this.currentPlayer.index, // 假设当前玩家是“你”
-        //   sendername: this.currentPlayer.name,
-        //   avatar: require('@/assets/head.png'),
-        //   text: this.userMessage,
-        //   recipients: this.isDead ? "dead" : this.messageRecipient // 死亡玩家只能发送给"dead"
-        // };
-
-        // 将消息推送到消息列表
-        // 这里先不推了，等到服务器正常返回更新的时候再推上去
-        // this.messages.push(newMessage);
+        // 把消息发到服务器
         if (this.isDead){
           this.sendMessage({
             type: "talk_content_dead",
@@ -1845,10 +1862,10 @@ p {
   color: var(--name-color);
 }
 .chat-section {
-  width: 60%;
+  position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  width: 60%;
 }
 
 .chat-box {
@@ -1883,7 +1900,6 @@ p {
   flex-direction: column;
   gap: 5px;
 }
-
 /* 聊天消息 */
 
 /* 系统消息样式 */
@@ -2538,6 +2554,86 @@ p {
   width: 100%;
 }
 
+/* 玩家发言状态样式优化 */
+.player-name-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.player-name-container p {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 0.95em;
+}
+
+/* 发言指示器容器 */
+.speaking-indicator {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  background: linear-gradient(45deg, #3b82f6, #60a5fa);
+  border-radius: 12px;
+  margin-left: 6px;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+}
+
+.speaking-indicator-text {
+  color: white;
+  font-size: 0.8em;
+  font-weight: 500;
+  margin-left: 4px;
+}
+
+/* 说话状态样式 */
+.speaking-status {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: linear-gradient(45deg, rgba(59, 130, 246, 0.1), rgba(147, 197, 253, 0.1));
+  border-radius: 12px;
+  animation: fadeInOut 2s infinite;
+}
+
+.speaking-icon {
+  width: 16px;
+  height: 16px;
+  animation: speakingPulse 1.5s infinite;
+}
+
+/* 发言图标动画 */
+@keyframes speakingPulse {
+  0% {
+    transform: scale(0.95) translateY(0);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.05) translateY(-2px);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.95) translateY(0);
+    opacity: 0.6;
+  }
+}
+
+/* 说话状态背景动画 */
+@keyframes fadeInOut {
+  0% {
+    background: linear-gradient(45deg, rgba(59, 130, 246, 0.05), rgba(147, 197, 253, 0.05));
+  }
+  50% {
+    background: linear-gradient(45deg, rgba(59, 130, 246, 0.15), rgba(147, 197, 253, 0.15));
+  }
+  100% {
+    background: linear-gradient(45deg, rgba(59, 130, 246, 0.05), rgba(147, 197, 253, 0.05));
+  }
+}
 
 
 /* 添加资料卡动画 */
@@ -2968,6 +3064,18 @@ p {
 .chat-section {
   width: min(60%, 800px);
   min-width: 300px;
+}
+
+.phase-display {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  z-index: 1;
+  margin-top: -60px;
+  margin-bottom: 38px;
+  width: 100%;
 }
 
 /* 聊天框相关 */

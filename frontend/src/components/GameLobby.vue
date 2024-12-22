@@ -28,15 +28,9 @@
           <div class="sidebar-content">
             <!-- 个人信息头部 -->
             <div class="profile-header-menu">
-              <div class="profile-avatar" @click="toggleAvatarEdit" @mouseenter="showChangeAvatar" @mouseleave="hideChangeAvatar">
+              <div class="profile-avatar" @click="showProfileDialog = true" @mouseenter="showChangeAvatar" @mouseleave="hideChangeAvatar">
                 <img :src="userProfile.avatar" alt="用户头像" />
-                <!-- 头像编辑遮罩 -->
                 <div class="avatar-overlay" v-show="isHoveringAvatar">
-                  <input type="file"
-                        @change="handleAvatarChange"
-                        accept="image/*"
-                        class="avatar-input"
-                        ref="avatarInput">
                   <div class="avatar-edit-text">更换头像</div>
                 </div>
                 <div class="online-status" :class="{ 'is-online': userProfile.isOnline }"></div>
@@ -942,7 +936,6 @@ export default {
       isHoveringAvatar: false,
       isEditingSignature: false,
       tempSignature: "",
-      isEditingAvatar: false,
 
       //userProfile: null,
 
@@ -1840,6 +1833,7 @@ export default {
     };
 
     // 更新个性签名
+    // 在 updateSignature 中统一处理提示
     const updateSignature = async (newSignature) => {
       try {
         const response = await api.put('/api/accounts/bio/update/', {
@@ -1848,11 +1842,13 @@ export default {
 
         if (response.status === 200) {
           userProfile.value.signature = response.data.bio;
+          showConfirmDialog('成功', '个性签名更新成功');  // 使用统一的提示方式
           return true;
         }
         return false;
       } catch (error) {
         console.error('更新个性签名失败:', error);
+        showConfirmDialog('错误', '更新个性签名失败，请重试');
         return false;
       }
     };
@@ -2205,17 +2201,17 @@ export default {
       this.isHoveringAvatar = false;
     },
 
-    toggleAvatarEdit() {
-      this.isEditingAvatar = !this.isEditingAvatar;
-      if (this.isEditingAvatar) {
-        this.$nextTick(() => {
-          this.$refs.avatarInput.click();
-        });
-      }
-    },
+    // toggleAvatarEdit() {
+    //   this.isEditingAvatar = !this.isEditingAvatar;
+    //   if (this.isEditingAvatar) {
+    //     this.$nextTick(() => {
+    //       this.$refs.avatarInput.click();
+    //     });
+    //   }
+    // },
 
-    async handleAvatarChange(event) {
-      const file = event.target.files[0];
+    // GameLobby.vue 修改后的方法
+    async handleAvatarChange(file) {  // 直接接收 file 对象
       if (!file) return;
 
       if (!file.type.startsWith('image/')) {
@@ -2230,14 +2226,11 @@ export default {
 
       const success = await this.updateAvatar(file);
       if (success) {
-        // 更新头像后立即刷新用户信息
         await this.fetchUserInfo();
-        alert('头像上传成功！');
-      } else {
-        alert('上传头像失败，请重试');
       }
     },
 
+    // 移除 saveSignature 方法中的提示
     async saveSignature() {
       if (!this.userProfile.tempSignature.trim()) {
         alert('个性签名不能为空！');
@@ -2248,9 +2241,7 @@ export default {
       if (success) {
         this.userProfile.signature = this.userProfile.tempSignature;
         this.userProfile.isEditingSignature = false;
-        alert('个性签名更新成功！');
-      } else {
-        alert('更新个性签名失败，请重试');
+        // 移除这里的 alert
       }
     },
 

@@ -7,7 +7,7 @@
     </div>
 
     <!-- 修改路由视图处理 -->
-    <div :class="['router-view-container', { 'no-padding': $route.path === '/GameInterface' }]">
+    <div :class="['router-view-container', {'no-padding': $route.path === '/GameInterface' ||$route.path === '/login' }]">
       <router-view v-slot="{ Component, route }">
         <transition name="fade" mode="out-in">
           <keep-alive :include="cachedViews">

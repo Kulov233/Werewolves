@@ -186,7 +186,7 @@ export default {
       resetForm();
     };
 
-    // 处理头像变更
+    // 在 ProfileDialog.vue 中修改 handleAvatarChange 方法
     const handleAvatarChange = (event) => {
       const file = event.target.files[0];
       if (!file) return;
@@ -201,7 +201,23 @@ export default {
         return;
       }
 
-      emit('update-avatar', file);
+      // 获取文件扩展名
+      const fileExt = file.name.split('.').pop();
+
+      // 创建新的文件名，加入时间戳确保唯一性
+      const timestamp = new Date().getTime();
+      const newFileName = `avatar_${timestamp}.${fileExt}`;
+
+      // 创建新的 File 对象
+      const newFile = new File([file], newFileName, {
+        type: file.type,
+        lastModified: file.lastModified,
+      });
+
+      // 清空 input 的值，确保能重复选择同一个文件
+      event.target.value = '';
+
+      emit('update-avatar', newFile);
     };
 
     // 个性签名编辑功能
