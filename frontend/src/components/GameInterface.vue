@@ -270,6 +270,68 @@
 
     </div>
 
+    <!-- 配置按钮 -->
+    <button
+      @click="toggleRoleConfig"
+      class="config-toggle-button"
+      title="查看角色配置"
+    >
+      <img src="@/assets/config.svg" alt="配置" class="config-icon" />
+    </button>
+
+    <!-- 配置面板 -->
+    <transition name="slide-config">
+      <div v-if="showRoleConfig" class="role-config-panel">
+        <div class="role-config-header">
+          <h3>角色配置 ({{ gameData.max_players }}人局)</h3>
+          <button @click="toggleRoleConfig" class="close-config-button">
+            <span>×</span>
+          </button>
+        </div>
+
+        <div class="role-config-content">
+          <!-- 角色分布 -->
+          <div class="config-section">
+            <h4 class="section-title">角色分布</h4>
+            <div class="roles-grid">
+              <div v-for="(count, role) in roleConfigs[gameData.max_players].roles"
+                   :key="role"
+                   :class="['role-item', { 'current-player': role === roleInfo.role }]">
+                <div class="role-icon-name">
+                  <img :src="getRoleIcon(role)"
+                       :alt="roleNames[role]"
+                       class="role-svg-icon" />
+                  <span class="role-name">{{ roleNames[role] }}</span>
+                </div>
+                <span class="role-count">× {{ count }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 女巫道具 -->
+          <div class="config-section" v-if="roleConfigs[gameData.max_players].witchItems">
+            <h4 class="section-title">女巫道具</h4>
+            <div class="items-grid">
+              <div class="item">
+                <div class="item-icon-name">
+                  <img src="@/assets/cure.svg" alt="解药" class="item-svg-icon" />
+                  <span class="item-name">解药</span>
+                </div>
+                <span class="item-count">× {{ roleConfigs[gameData.max_players].witchItems.cure }}</span>
+              </div>
+              <div class="item">
+                <div class="item-icon-name">
+                  <img src="@/assets/poison.svg" alt="毒药" class="item-svg-icon" />
+                  <span class="item-name">毒药</span>
+                </div>
+                <span class="item-count">× {{ roleConfigs[gameData.max_players].witchItems.poison }}</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </transition>
   </template>
 
 <script>
@@ -360,6 +422,61 @@ export default {
   },
   data() {
     return {
+      showRoleConfig: false,
+      roleConfigs: {
+        4: {
+          roles: {
+            Werewolf: 1,
+            Villager: 3
+          },
+          witchItems: { cure: 1, poison: 1 }
+        },
+        6: {
+          roles: {
+            Werewolf: 2,
+            Prophet: 1,
+            Witch: 1,
+            Villager: 2
+          },
+          witchItems: { cure: 1, poison: 1 },
+        },
+        8: {
+          roles: {
+            Werewolf: 3,
+            Prophet: 1,
+            Witch: 1,
+            Idiot: 1,
+            Villager: 2
+          },
+          witchItems: { cure: 1, poison: 1 },
+        },
+        12: {
+          roles: {
+            Werewolf: 4,
+            Prophet: 1,
+            Witch: 1,
+            Villager: 6
+          },
+          witchItems: { cure: 2, poison: 2 }
+        },
+        16: {
+          roles: {
+            Werewolf: 6,
+            Prophet: 1,
+            Witch: 1,
+            Villager: 8
+          },
+          witchItems: { cure: 2, poison: 2 }
+        }
+      },
+      roleNames: {
+        Werewolf: "狼人",
+        Prophet: "预言家",
+        Witch: "女巫",
+        Villager: "平民",
+        Idiot: "白痴"
+      },
+
       showScrollButton: false,
       // 计时方式
       timer: null,
@@ -1596,6 +1713,27 @@ export default {
 
   methods: {
 
+    toggleRoleConfig() {
+      this.showRoleConfig = !this.showRoleConfig;
+    },
+
+    getRoleIcon(role) {
+      switch(role) {
+        case 'Werewolf':
+          return require('@/assets/wolf.svg');
+        case 'Prophet':
+          return require('@/assets/prophet.svg');
+        case 'Witch':
+          return require('@/assets/wolf.svg');
+        case 'Villager':
+          return require('@/assets/villager.svg');
+        case 'Idiot':
+          return require('@/assets/wolf.svg');
+        default:
+          return '';
+      }
+    },
+
     handleScroll() {
       const chatBox = this.$refs.chatBox;
       const isNearBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight <= 100;
@@ -1665,6 +1803,7 @@ export default {
       this.closeFriendsSidebar();
       this.closeHistorySidebar();
       this.closePlayerDetails();
+      this.showRoleConfig = null;
       this.selectedProfileId = null;
     },
 
@@ -2194,46 +2333,116 @@ p {
   width: 400px; /* 与role-info相同的宽度 */
 }
 
+/* 角色信息容器 */
 .role-info {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-    font-size: 1.2em; 
-    color: #444; 
-    margin: 20px; 
-    background-color: #f4f4f9;
-    border-radius: 10px; 
-    padding: 20px; 
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    max-width: 400px;
-    margin: 20px auto; 
+  position: relative;
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+  border-radius: 16px;
+  padding: 24px;
+  margin-left: 15px; /* 额外的左侧间距 */
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.08),
+    0 1px 3px rgba(0, 0, 0, 0.05);
+  width: 100%;
+  max-width: 400px;
+  transition: all 0.3s ease;
+  overflow: hidden;
 }
 
+.role-info:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 6px 24px rgba(0, 0, 0, 0.12),
+    0 2px 4px rgba(0, 0, 0, 0.08);
+}
 
+/* 角色信息项 */
 .role-item {
-    display: flex; 
-    justify-content: space-between;
-    align-items: center; 
-    margin-bottom: 10px; 
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.role-item:hover {
+  background: rgba(255, 255, 255, 0.9);
+  transform: translateX(4px);
 }
 
 /* 标签样式 */
 .label {
-    font-weight: bold;
-    color: #4CAF50; 
-    text-transform: uppercase;
-    letter-spacing: 1px; 
-    width: 120px; 
+  font-size: 0.9em;
+  font-weight: 600;
+  color: #4a5568;
+  letter-spacing: 0.5px;
+  min-width: 90px;
+  position: relative;
+  padding-left: 12px;
 }
 
+.label::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 16px;
+  background: linear-gradient(to bottom, #3b82f6, #60a5fa);
+  border-radius: 2px;
+}
 
 /* 值的样式 */
 .value {
-    font-weight: normal;
-    color: #555; 
-    text-align: center; 
-    flex: 1;
-    font-size: 1.0em;
+  flex: 1;
+  font-size: 1em;
+  color: #1a202c;
+  padding-left: 16px;
+  font-weight: 500;
+  text-align: left;
+  position: relative;
+  transition: all 0.2s ease;
 }
 
+/* 特殊样式：角色名称 */
+.role-item:first-child .value {
+  font-size: 1.2em;
+  font-weight: 700;
+  background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* 队友信息特殊样式 */
+.role-item:last-child {
+  background: linear-gradient(to right, rgba(59, 130, 246, 0.05), rgba(96, 165, 250, 0.1));
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .role-info {
+    padding: 16px;
+  }
+
+  .role-item {
+    padding: 10px 12px;
+    margin-bottom: 8px;
+  }
+
+  .label {
+    font-size: 0.85em;
+    min-width: 80px;
+  }
+
+  .value {
+    font-size: 0.95em;
+  }
+}
 .role-abilities {
   margin-top: -15px;
   padding: 10px;
@@ -3178,5 +3387,190 @@ p {
   height: min(100px, 8vw);
   min-width: 60px;
   min-height: 60px;
+}
+
+/* 配置按钮样式 */
+.config-toggle-button {
+  position: fixed;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 48px;
+  height: 48px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 10px rgba(99, 102, 241, 0.3);
+  transition: all 0.3s ease;
+  z-index: 100;
+}
+
+.config-toggle-button:hover {
+  transform: translateY(-50%) scale(1.1);
+  box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+}
+
+.config-icon {
+  width: 24px;
+  height: 24px;
+  filter: brightness(0) invert(1);
+}
+
+/* 配置面板样式 */
+.role-config-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 320px;
+  height: 100vh;
+  background: white;
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+  padding: 24px;
+  z-index: 1000;
+  overflow-y: auto;
+  border-radius: 20px 0 0 20px;
+}
+
+.role-config-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.role-config-header h3 {
+  font-size: 1.2em;
+  font-weight: 600;
+  color: #2d3748;
+  margin: 0;
+}
+
+.close-config-button {
+  background: transparent;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #666;
+  padding: 8px;
+  line-height: 1;
+  transition: all 0.3s ease;
+}
+
+.close-config-button:hover {
+  color: #333;
+  transform: scale(1.1);
+}
+
+/* 内容样式 */
+.role-config-content {
+  padding-right: 10px;
+}
+
+.section-title {
+  font-size: 1.1em;
+  font-weight: 600;
+  color: #2d3748;
+  margin: 0 0 16px 0;
+}
+
+.roles-grid, .items-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.role-item, .item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: #f7fafc;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.role-item:hover, .item:hover {
+  background: #edf2f7;
+  transform: translateX(4px);
+}
+
+/* 当前玩家的角色特殊标注 */
+.role-item.current-player {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(79, 70, 229, 0.1) 100%);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+.role-item.current-player .role-name::after {
+  content: ' (你)';
+  color: #4f46e5;
+  font-weight: 600;
+}
+
+.role-icon-name, .item-icon-name {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.role-icon-name, .item-icon-name {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.role-svg-icon, .item-svg-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.role-name, .item-name {
+  font-size: 0.95em;
+  color: #4a5568;
+}
+
+.role-count, .item-count {
+  font-size: 0.95em;
+  font-weight: 500;
+  color: #2d3748;
+}
+
+.camp-stats {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.stat-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+}
+
+.stat-label {
+  color: #4a5568;
+  font-size: 0.9em;
+}
+
+.stat-value {
+  color: #2d3748;
+  font-weight: 500;
+  font-size: 0.9em;
+}
+
+/* 滑动动画 */
+.slide-config-enter-active,
+.slide-config-leave-active {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.slide-config-enter-from,
+.slide-config-leave-to {
+  transform: translateX(100%);
+  opacity: 0;
 }
 </style>
