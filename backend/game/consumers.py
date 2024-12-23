@@ -9,6 +9,9 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.layers import get_channel_layer
 from django.core.cache import caches
 
+import copy
+from asgiref.sync import sync_to_async
+
 from functools import wraps
 
 def with_game_data_lock(timeout=5):
@@ -67,6 +70,31 @@ def ensure_player_is_alive():
 
     return decorator
 
+def ensure_player_is_dead():
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(consumer, *args, **kwargs):
+            room_id = consumer.scope['url_route']['kwargs']['room_id']
+            game_data = await consumer.get_game_data_from_cache(room_id)
+            if game_data is None:
+                await consumer.send(text_data=json.dumps({
+                    "type": "error",
+                    "message": "房间不存在。"
+                }))
+                return
+            user_id = str(consumer.scope['user'].id)
+            is_alive = game_data['players'][user_id]['alive']
+            if is_alive and not game_data["should_cleanup"]:
+                await consumer.send(text_data=json.dumps({
+                    "type": "error",
+                    "message": "你还活着，不能进行此操作。"
+                }))
+                return
+            return await func(consumer, *args, **kwargs)
+        return wrapper
+
+    return decorator
+
 
 # Channel: room:{room_id}
 # noinspection PyUnresolvedReferences
@@ -76,6 +104,7 @@ class GameConsumer(AsyncWebsocketConsumer):
         self.game_cache = caches['game_cache']
         self.lobby_cache = caches['lobby_cache']
         self.room_timeout = 3600
+        self.status_update_interval = 30  # 用户在线状态更新间隔[s]
 
     # noinspection PyUnresolvedReferences
     @with_game_data_lock(timeout=5)
@@ -111,19 +140,37 @@ class GameConsumer(AsyncWebsocketConsumer):
                     self.channel_name
                 )
 
-                game_data['players'][user_id]['online'] = True
-                await self.update_game_data_in_cache(room_id, game_data)
+                # 如果是狼人，加入狼人私聊频道
+                if game_data['players'][user_id]['role'] == "Werewolf":
+                    await self.channel_layer.group_add(
+                        f"room_{room_id}_werewolves",
+                        self.channel_name
+                    )
 
                 await self.accept()
 
-                await self.send(text_data=json.dumps({
-                    "type": "game_info",
-                    "game": game_data
-                }))
+                if bool(await self.is_user_online(user_id)):
+                    await self.send(text_data=json.dumps({
+                        "type": "warning",
+                        "message": "您似乎已经有一个活跃连接，请确保没有重复连接。"
+                    }))
+
+                game_data['players'][user_id]['online'] = True
+                await self.update_game_data_in_cache(room_id, game_data)
+
+                await self.set_online_status(user_id)
+                # 启动定期更新状态的任务
+                self.status_update_task = asyncio.create_task(self.update_online_status())
+
+                # await self.send(text_data=json.dumps({
+                #     "type": "game_info",
+                #     "game": game_data
+                # }))
 
                 await self.broadcast_game_update(room_id, "player_joined", game_data)
 
                 # TODO: 用户全部连接后，开始游戏
+                # TODO: 重连时，发送角色信息
 
         except DenyConnection as e:
             await self.accept()
@@ -138,6 +185,12 @@ class GameConsumer(AsyncWebsocketConsumer):
         room_id = self.scope['url_route']['kwargs']['room_id']
         user_id = str(self.scope['user'].id)
 
+        # 清除在线状态
+        await self.remove_online_status(user_id)
+        # 取消状态更新任务
+        if hasattr(self, 'status_update_task'):
+            self.status_update_task.cancel()
+
         await self.channel_layer.group_discard(f"room_{room_id}", self.channel_name)
         await self.channel_layer.group_discard(f"room_{room_id}_user_{user_id}", self.channel_name)
 
@@ -145,6 +198,10 @@ class GameConsumer(AsyncWebsocketConsumer):
         game_data = await self.get_game_data_from_cache(room_id)
         if game_data is None:
             return
+
+        if game_data['players'][user_id]['role'] == "Werewolf":
+            await self.channel_layer.group_discard(f"room_{room_id}_werewolves", self.channel_name)
+
         game_data['players'][user_id]['online'] = False
         await self.update_game_data_in_cache(room_id, game_data)
         await self.broadcast_game_update(room_id, "player_left", game_data)
@@ -155,21 +212,29 @@ class GameConsumer(AsyncWebsocketConsumer):
         """
         接收客户端发送的消息。应该根据游戏目前所处阶段处理信息。
         """
-        data = json.loads(text_data)
-        type = data.get("type")
+        try:
+            data = json.loads(text_data)
+            action = data.get("type")
 
-        if type == "kill_vote":
-            await self.handle_kill_vote(data)
-        elif type == "check":
-            await self.handle_check(data)
-        elif type == "witch_action":
-            await self.handle_witch_action(data)
-        elif type == "talk_content":
-            await self.handle_talk_content(data)
-        elif type == "talk_end":
-            await self.handle_talk_end(data)
-        elif type == "vote":
-            await self.handle_vote(data)
+            if action == "kill_vote":
+                await self.handle_kill_vote(data)
+            elif action == "check":
+                await self.handle_check(data)
+            elif action == "witch_action":
+                await self.handle_witch_action(data)
+            elif action == "talk_content":
+                await self.handle_talk_content(data)
+            elif action == "talk_content_dead":
+                await self.handle_talk_content_dead(data)
+            elif action == "talk_end":
+                await self.handle_talk_end(data)
+            elif action == "vote":
+                await self.handle_vote(data)
+        except Exception as e:
+            await self.send(text_data=json.dumps({
+                "type": "error",
+                "message": str(e)
+            }))
 
     @ensure_player_is_alive()
     @with_game_data_lock(timeout=5)
@@ -202,13 +267,11 @@ class GameConsumer(AsyncWebsocketConsumer):
 
         # 校验投票目标是否合法
         valid_targets = []
-        for user_id in game_data['players']:
-            if game_data['players'][user_id]['alive']:
-                valid_targets.append(game_data['players'][user_id]['index'])
+        players = {**game_data["players"], **game_data["ai_players"]}
 
-        for uuid in game_data['ai_players']:
-            if game_data['ai_players'][uuid]['alive']:
-                valid_targets.append(game_data['ai_players'][uuid]['index'])
+        for _, data in players.items():
+            if data['alive']:
+                valid_targets.append(data['index'])
 
         if target not in valid_targets:
             await self.send(text_data=json.dumps({
@@ -216,6 +279,11 @@ class GameConsumer(AsyncWebsocketConsumer):
                 "message": "投票目标不合法。目标不存在，或者已经死亡。"
             }))
             return
+
+        # 记录操作
+        game_data['action_history'].append({
+            "Werewolf": f"狼人 {game_data['players'][user_id]['index']} 号玩家投票杀死 {target} 号玩家。"
+        })
 
         # 同步狼人投票结果
         game_data['werewolves_targets'][game_data['players'][user_id]['index']] = target
@@ -252,30 +320,37 @@ class GameConsumer(AsyncWebsocketConsumer):
 
         target = data.get("target")
 
-        # 校验投票目标是否合法
+        # 校验目标是否合法
         valid_targets = []
-        for user_id in game_data['players']:
-            if game_data['players'][user_id]['alive']:
-                valid_targets.append(game_data['players'][user_id]['index'])
+        players = {**game_data["players"], **game_data["ai_players"]}
 
-        for uuid in game_data['ai_players']:
-            if game_data['ai_players'][uuid]['alive']:
-                valid_targets.append(game_data['ai_players'][uuid]['index'])
+        for _, data in players.items():
+            if data['alive']:
+                valid_targets.append(data['index'])
 
         if target not in valid_targets:
             await self.send(text_data=json.dumps({
                 "type": "error",
-                "message": "投票目标不合法。目标不存在，或者已经死亡。"
+                "message": "查验目标不合法。目标不存在，或者已经死亡。"
             }))
             return
 
+        role = None
+
         # 返回查验结果
-        role = game_data['players'][target]['role']
-        await self.send_check_result(room_id, user_id, target, role)
+        for _, data in players.items():
+            if data['index'] == target:
+                role = data['role']
+                await self.send_check_result(room_id, user_id, target, role)
+
+        index = game_data['players'][user_id]['index']
+        game_data['action_history'].append({
+            index: f"预言家 {index} 号玩家查验 {target} 号玩家，他的身份是 {role}。"
+        })
 
         from .tasks import end_current_phase
         # 取消定时器
-        await end_current_phase(room_id)
+        await sync_to_async(end_current_phase)(room_id)
 
     @ensure_player_is_alive()
     @with_game_data_lock(timeout=5)
@@ -322,19 +397,18 @@ class GameConsumer(AsyncWebsocketConsumer):
                 }))
                 return
             game_data['victims_info'].remove(cure)
+            game_data["players"][user_id]['role_skills']['cure_count'] -= 1
 
         # 校验毒目标是否合法
         valid_targets = []
-        for user_id in game_data['players']:
-            if game_data['players'][user_id]['alive']:
-                valid_targets.append(game_data['players'][user_id]['index'])
+        players = {**game_data["players"], **game_data["ai_players"]}
 
-        for uuid in game_data['ai_players']:
-            if game_data['ai_players'][uuid]['alive']:
-                valid_targets.append(game_data['ai_players'][uuid]['index'])
+        for _, data in players.items():
+            if data['alive']:
+                valid_targets.append(data['index'])
 
         if poison:
-            if target not in valid_targets:
+            if poison not in valid_targets:
                 await self.send(text_data=json.dumps({
                     "type": "error",
                     "message": "毒杀目标不合法。目标不存在，或者已经死亡。"
@@ -347,13 +421,26 @@ class GameConsumer(AsyncWebsocketConsumer):
                 }))
                 return
             game_data['poisoned_victims_info'].append(poison)
+            game_data["players"][user_id]['role_skills']['poison_count'] -= 1
 
         # 返回操作结果
         await self.send_witch_action_result(room_id, user_id, cure, poison)
 
+        await self.update_game_data_in_cache(room_id, game_data)
+
+        index = game_data['players'][user_id]['index']
+        if cure:
+            game_data['action_history'].append({
+                index: f"女巫 {index} 号玩家使用解药救治了 {cure} 号玩家。"
+            })
+        if poison:
+            game_data['action_history'].append({
+                index: f"女巫 {index} 号玩家使用毒药毒杀了 {poison} 号玩家。"
+            })
+
         from .tasks import end_current_phase
         # 取消定时器
-        await end_current_phase(room_id)
+        await sync_to_async(end_current_phase)(room_id)
 
     @ensure_player_is_alive()
     @with_game_data_lock(timeout=5)
@@ -384,8 +471,27 @@ class GameConsumer(AsyncWebsocketConsumer):
 
         # 记录发言
         game_data['action_history'].append({
-            "speak": f"{index} 号玩家说：“{content}”。"
+            "all": f"{index} 号玩家说：“{content}”。"
         })
+
+    @ensure_player_is_dead()
+    @with_game_data_lock(timeout=5)
+    async def handle_talk_content_dead(self, data):
+        # 获取房间 ID
+        room_id = self.scope['url_route']['kwargs']['room_id']
+
+        # 获取用户 ID
+        user_id = str(self.scope['user'].id)
+
+        game_data = await self.get_game_data_from_cache(room_id)
+
+        index = game_data['players'][user_id]['index']
+
+        content = data.get("content")
+
+        # 广播发言
+        await self.broadcast_talk_message_dead(room_id, index, content)
+
 
     @ensure_player_is_alive()
     @with_game_data_lock(timeout=5)
@@ -419,7 +525,8 @@ class GameConsumer(AsyncWebsocketConsumer):
             return
 
         # 取消定时器
-        await end_current_phase(room_id)
+        from .tasks import end_current_phase
+        await sync_to_async(end_current_phase)(room_id)
 
     @ensure_player_is_alive()
     @with_game_data_lock(timeout=5)
@@ -446,13 +553,11 @@ class GameConsumer(AsyncWebsocketConsumer):
 
         # 校验投票目标是否合法
         valid_targets = []
-        for user_id in game_data['players']:
-            if game_data['players'][user_id]['alive']:
-                valid_targets.append(game_data['players'][user_id]['index'])
+        players = {**game_data["players"], **game_data["ai_players"]}
 
-        for uuid in game_data['ai_players']:
-            if game_data['ai_players'][uuid]['alive']:
-                valid_targets.append(game_data['ai_players'][uuid]['index'])
+        for _, data in players.items():
+            if data['alive']:
+                valid_targets.append(data['index'])
 
         if target not in valid_targets:
             await self.send(text_data=json.dumps({
@@ -471,20 +576,6 @@ class GameConsumer(AsyncWebsocketConsumer):
         event_type = event.get("event")
         game_data = event.get("game")
 
-        # TODO: 去掉敏感信息
-        keys_to_remove = ["roles_for_humans_first", "game_specified_prompt", "victims_info", "poisoned_victims_info"]
-        for key in keys_to_remove:
-            game_data.pop(key, None)
-
-        keys_to_remove_in_players = ["role", "role_skills"]
-        for player in game_data['players']:
-            for key in keys_to_remove_in_players:
-                game_data['players'][player].pop(key, None)
-
-        for ai_player in game_data['ai_players']:
-            for key in keys_to_remove_in_players:
-                game_data['ai_players'][ai_player].pop(key, None)
-
         # 将广播的消息发送到客户端
         await self.send(text_data=json.dumps({
             "type": event_type,
@@ -496,12 +587,33 @@ class GameConsumer(AsyncWebsocketConsumer):
         try:
             channel_layer = get_channel_layer()
 
+            public_game_data = copy.deepcopy(game_data)
+
+            # 去掉敏感信息
+            keys_to_remove = ["roles_for_humans_first", "victory_conditions", "game_specified_prompt", "victims_info",
+                              "poisoned_victims_info", "voted_victims_info", "werewolves_targets", "votes", "action_history", "phase_transitions"]
+
+            for key in keys_to_remove:
+                public_game_data.pop(key, None)
+
+            keys_to_remove_in_players = ["role", "role_skills"]
+
+            for player in public_game_data['players']:
+                for key in keys_to_remove_in_players:
+                    public_game_data['players'][player].pop(key, None)
+
+            for ai_player in public_game_data['ai_players']:
+                for key in keys_to_remove_in_players:
+                    public_game_data['ai_players'][ai_player].pop(key, None)
+
+            # print(public_game_data)
+
             await channel_layer.group_send(
                 f"room_{room_id}",
                 {
                     "type": "game_message",
                     "event": event_type,
-                    "game": game_data
+                    "game": public_game_data
                 }
             )
         except Exception as e:
@@ -518,7 +630,8 @@ class GameConsumer(AsyncWebsocketConsumer):
                 "role_skills": { // 若非女巫则为null
                     "cure_count": 1,
                     "poison_count": 1
-                }
+                },
+                "teammates": null | ["1" ,"2" ]
             }
         }
         """
@@ -552,7 +665,7 @@ class GameConsumer(AsyncWebsocketConsumer):
             if role_info['role'] == "Werewolf":
                 # 将狼人加入狼人私有频道
                 await channel_layer.group_send(
-                    f"room_{room_id}",
+                    f"room_{room_id}_user_{user_id}",
                     {
                         "type": "join_werewolf_group",
                         "room_id": room_id
@@ -672,16 +785,20 @@ class GameConsumer(AsyncWebsocketConsumer):
         """
         {
           "type": "witch_info",
-          "cure_count": 1,
-          "poison_count": 0,
+          "role_skills": {
+              "cure_count": 0,
+              "poison_count": 1
+          },
           "cure_target": ["6", "8"], // 今晚死掉的玩家序号列表，玩家序号为字符串
         }
         """
 
         await self.send(text_data=json.dumps({
             "type": "witch_info",
-            "cure_count": cure_count,
-            "poison_count": poison_count,
+            "role_skills": {
+                "cure_count": cure_count,
+                "poison_count": poison_count
+            },
             "cure_target": cure_target
         }))
 
@@ -800,6 +917,39 @@ class GameConsumer(AsyncWebsocketConsumer):
         except Exception as e:
             print(f"广播玩家发言时出错：{e}")
 
+    async def talk_update_dead(self, event):
+        source = event.get("source")
+        message = event.get("message")
+
+        """
+        {
+          "type": "talk_update_dead",
+          "source": "5",
+          "message": "我会喷火，你会吗？"
+        }
+        """
+
+        await self.send(text_data=json.dumps({
+            "type": "talk_update_dead",
+            "source": source,
+            "message": message
+        }))
+
+    async def broadcast_talk_message_dead(self, room_id: str, source: str, message: str):
+        try:
+            channel_layer = get_channel_layer()
+
+            await channel_layer.group_send(
+                f"room_{room_id}_dead",
+                {
+                    "type": "talk_update_dead",
+                    "source": source,
+                    "message": message
+                }
+            )
+        except Exception as e:
+            print(f"广播玩家发言时出错：{e}")
+
     async def talk_start(self, event):
         player = event.get("player")
 
@@ -841,7 +991,7 @@ class GameConsumer(AsyncWebsocketConsumer):
         """
 
         await self.send(text_data=json.dumps({
-            "type": "talk_start",
+            "type": "talk_end",
             "player": player
         }))
 
@@ -972,6 +1122,29 @@ class GameConsumer(AsyncWebsocketConsumer):
         except Exception as e:
             print(f"广播白天死亡玩家时出错：{e}")
 
+    async def join_dead_group(self, event):
+        room_id = event.get('room_id')
+
+        await self.channel_layer.group_add(
+            f"room_{room_id}_dead",
+            self.channel_name
+        )
+
+    @classmethod
+    async def add_player_to_dead_group(cls, room_id: str, user_id: str):
+        try:
+            channel_layer = get_channel_layer()
+
+            await channel_layer.group_send(
+                f"room_{room_id}_user_{user_id}",
+                {
+                    "type": "join_dead_group",
+                    "room_id": room_id
+                }
+            )
+        except Exception as e:
+            print(f"将玩家加入死亡玩家群组时出错：{e}")
+
     async def not_connected(self, event):
         event_type = event.get("event")
         message = event.get("message")
@@ -1000,6 +1173,57 @@ class GameConsumer(AsyncWebsocketConsumer):
         except Exception as e:
             print(f"广播消息时出错：{e}")
 
+    async def should_disconnect(self, event):
+        try:
+            await self.send(text_data=json.dumps({
+                "type": "room_cleanup"
+            }))
+            await self.close()
+        except Exception as e:
+            pass
+
+    @classmethod
+    async def handle_should_disconnect(cls, room_id, user_id):
+        try:
+            channel_layer = get_channel_layer()
+
+            await channel_layer.group_send(
+                f"room_{room_id}",
+                {
+                    "type": "should_disconnect"
+                }
+            )
+
+        except Exception as e:
+            print(f"发送退出房间指示时出错：{e}")
+
+    # 定期更新在线状态
+    # noinspection PyUnresolvedReferences
+    async def update_online_status(self):
+        while True:
+            user_id = self.scope["user"].id
+            await self.set_online_status(user_id)
+            await asyncio.sleep(self.status_update_interval)
+
+    # 设置用户在线状态
+    @database_sync_to_async
+    def set_online_status(self, user_id):
+        self.game_cache.set(
+            f"user_online:{user_id}",
+            True,
+            timeout=self.status_update_interval * 2
+        )
+
+    # 移除用户在线状态
+    @database_sync_to_async
+    def remove_online_status(self, user_id):
+        self.game_cache.delete(f"user_online:{user_id}")
+
+    # 检查用户是否在线
+    @classmethod
+    @database_sync_to_async
+    def is_user_online(cls, user_id):
+        return bool(caches['game_cache'].get(f"user_online:{user_id}"))
 
     # 从缓存中获取房间信息
     @database_sync_to_async

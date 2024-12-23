@@ -311,7 +311,7 @@ const onFinish = async (values) => {
     return;
   }
   try {
-    const response = await axios.post("http://localhost:8000/api/accounts/login/", {
+    const response = await axios.post("/api/accounts/login/", {
       username_or_email: values.username_or_email,
       password: values.password,
     });

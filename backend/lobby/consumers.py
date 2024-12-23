@@ -89,6 +89,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
         self.lobby_cache = caches["lobby_cache"]
         self.game_cache = caches["game_cache"]
         self.room_timeout = 3600  # 房间超时时间[s]
+        self.status_update_interval = 30  # 用户在线状态更新间隔[s]
 
     # 连接时触发
     # noinspection PyUnresolvedReferences
@@ -101,21 +102,36 @@ class LobbyConsumer(AsyncWebsocketConsumer):
             else:
                 # TODO: 需要检查用户是否已连接吗？
                 # TODO: 需要检查用户是否在房间中吗？
-                # 检查用户是否已有连接
-                # user_id = self.scope["user"].id
+                user_id = self.scope["user"].id
+
                 # if await self.has_active_connection(user_id):
                 #     # 如果有现有连接，拒绝连接
                 #     raise DenyConnection("您已经有一个活跃连接。")
 
                 # 接受连接并将用户加入组
                 await self.channel_layer.group_add("lobby", self.channel_name)
+                await self.channel_layer.group_add(f"lobby_user_{user_id}", self.channel_name)
                 await self.accept()
+
+                if bool(await self.is_user_online(user_id)):
+                    await self.send(text_data=json.dumps({
+                        "type": "warning",
+                        "message": "您似乎已经有一个活跃连接，请确保没有重复连接。"
+                    }))
+
+                # 设置用户在线状态
+                await self.set_online_status(user_id)
+                # 启动定期更新状态的任务
+                self.status_update_task = asyncio.create_task(self.update_online_status())
 
                 # 将用户的连接信息添加到 channel_layer 中
                 # await self.add_connection(user_id)
 
                 # 清理信息
                 await self.clear_user_room_in_cache(self.scope["user"].id)
+
+                # 发送在线的好友列表
+                await self.send_online_friends()
 
                 # 发送房间列表
                 rooms = await self.get_room_list_from_cache()
@@ -134,13 +150,20 @@ class LobbyConsumer(AsyncWebsocketConsumer):
     # noinspection PyUnresolvedReferences
     async def disconnect(self, close_code):
         # 从 "lobby" 组移除用户
-        # user_id = self.scope["user"].id
+        user_id = self.scope["user"].id
         # await self.remove_connection(user_id)
+
+        # 清除在线状态
+        await self.remove_online_status(user_id)
+        # 取消状态更新任务
+        if hasattr(self, 'status_update_task'):
+            self.status_update_task.cancel()
 
         # TODO: 游戏已开始？
 
         # TODO: 检查用户是否在房间中，如果在房间中则移除用户
         await self.channel_layer.group_discard("lobby", self.channel_name)
+        await self.channel_layer.group_discard(f"lobby_user_{user_id}", self.channel_name)
         room_id = await self.get_user_room_from_cache(self.scope["user"].id)
         if room_id:
             await self.remove_player_from_room(room_id, self.scope["user"].id)
@@ -170,6 +193,15 @@ class LobbyConsumer(AsyncWebsocketConsumer):
             # 加入房间
             elif action == "join_room":
                 await self.handle_join_room(data)
+            # 获取在线好友列表
+            elif action == "get_friends":
+                await self.send_online_friends()
+            # 邀请玩家
+            elif action == "invite_player":
+                await self.handle_invite_player(data)
+            # 移除玩家
+            elif action == "remove_player_from_room":
+                await self.handle_remove_player_from_room(data)
             # 添加 AI 玩家
             elif action == "add_ai_player":
                 await self.handle_add_ai_player(data)
@@ -332,6 +364,76 @@ class LobbyConsumer(AsyncWebsocketConsumer):
 
     # noinspection PyUnresolvedReferences
     @with_room_lock(timeout=5)
+    async def handle_invite_player(self, data):
+        if not await self.get_user_room_from_cache(self.scope["user"].id):
+            await self.send(text_data=json.dumps({
+                "type": "error",
+                "message": "您不在任何房间中。"
+            }))
+            return
+
+        room_id = data.get("room_id")
+        room_data = await self.get_room_data_from_cache(room_id)
+
+        if room_id != await self.get_user_room_from_cache(self.scope["user"].id):
+            await self.send(text_data=json.dumps({
+                "type": "error",
+                "message": "您不在该房间中。"
+            }))
+            return
+
+        if room_data:
+            target = data.get("target")
+            if not target:
+                await self.send(text_data=json.dumps({
+                    "type": "error",
+                    "message": "请提供要邀请的玩家的用户ID。"
+                }))
+                return
+            if target == self.scope["user"].id:
+                await self.send(text_data=json.dumps({
+                    "type": "error",
+                    "message": "您不能邀请自己。"
+                }))
+                return
+            if not await self.is_friend(self.scope["user"].id, target):
+                await self.send(text_data=json.dumps({
+                    "type": "error",
+                    "message": "目标玩家不是您的好友。"
+                }))
+                return
+            if not await self.is_user_online(target):
+                await self.send(text_data=json.dumps({
+                    "type": "error",
+                    "message": "目标玩家不在线。"
+                }))
+                return
+            if target in room_data["players"]:
+                await self.send(text_data=json.dumps({
+                    "type": "error",
+                    "message": "目标玩家已经在房间中。"
+                }))
+                return
+            if len(room_data["players"]) + len(room_data["ai_players"]) >= room_data["max_players"]:
+                await self.send(text_data=json.dumps({
+                    "type": "error",
+                    "message": "房间已满。"
+                }))
+                return
+            await self.send_game_invite(target, room_id)
+            await self.send(text_data=json.dumps({
+                "type": "info",
+                "message": "邀请已发送。"
+            }))
+
+        else:
+            await self.send(text_data=json.dumps({
+                "type": "error",
+                "message": "房间不存在。"
+            }))
+
+    # noinspection PyUnresolvedReferences
+    @with_room_lock(timeout=5)
     async def handle_join_room(self, data):
         """
         加入房间
@@ -347,6 +449,10 @@ class LobbyConsumer(AsyncWebsocketConsumer):
         room_id = data.get("room_id")
         room_data = await self.get_room_data_from_cache(room_id)
         if room_data:
+            if self.scope["user"].id in room_data["players"]:
+                await self.set_user_room_in_cache(self.scope["user"].id, room_id)
+                return
+
             if room_data["status"] == "in-game":
                 await self.send(text_data=json.dumps({
                     "type": "error",
@@ -521,6 +627,38 @@ class LobbyConsumer(AsyncWebsocketConsumer):
 
     # noinspection PyUnresolvedReferences
     @with_room_lock(timeout=5)
+    async def handle_remove_player_from_room(self, data):
+        room_id = data.get("room_id")
+        room_data = await self.get_room_data_from_cache(room_id)
+        if room_data:
+            if room_data["owner"] == self.scope["user"].id:
+                user_id = data.get("user_id")
+                if user_id == self.scope["user"].id:
+                    await self.send(text_data=json.dumps({
+                        "type": "error",
+                        "message": "不能踢出自己。"
+                    }))
+                    return
+
+                if user_id in room_data["players"]:
+                    await self.remove_player_from_room(room_id, user_id)
+                else:
+                    await self.send(text_data=json.dumps({
+                        "type": "error",
+                        "message": "玩家不在房间中。"
+                    }))
+            else:
+                await self.send(text_data=json.dumps({
+                    "type": "error",
+                    "message": "只有房主可以踢出玩家。"
+                }))
+        else:
+            await self.send(text_data=json.dumps({
+                "type": "error",
+                "message": "房间不存在。"}))
+
+    # noinspection PyUnresolvedReferences
+    @with_room_lock(timeout=5)
     async def handle_leave_room(self, data):
         """
         离开房间
@@ -603,7 +741,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                                 'alive': True,
                                 'role': None,  # 敏感
                                 'role_skills': None, # 敏感
-                                'action_history': None # 敏感
+                                # 'action_history': None # 敏感
                             }
                             for idx, (player_id, player_info) in enumerate(room_data["ai_players"].items())
                         },
@@ -615,17 +753,20 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                         "werewolves_targets": {}, # 敏感
                         "votes": {},  # 敏感
                         "current_phase": "Waiting",
-                        "action_history": "", # 敏感
+                        "action_history": [], # 敏感
                         "phase_timer": {
                             "Initialize": 1,
-                            "Werewolf": 120,
+                            "Werewolf": 40,
                             "Prophet": 20,
-                            "Witch": 30,
+                            "Witch": 40,
                             "Day": 3,
                             "Speak": 60,
-                            "Vote": 60,
-                            'End': 3,
+                            "Vote": 40,
+                            "End": 3,
+                            "Cleanup": 120
                         },
+                        "starts_at": datetime.now().isoformat(),
+                        "should_cleanup": False,
                         # ...
                     }
                     speaking_phases = [f"Speak_{i}" for i in range(1, room_data["max_players"] + 1)]
@@ -634,25 +775,26 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                         "Werewolf": "Prophet",
                         "Prophet": "Witch",
                         "Witch": "Day",
-                        "Day": speaking_phases[0],
+                        "Day": "End_Night",
+                        "End_Night": speaking_phases[0],
                     }
                     for i in range(room_data["max_players"] - 1):
                         room_data_in_game["phase_transitions"][speaking_phases[i]] = speaking_phases[i + 1]
                     room_data_in_game["phase_transitions"][speaking_phases[-1]] = "Vote"
-                    room_data_in_game["phase_transitions"]["Vote"] = "End"
-                    room_data_in_game["phase_transitions"]["End"] = "Werewolf"
+                    room_data_in_game["phase_transitions"]["Vote"] = "End_Day"
+                    room_data_in_game["phase_transitions"]["End_Day"] = "Werewolf"
                     """
-                    Initialize -> Werewolf -> Prophet -> Witch -> Day -> Speak_1 ->
+                    Initialize -> Werewolf -> Prophet -> Witch -> End_Night -> Day -> Speak_1 ->
                      Speak_2 -> ... -> Speak_n -> Vote 
-                     -> End -> Werewolf
+                     -> End_Day -> Werewolf
                      如果编号 n - len(room_data["players"]) > 0，则 Speak_n 为 AI 玩家发言
                     """
 
-                    all_phases = list(room_data_in_game["phase_transitions"].keys()) + list(
-                        room_data_in_game["phase_transitions"].values())
-                    unique_phases = set(all_phases)
-                    unique_phases_list = list(unique_phases)
-                    room_data_in_game["phases"] = unique_phases_list
+                    # all_phases = list(room_data_in_game["phase_transitions"].keys()) + list(
+                    #     room_data_in_game["phase_transitions"].values())
+                    # unique_phases = set(all_phases)
+                    # unique_phases_list = list(unique_phases)
+                    # room_data_in_game["phases"] = unique_phases_list
 
                     await self.set_room_data_in_game_cache(room_id, room_data_in_game)
                     # TODO: 在大厅中删除房间？
@@ -662,6 +804,9 @@ class LobbyConsumer(AsyncWebsocketConsumer):
 
                     # 触发游戏开始检查
                     await trigger_game_start_check(room_id)
+
+                    room_data["status"] = "in-game"
+                    await self.update_room_in_cache(room_id, room_data)
 
             else:
                 await self.send(text_data=json.dumps({
@@ -680,10 +825,11 @@ class LobbyConsumer(AsyncWebsocketConsumer):
             return
         room_data = await self.get_room_data_from_cache(room_id)
         if room_data:
-            room_data["players"].append(user_id)
-            await self.update_room_in_cache(room_id, room_data)
             await self.set_user_room_in_cache(user_id, room_id)
-            await self.broadcast_room_update("player_joined", room_data)
+            if user_id not in room_data["players"]:
+                room_data["players"].append(user_id)
+                await self.update_room_in_cache(room_id, room_data)
+                await self.broadcast_room_update("player_joined", room_data)
 
     # noinspection PyUnresolvedReferences
     async def add_ai_player_to_room(self, room_id, player_info):
@@ -750,6 +896,47 @@ class LobbyConsumer(AsyncWebsocketConsumer):
         except Exception as e:
             print(f"广播消息时出错：{e}")
 
+    # noinspection PyUnresolvedReferences
+    async def online_friends(self, event):
+        online_friends = await self.get_online_friends(self.scope["user"].id)
+        await self.send(text_data=json.dumps({
+            "type": "online_friends",
+            "friends": online_friends
+        }))
+
+    async def send_online_friends(self):
+        try:
+            await self.channel_layer.group_send(
+                f"lobby_user_{self.scope['user'].id}",
+                {
+                    "type": "online_friends"
+                }
+            )
+        except Exception as e:
+            print(f"发送在线好友列表时出错：{e}")
+
+    async def game_invite(self, event):
+        """处理接收到的游戏邀请"""
+        await self.send(text_data=json.dumps({
+            "type": "game_invite",
+            "source": event["sender_id"],
+            "room_id": event["room_id"]
+        }))
+
+    async def send_game_invite(self, target_id: int, room_id: str):
+        try:
+            """发送游戏邀请"""
+            await self.channel_layer.group_send(
+                f"lobby_user_{target_id}",  # 目标用户的私人频道
+                {
+                    "type": "game_invite",
+                    "sender_id": self.scope["user"].id,
+                    "room_id": room_id
+                }
+            )
+        except Exception as e:
+            print(f"发送游戏邀请时出错：{e}")
+
     # @database_sync_to_async
     # def has_active_connection(self, user_id):
     #     # 使用 Django 缓存检查用户是否已有连接
@@ -764,6 +951,56 @@ class LobbyConsumer(AsyncWebsocketConsumer):
     # def remove_connection(self, user_id):
     #     # 用户断开连接时，从缓存中删除连接标记
     #     self.lobby_cache.delete(f"user:{user_id}:connected")
+
+    # 定期更新在线状态
+    # noinspection PyUnresolvedReferences
+    async def update_online_status(self):
+        while True:
+            user_id = self.scope["user"].id
+            await self.set_online_status(user_id)
+            await asyncio.sleep(self.status_update_interval)
+
+    @database_sync_to_async
+    def get_online_friends(self, user_id) -> list[int]:
+        """获取在线好友列表"""
+        from django.contrib.auth.models import User
+
+        user = User.objects.get(id=user_id)
+        # 获取所有好友
+        friends = user.userprofile.friends.all()
+        # 过滤出在线的好友
+        online_friend_ids = []
+        for friend in friends:
+            if self.lobby_cache.get(f"user_online:{friend.id}"):
+                online_friend_ids.append(friend.id)
+
+        return online_friend_ids
+
+    @database_sync_to_async
+    def is_friend(self, user_id: int, target_id: int) -> bool:
+        """检查target_id是否是user_id的好友"""
+        from django.contrib.auth.models import User
+        user = User.objects.get(id=user_id)
+        return user.userprofile.friends.filter(id=target_id).exists()
+
+    # 设置用户在线状态
+    @database_sync_to_async
+    def set_online_status(self, user_id):
+        self.lobby_cache.set(
+            f"user_online:{user_id}",
+            True,
+            timeout=self.status_update_interval * 2
+        )
+
+    # 移除用户在线状态
+    @database_sync_to_async
+    def remove_online_status(self, user_id):
+        self.lobby_cache.delete(f"user_online:{user_id}")
+
+    # 检查用户是否在线
+    @database_sync_to_async
+    def is_user_online(self, user_id):
+        return bool(self.lobby_cache.get(f"user_online:{user_id}"))
 
     # 添加房间 ID 列表到缓存中
     @database_sync_to_async

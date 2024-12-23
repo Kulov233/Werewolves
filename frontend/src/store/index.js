@@ -15,7 +15,7 @@ export default createStore({
     userProfile: null,
     onlineFriends: null,
     offlineFriends: null,
-    wsBaseUrl: 'ws://localhost:8000/ws',
+    wsBaseUrl: `ws://${window.location.host}/ws`,
 
     isLoading: false,
 

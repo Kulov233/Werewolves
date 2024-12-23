@@ -20,13 +20,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-m#*59qpr6e%tw#cafsbgt_bgy#rpb8afd_(djm3e%j!3t9_5oy'
+SECRET_KEY = 'django-inagw@$*(&jjjaowihf!3t9_5oy'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS = ["*"]
 
 # Application definition
 
@@ -58,9 +57,19 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:8080",
+CORS_ORIGIN_WHITELIST = [
+    "http://se.ydmsk.xyz:8080",
+    "http://106.54.223.124:8080",
+    "http://app:8080"
 ]
+
+CORS_ALLOWED_ORIGINS = [
+    "http://se.ydmsk.xyz:8080",
+    "http://106.54.223.124:8080",
+    "http://app:8080"
+]
+
+CORS_ALLOW_CREDENTIALS = True
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
@@ -69,6 +78,13 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated', # 设置接口默认权限为需要认证
     ),
+}
+
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=2),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
 }
 
 ROOT_URLCONF = 'app.urls'
@@ -102,14 +118,14 @@ WSGI_APPLICATION = 'app.wsgi.application'
 #     }
 # }
 
-DATABASES = { # TODO: 转为生产环境时修改
+DATABASES = { # 转为生产环境时修改
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'debug_db',
+        'NAME': 'werewolves',
         'USER': 'root',
-        'PASSWORD': 'password',
-        'HOST': '127.0.0.1',
-        'PORT': '33060',
+        'PASSWORD': 'sbwzs233',
+        'HOST': 'mysql',
+        'PORT': '3306',
     }
 }
 
@@ -138,7 +154,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Shanghai'
 
 USE_I18N = True
 
@@ -158,8 +174,11 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # 媒体文件
 
 import os
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_ROOT = '/usr/share/nginx/media/' if not DEBUG else os.path.join(BASE_DIR, 'media')
 MEDIA_URL = '/media/'
+FILE_UPLOAD_PERMISSIONS = 0o644
+FILE_UPLOAD_DIRECTORY_PERMISSIONS = 0o755
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
 
 # ASGI
 
@@ -173,7 +192,7 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [("127.0.0.1", 63790)],
+            "hosts": [("redis", 6379)],
         },
     },
 }
@@ -183,7 +202,7 @@ CHANNEL_LAYERS = {
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": "redis://127.0.0.1:63790/0",  # 主 Redis 数据库
+        "LOCATION": "redis://redis:6379/0",  # 主 Redis 数据库
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         },
@@ -191,7 +210,7 @@ CACHES = {
     # 大厅缓存
     "lobby_cache": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": "redis://127.0.0.1:63790/1",
+        "LOCATION": "redis://redis:6379/1",
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         },
@@ -200,7 +219,7 @@ CACHES = {
     # 游戏房间缓存
     "game_cache": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": "redis://127.0.0.1:63790/1",
+        "LOCATION": "redis://redis:6379/1",
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         },
@@ -210,12 +229,28 @@ CACHES = {
 
 # Celery 配置
 
-CELERY_BROKER_URL = 'redis://localhost:63790/2'
+CELERY_BROKER_URL = 'redis://redis:6379/2'
 
-CELERY_RESULT_BACKEND = 'redis://localhost:63790/2'
+CELERY_RESULT_BACKEND = 'redis://redis:6379/2'
 
 CELERY_ACCEPT_CONTENT = ['json']  # Celery 接受的消息内容类型
 
 CELERY_TASK_SERIALIZER = 'json'  # 任务序列化格式
 
 CELERY_RESULT_SERIALIZER = 'json'  # 结果序列化格式
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+        },
+    },
+}

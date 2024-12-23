@@ -351,7 +351,7 @@ import ConfirmDialog from "@/components/shared_components/ConfirmDialog.vue";
 const router = useRouter();
 // 创建axios实例
 const api = axios.create({
-  baseURL: 'http://localhost:8000'
+  baseURL: '/'
 });
 
 // 添加请求拦截器
@@ -383,7 +383,7 @@ api.interceptors.response.use(
       try {
         // 使用refresh token获取新的access token
         const refreshToken = localStorage.getItem('refresh_token');
-        const response = await axios.post('http://localhost:8000/api/token/refresh/', {
+        const response = await axios.post('api/token/refresh/', {
           refresh: refreshToken
         });
 

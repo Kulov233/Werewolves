@@ -245,7 +245,7 @@ const onFinish = async (values) => {
 
   try {
     // 发送注册请求
-    const response = await axios.post("http://localhost:8000/api/accounts/register/", requestData);
+    const response = await axios.post("/api/accounts/register/", requestData);
 
     // 注册成功的响应
     await showConfirmDialog(response.data.message || "注册成功！", "", "register_success");
