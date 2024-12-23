@@ -1227,8 +1227,8 @@ export default {
     function handleKillResult(message) {
       // 处理刀人结果
       if (message.kill_result){
-        sendNotification(message.kill_result + "号玩家被你们杀死");
-        // TODO: 是否要换个说法？因为不一定真死
+        sendNotification( "今晚你们选择杀死" + message.kill_result + "号玩家");
+        sendSystemMessage( "今晚你们选择杀死" + message.kill_result + "号玩家");
       }
     }
 
@@ -1254,6 +1254,7 @@ export default {
     function handleCheckResult(message) {
       // 处理查人结果
       sendNotification(message.target + "号玩家的身份为" +  $translate(message.role) );
+      sendSystemMessage(message.target + "号玩家的身份为" +  $translate(message.role) );
 
     }
 
@@ -1291,17 +1292,18 @@ export default {
       // 处理Witch操作结果
       let line = ""
       if (message.cure){
-        roleInfo.value.cure_count -= 1;
-        line += "你选择对" + message.cure + "号玩家使用解药";
+        roleInfo.value.role_skills.cure_count -= 1;
+        line += "你选择对" + message.cure + "号玩家使用解药\n";
       }
       if (message.poison){
-        roleInfo.value.poison_count -= 1;
-        line += "你选择对" + message.poison + "号玩家使用毒药";
+        roleInfo.value.role_skills.poison_count -= 1;
+        line += "你选择对" + message.poison + "号玩家使用毒药\n";
       }
       if (line !== ""){
+        sendSystemMessage(line);
         showInfo("女巫行动", line);
       }
-      // TODO: 其实这个信息没有必要提示给玩家，本来也是不知道的。理论上完全不会出现非法情况。
+
     }
 
 
@@ -1373,9 +1375,11 @@ export default {
     function handleVoteResult(message) {
       // 处理投票结果
       if (!message.result){
+        sendSystemMessage("投票结果: 由于出现平票，没有人被放逐")
         sendNotification("投票结果: 由于出现平票，没有人被放逐", "vote");
       }
       else {
+        sendSystemMessage(message.result + "号玩家被放逐");
         sendNotification("投票结果: "+ message.result + "号玩家被放逐", "death");
       }
 
