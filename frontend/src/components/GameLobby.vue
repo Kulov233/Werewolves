@@ -1791,7 +1791,6 @@ export default {
           stats: [
             { label: '游戏场数', value: data.profile.games.length },
             { label: '胜率', value: calculateWinRate(data.profile.games) },
-            // { label: '评分', value: calculateRating(data.profile.games) }
           ]
         };
       } catch (error) {
