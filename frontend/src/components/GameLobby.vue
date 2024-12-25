@@ -53,13 +53,6 @@
               </div>
             </div>
 
-            <!-- 个人统计数据 -->
-            <div class="profile-stats">
-              <div v-for="stat in userProfile.stats" :key="stat.label" class="stat-card">
-                <span class="stat-value">{{ stat.value }}</span>
-                <span class="stat-label">{{ stat.label }}</span>
-              </div>
-            </div>
 
             <!-- 功能区块 -->
             <div class="menu-sections">
