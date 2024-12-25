@@ -4,7 +4,7 @@
 
       <!-- 左侧玩家列表 -->
       <div class="player-list" v-if="Boolean(players && aiPlayers)">
-        <!-- 使用 Object.values() 将对象的值转换为数组，并确保通过 .value 访问 ref 的值 -->
+        <!-- 使用 Object.values() 将对象的值转换为数组-->
         <div v-for="(player, index) in [...Object.values(players), ...Object.values(aiPlayers)].sort((a, b) => a.index - b.index)" :key="index"
              :class="['player-container', { 'selected-player': index + 1 === selectedPlayer }]">
             <div class="player" :class="{ 'dead': ![...Object.values(gameData.players), ...Object.values(gameData.ai_players)].sort((a, b) => a.index - b.index)[index].alive }">
@@ -801,7 +801,6 @@ export default {
       teammates: [],
     });
 
-    // const selectedPlayerId = ref(null);
     const gameData = ref({
       id: "1c134013-3b54-4ccd-a2b9-e42ef088d9a9",
       title: "一个房间",
@@ -1314,7 +1313,7 @@ export default {
     async function handleKillPhase(message) {
       // 处理Werewolf投票阶段
       updateGame(message.game);
-      if (roleInfo.value.role === "Werewolf") {
+      if (roleInfo.value.role === "Werewolf" && !isDead.value) {
         sendNotification("狼人请行动", "action", "请选择要杀害的对象");
         await handleMultipleKillVotes();
       }
@@ -1356,7 +1355,7 @@ export default {
       // 处理Prophet查人阶段, 不能告诉他谁死了
 
       updateGame(message.game);
-      if (roleInfo.value.role === "Prophet" && gameData.value.current_phase === "Prophet"){
+      if (roleInfo.value.role === "Prophet" && gameData.value.current_phase === "Prophet" && !isDead.value){
         sendNotification("预言家请行动", "action", "请选择要查验的玩家");
         const checkTarget = await select("选择要查验的目标", "查验",
             gameData.value.phase_timer[gameData.value.current_phase], null, true);
@@ -1381,7 +1380,7 @@ export default {
 
     async function handleWitchInfo(message) {
       // 处理Witch信息
-      if(roleInfo.value.role === "Witch"){
+      if(roleInfo.value.role === "Witch" && !isDead.value){
         roleInfo.value.role_skills = message.role_skills;
         sendNotification("女巫请行动", "action", "请选择使用解药和毒药");
         let cure_target = -1, poison_target = -1;
