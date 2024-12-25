@@ -533,30 +533,30 @@ const ROLE_CONFIGS = {
   },
   8: {
     roles: {
-      Werewolf: 2,
+      Werewolf: 3,
       Prophet: 1,
       Witch: 1,
       Idiot: 1,
-      Villager: 3
+      Villager: 2
     },
     witchItems: { cure: 1, poison: 1 },
     priorityRoles: ["Witch", "Idiot"]
   },
   12: {
     roles: {
-      Werewolf: 3,
+      Werewolf: 4,
       Prophet: 1,
       Witch: 1,
-      Villager: 7
+      Villager: 6
     },
     witchItems: { cure: 2, poison: 2 }
   },
   16: {
     roles: {
-      Werewolf: 4,
+      Werewolf: 6,
       Prophet: 1,
       Witch: 1,
-      Villager: 10
+      Villager: 8
     },
     witchItems: { cure: 2, poison: 2 }
   }
@@ -815,8 +815,9 @@ export default {
           message: '搜索失败'
         };
       } catch (error) {
-        console.error('Search error:', error);
+        showConfirmDialog('搜索失败', '');
         return {
+
           success: false,
           message: error.response?.data?.message || '搜索失败'
         };
@@ -871,7 +872,6 @@ export default {
           };
         }
       } catch (error) {
-        console.error('发送好友请求失败:', error);
         showConfirmDialog('错误', error.response?.data?.message || '发送好友请求失败');
         return {
           success: false,
@@ -896,7 +896,7 @@ export default {
         invitedUsers.value.push(userId);
 
       } catch (error) {
-        console.error('邀请失败:', error);
+        showConfirmDialog('邀请失败', '');
       }
     };
 
@@ -911,7 +911,7 @@ export default {
       try {
         // 确保有房间ID和好友ID
         if (!currentRoom.value.id || !friendId) {
-          console.error('Missing required parameters for invitation');
+          showConfirmDialog('邀请失败', '请刷新后重试');
           return;
         }
 
@@ -937,7 +937,7 @@ export default {
         }, 3000);
 
       } catch (error) {
-        console.error('邀请失败:', error);
+        showConfirmDialog('邀请失败', '');
       }
     };
 
@@ -971,7 +971,7 @@ export default {
           };
         }
       } catch (error) {
-        console.error('获取用户信息失败:', error);
+        showConfirmDialog('获取用户信息失败', '请重试');
         return null;
       }
     };
@@ -1158,7 +1158,6 @@ export default {
 
       // 处理开始游戏
       const gameStartedCleanup = onType('game_prepared', (data) => {
-        // TODO: 存储房间信息
         // 跳转到游戏界面
 
         // 确保是当前房间
@@ -1290,7 +1289,7 @@ export default {
         showDialog.value = true;
 
       } catch (error) {
-        console.error('保存房间设置失败:', error);
+        showConfirmDialog('修改房间设置失败！', '请先减少房间人数到需要修改的数量');
         // 可以添加错误提示
       }
     };
@@ -1357,7 +1356,7 @@ export default {
                   lastSeen: '在线'
                 };
               } catch (error) {
-                console.error('获取好友信息失败:', error);
+                showConfirmDialog('获取好友信息失败', '请重试');
                 return null;
               }
             })
@@ -1373,7 +1372,7 @@ export default {
         onType('online_friends', handleOnlineFriends);
 
       } catch (error) {
-        console.error('获取好友列表失败:', error);
+        showConfirmDialog('获取好友列表失败', '请刷新后重试');
       }
     };
 
@@ -1385,7 +1384,6 @@ export default {
         action: "start_game",
         room_id: currentRoom.value.id
       });
-      // TODO：可以加个弹窗，然后弹窗点确定后跳转到游戏界面
 
     };
     const getRoleCountMap = (roles) => {

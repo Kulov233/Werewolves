@@ -851,11 +851,11 @@ export default {
     return {
 
       roleIcons: {
-        //'Witch': require('@/assets/witch.svg'),
+        'Witch': require('@/assets/cure.svg'),
         'Werewolf': require('@/assets/wolf.svg'),
         'Villager': require('@/assets/villager.svg'),
-        //'Prophet': require('@/assets/prophet.svg'),
-        //'Idiot': require('@/assets/idiot.svg')
+        'Prophet': require('@/assets/prophet.svg'),
+        'Idiot': require('@/assets/villager.svg')
       },
       //friendRequests: [
       //  {
@@ -1901,7 +1901,7 @@ export default {
     // 辅助函数：计算胜率
     const calculateWinRate = (games) => {
       if (!games || games.length === 0) return '0%';
-      const wins = games.filter(game => game.result === 'win').length;
+      const wins = games.filter(game => game.won).length;
       return `${Math.round((wins / games.length) * 100)}%`;
     };
 
