@@ -2425,7 +2425,7 @@ p {
   border-color: transparent;
   transform: scale(1.1);
 }
-/*TODO:改悬浮样式*/
+
 
 .right-info-container {
   display: flex;
