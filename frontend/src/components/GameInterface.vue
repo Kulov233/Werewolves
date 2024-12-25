@@ -3038,8 +3038,13 @@ p {
   margin-bottom: 16px !important;
 }
 
-.stat-item {
+stat-item {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
   text-align: center !important;
+  padding: 4px 8px !important;
 }
 
 .stat-value {
@@ -3047,9 +3052,11 @@ p {
   font-size: 1em !important;
   font-weight: 600 !important;
   color: #2c3e50 !important;
+  margin-bottom: 4px !important;
 }
 
 .stat-label {
+  display: block !important;
   font-size: 0.75em !important;
   color: #666 !important;
 }
