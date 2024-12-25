@@ -53,13 +53,6 @@
               </div>
             </div>
 
-            <!-- 个人统计数据 -->
-            <div class="profile-stats">
-              <div v-for="stat in userProfile.stats" :key="stat.label" class="stat-card">
-                <span class="stat-value">{{ stat.value }}</span>
-                <span class="stat-label">{{ stat.label }}</span>
-              </div>
-            </div>
 
             <!-- 功能区块 -->
             <div class="menu-sections">
@@ -80,12 +73,12 @@
               <!-- 好友系统 -->
               <div class="menu-section">
                 <h4 class="section-title">
-                  <img src="@/assets/wolf.svg" alt="Friends" class="section-icon" />
+                  <img src="@/assets/social.svg" alt="Friends" class="section-icon" />
                   社交中心
                 </h4>
                 <div class="section-content">
                   <button class="menu-button" @click="goToFriends">
-                    <img src="@/assets/wolf.svg" alt="Friend List" />
+                    <img src="@/assets/friends.svg" alt="Friend List" />
                     好友列表
                   </button>
                 </div>
@@ -94,12 +87,12 @@
               <!-- 设置中心 -->
               <div class="menu-section">
                 <h4 class="section-title">
-                  <img src="@/assets/wolf.svg" alt="Settings" class="section-icon" />
+                  <img src="@/assets/settings.svg" alt="Settings" class="section-icon" />
                   设置中心
                 </h4>
                 <div class="section-content">
                   <button class="menu-button" @click="goToProfile">
-                    <img src="@/assets/wolf.svg" alt="Profile" />
+                    <img src="../assets/profile-setting.svg" alt="Profile" />
                     资料设置
                   </button>
                 </div>
@@ -1797,8 +1790,7 @@ export default {
           games:gameHistory,
           stats: [
             { label: '游戏场数', value: data.profile.games.length },
-            { label: '胜率', value: calculateWinRate(data.profile.games) },
-            // { label: '评分', value: calculateRating(data.profile.games) }
+            { label: '胜率', value: calculateWinRate(data.profile) },
           ]
         };
       } catch (error) {
@@ -1883,8 +1875,7 @@ export default {
           isFriend: checkIsFriend(userId),
           stats: [
             { label: '游戏场数', value: data.profile.wins + data.profile.loses },
-            { label: '胜率', value: `${calculateWinRate(data.profile.games)}` },
-            { label: '评分', value: data.profile.rating || 0 }
+            { label: '胜率', value: `${calculateWinRate(data.profile)}` },
           ],
           recentGames: (data.profile.recent_games || []).map((game, index) => ({
             id: index.toString(),
@@ -1899,10 +1890,10 @@ export default {
     };
 
     // 辅助函数：计算胜率
-    const calculateWinRate = (games) => {
-      if (!games || games.length === 0) return '0%';
-      const wins = games.filter(game => game.won).length;
-      return `${Math.round((wins / games.length) * 100)}%`;
+    const calculateWinRate = (userData) => {
+      const totalGames = userData.wins + userData.loses;
+      if (totalGames === 0) return '0%';
+      return `${Math.round((userData.wins / totalGames) * 100)}%`;
     };
 
     // 辅助函数：计算平均评分
@@ -1989,7 +1980,7 @@ export default {
       });
     },
       filteredGameHistory() {
-      let filtered = this.userProfile?.games || this.gameHistory;
+      let filtered = this.userProfile?.games || [];
 
       // 按时间筛选
       if (this.timeFilter !== 'all') {
@@ -2010,8 +2001,8 @@ export default {
 
       // 按时间排序
       filtered.sort((a, b) => {
-        const timeA = new Date(a.time).getTime();
-        const timeB = new Date(b.time).getTime();
+        const timeA = new Date(a.date).getTime();
+        const timeB = new Date(b.date).getTime();
         return this.timeSort === 'desc' ? timeB - timeA : timeA - timeB;
       });
 
@@ -3822,11 +3813,11 @@ export default {
 }
 
 .slide-right-enter-from {
-  transform: translateX(100%);
+  transform: translateX(110%);
 }
 
 .slide-right-leave-to {
-  transform: translateX(100%);
+  transform: translateX(110%);
 }
 
 .icon {
