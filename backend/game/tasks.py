@@ -728,6 +728,8 @@ def handle_ai_action(room_id: str, ai_id: str, phase: str, action: dict):
             })
             print(f"{room_id} 房间 {game_data['ai_players'][ai_id]['index']} 号AI选择救人 {cure} 号玩家，毒人 {poison} 号玩家。")
         elif action["type"] == "speak":
+            if result.startswith('"') and result.endswith('"'):
+                result = result[1:-1]
             async_to_sync(GameConsumer.broadcast_talk_message)(room_id, game_data["ai_players"][ai_id]["index"], result)
 
             message = "我选择发言："
@@ -876,6 +878,7 @@ def start_phase(room_id: str, phase: str):
         elif phase == 'Day':
             # 结算昨晚的结果
             victims = game_data["victims_info"] + game_data["poisoned_victims_info"]
+            victims = list(set(victims))
             # 按序号排序
             victims.sort(key=int)
 
