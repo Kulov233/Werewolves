@@ -1529,21 +1529,27 @@ export default {
               "恭喜，您成功地守护了村庄免受狼人威胁！……继往圣之绝学，为万世开太平。");
           }
         } else {
-          if (roleInfo.value.role === "Werewolf") {
-            sendNotification("游戏结束，好人阵营获胜。你的阵营失败了……再接再厉！", "day",
-            "狼人们一一被发现后被驱逐，亦或是被女巫的毒药杀害。但复仇的时刻会来的……总有一天。");
-          } else if (roleInfo.value.role === "Idiot") {
-            // If Idiot loses, either werewolf or villagers won
-            if (message.victory["Werewolf"]) {
-              sendNotification("游戏结束，狼人获胜。你失败了……再接再厉！", "night",
-              "可惜的是，愚者还没来得及展示所有人的愚蠢，就被狼人杀害了。毕竟，人死了又能说出什么来呢？");
+          if (message.victory["Idiot"]) {
+            sendNotification("游戏结束，白痴获胜！", "Day",
+              "愚者看似游于争斗之外，但博弈中棋子们却均投出如此无用之票，命运是否在向他们展示，生命不过一场游戏？");
+          }
+          else {
+            if (roleInfo.value.role === "Werewolf") {
+              sendNotification("游戏结束，好人阵营获胜。你的阵营失败了……再接再厉！", "day",
+              "狼人们一一被发现后被驱逐，亦或是被女巫的毒药杀害。但复仇的时刻会来的……总有一天。");
+            } else if (roleInfo.value.role === "Idiot") {
+              // If Idiot loses, either werewolf or villagers won
+              if (message.victory["Werewolf"]) {
+                sendNotification("游戏结束，狼人获胜。你失败了……再接再厉！", "night",
+                "可惜的是，愚者还没来得及展示所有人的愚蠢，就被狼人杀害了。毕竟，人死了又能说出什么来呢？");
+              } else {
+                sendNotification("游戏结束，好人阵营获胜。你失败了……再接再厉！", "day",
+                "你看着村民的狂欢，他们似乎已不在意你的存在。也罢，也罢。如此得过且过，也算一幸事。");
+              }
             } else {
-              sendNotification("游戏结束，好人阵营获胜。你失败了……再接再厉！", "day",
-              "你看着村民的狂欢，他们似乎已不在意你的存在。也罢，也罢。如此得过且过，也算一幸事。");
+              sendNotification("游戏结束，狼人获胜！你的阵营失败了……再接再厉！", "night",
+              "狼人将村民与守护者们屠戮殆尽，村庄沦为怪物们的巢穴。但我们仍相信人类的勇气、胆识与正义，邪不压正，它们总有被消灭的一天。");
             }
-          } else {
-            sendNotification("游戏结束，狼人获胜！你的阵营失败了……再接再厉！", "night",
-            "狼人将村民与守护者们屠戮殆尽，村庄沦为怪物们的巢穴。但我们仍相信人类的勇气、胆识与正义，邪不压正，它们总有被消灭的一天。");
           }
         }
         // 游戏结束的聊天室
@@ -2419,7 +2425,7 @@ p {
   border-color: transparent;
   transform: scale(1.1);
 }
-/*TODO:改悬浮样式*/
+
 
 .right-info-container {
   display: flex;
