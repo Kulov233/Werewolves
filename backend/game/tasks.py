@@ -590,10 +590,6 @@ def handle_phase_timed_out(room_id: str, current_phase: str):
             # 结算投票
             get_vote_result(room_id)
             game_data = game_cache.get(f"room:{room_id}")
-            async_to_sync(GameConsumer.broadcast_game_update)(room_id, 'vote_phase_end', game_data)
-            # async_to_sync(GameConsumer.broadcast_day_death_info)(room_id, game_data["voted_victims_info"])
-            async_to_sync(GameConsumer.broadcast_vote_result)(room_id, game_data["voted_victims_info"][0] if len(game_data["voted_victims_info"]) == 1 else None)
-
             # 更新存活状态
             players = {**game_data["players"], **game_data["ai_players"]}
             for user_id, data in players.items():
@@ -602,7 +598,10 @@ def handle_phase_timed_out(room_id: str, current_phase: str):
                     async_to_sync(GameConsumer.add_player_to_dead_group)(room_id, user_id)
 
             game_cache.set(f"room:{room_id}", game_data)
-
+            # 通知前端
+            async_to_sync(GameConsumer.broadcast_game_update)(room_id, 'vote_phase_end', game_data)
+            async_to_sync(GameConsumer.broadcast_day_death_info)(room_id, game_data["voted_victims_info"])
+            async_to_sync(GameConsumer.broadcast_vote_result)(room_id, game_data["voted_victims_info"][0] if len(game_data["voted_victims_info"]) == 1 else None)
         elif current_phase.startswith("End"):
             if game_data["should_cleanup"]:
                 # 通知前端游戏结束，并断开连接
