@@ -175,7 +175,6 @@
         <!-- 输入框和发送按钮在聊天框外部 -->
         <div class="message-input-section">
           <!-- 结束发言按钮 -->
-          <!-- TODO: 需要美化 -->
           <button @click="handleTalkEnd" class="end-talk-button" v-if="talkStart">
             <span class="button-text"> {{returnButtonText}} </span>
           </button>
@@ -1122,7 +1121,6 @@ export default {
         aiPlayers.value = aiPlayerProfiles;
         initialized = true;
 
-        // TODO: 添加对玩家自身信息的初始化
       }
 
 
@@ -1200,7 +1198,6 @@ export default {
 
     // 展示信息用工具函数
     function showInfo(title, content){
-      // TODO: 美化，按网易的做？
       dialogTitle.value = title;
       dialogMessage.value = content;
       currentDialogAction.value = "showInfo";
@@ -1470,7 +1467,7 @@ export default {
     function handleTalkEndByServer(message) {
       // 处理服务器发过来的聊天结束
       // this.userMessage = "";  // 没必要直接清空
-      // TODO: 消息按钮重新变成灰的
+
       if (currentPlayer.value.index === message.player){
         sendNotification("你的发言时间结束。", "speak")
         talkStart.value = false;
@@ -1516,7 +1513,6 @@ export default {
 
     function handleGameEnd(message) {
       // 处理游戏结束
-      // TODO: 有空可以再改个胜利/失败界面
 
       if (message.end){
         if (message.victory[roleInfo.value.role]){
@@ -1554,7 +1550,6 @@ export default {
         timerSeconds.value = gameData.value.phase_timer[gameData.value.current_phase];
         gameEnd.value = true;
       }
-      // TODO: 展示所有人的角色并留两分钟复盘
     }
 
     function handleRoomCleanup(){
