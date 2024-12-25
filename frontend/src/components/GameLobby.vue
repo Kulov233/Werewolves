@@ -269,7 +269,7 @@
                       <div class="recent-games">
                         <h5>最近对战</h5>
                         <div class="game-list">
-                          <div v-for="game in [...selectedProfile.recentGames].reverse()"
+                          <div v-for="game in selectedProfile.recentGames"
                               :key="game.id"
                               class="game-item">
                             <span class="game-result" :class="game.result">
@@ -342,7 +342,7 @@
                       <div class="recent-games">
                         <h5>最近对战</h5>
                         <div class="game-list">
-                          <div v-for="game in [...selectedProfile.recentGames].reverse()"
+                          <div v-for="game in selectedProfile.recentGames"
                               :key="game.id"
                               class="game-item">
                             <span class="game-result" :class="game.result">
@@ -565,7 +565,7 @@
                       <div class="recent-games">
                         <h5>最近对战</h5>
                         <div class="game-list">
-                          <div v-for="game in [...selectedProfile.recentGames].reverse()"
+                          <div v-for="game in selectedProfile.recentGames"
                               :key="game.id"
                               class="game-item">
                             <span class="game-result" :class="game.result">
