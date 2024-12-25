@@ -216,7 +216,6 @@ class AIPlayer():
         pass
 
     def witch(self, alive_players: List[str], special_info: dict[str, bool]) -> tuple[str, str]:
-        # TODO: 请照着这里的模板修改女巫接口。输入例子：["cure": 0, "poison": 1]
         alive_indices = []
         for player_index in alive_players:
             if player_index != self.index:

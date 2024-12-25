@@ -124,7 +124,6 @@ class GameConsumer(AsyncWebsocketConsumer):
                 if user_id not in game_data['players']:
                     raise DenyConnection("用户不在房间内。")
 
-                # TODO: 用户连接超时？
                 # if game_data['status'] != 'waiting':
                 #     raise DenyConnection("游戏已经开始。")
 
@@ -144,6 +143,13 @@ class GameConsumer(AsyncWebsocketConsumer):
                 if game_data['players'][user_id]['role'] == "Werewolf":
                     await self.channel_layer.group_add(
                         f"room_{room_id}_werewolves",
+                        self.channel_name
+                    )
+
+                # 如果已经死亡或者游戏结束，加入死者频道
+                if not game_data['players'][user_id]['alive'] or game_data["should_cleanup"]:
+                    await self.channel_layer.group_add(
+                        f"room_{room_id}_dead",
                         self.channel_name
                     )
 
@@ -168,9 +174,6 @@ class GameConsumer(AsyncWebsocketConsumer):
                 # }))
 
                 await self.broadcast_game_update(room_id, "player_joined", game_data)
-
-                # TODO: 用户全部连接后，开始游戏
-                # TODO: 重连时，发送角色信息
 
         except DenyConnection as e:
             await self.accept()
@@ -205,7 +208,6 @@ class GameConsumer(AsyncWebsocketConsumer):
         game_data['players'][user_id]['online'] = False
         await self.update_game_data_in_cache(room_id, game_data)
         await self.broadcast_game_update(room_id, "player_left", game_data)
-        # TODO: 将离开玩家的昵称广播给其他玩家？
 
 
     async def receive(self, text_data=None, bytes_data=None):
@@ -474,6 +476,8 @@ class GameConsumer(AsyncWebsocketConsumer):
             "all": f"{index} 号玩家说：“{content}”。"
         })
 
+        await self.update_game_data_in_cache(room_id, game_data)
+
     @ensure_player_is_dead()
     @with_game_data_lock(timeout=5)
     async def handle_talk_content_dead(self, data):
@@ -570,7 +574,6 @@ class GameConsumer(AsyncWebsocketConsumer):
         await self.update_game_data_in_cache(room_id, game_data)
 
 
-    # TODO: 根据用户角色发送消息？
     async def game_message(self, event):
         # 从 event 中获取广播数据
         event_type = event.get("event")

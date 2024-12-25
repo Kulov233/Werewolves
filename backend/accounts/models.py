@@ -58,7 +58,6 @@ class FriendRequest(models.Model):
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     bio = models.TextField("自我介绍", max_length=500, blank=True, default="这个人很懒，还没有自我介绍~")  # 自我介绍字段
-    # TODO: 可能的前端bug：头像可能为null
     avatar = models.ImageField("头像", upload_to=user_directory_path, null=True, default="avatars/default.png")  # 头像字段
 
     """

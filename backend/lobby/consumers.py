@@ -100,8 +100,6 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                 # 如果用户未认证，拒绝连接
                 raise DenyConnection("用户未认证。")
             else:
-                # TODO: 需要检查用户是否已连接吗？
-                # TODO: 需要检查用户是否在房间中吗？
                 user_id = self.scope["user"].id
 
                 # if await self.has_active_connection(user_id):
@@ -159,9 +157,6 @@ class LobbyConsumer(AsyncWebsocketConsumer):
         if hasattr(self, 'status_update_task'):
             self.status_update_task.cancel()
 
-        # TODO: 游戏已开始？
-
-        # TODO: 检查用户是否在房间中，如果在房间中则移除用户
         await self.channel_layer.group_discard("lobby", self.channel_name)
         await self.channel_layer.group_discard(f"lobby_user_{user_id}", self.channel_name)
         room_id = await self.get_user_room_from_cache(self.scope["user"].id)
@@ -251,7 +246,6 @@ class LobbyConsumer(AsyncWebsocketConsumer):
         :param data: 客户端发送的text_data
         :return: 没有返回值，但是会向客户端发送消息
         """
-        # TODO: 检验是否已存在房间
         rooms = await self.get_room_list_from_cache()
         for room in rooms or []:
             if room:
@@ -264,14 +258,13 @@ class LobbyConsumer(AsyncWebsocketConsumer):
 
         room_id = str(uuid.uuid4())
         room_data = {
-            # TODO: 确定房间数据的格式
             "id": room_id,
             "title": data.get("title", None),
             "description": data.get("description", None),
             "owner": self.scope["user"].id,
             "players": [self.scope["user"].id],
             "allow_ai_players": data.get("allow_ai_players", None),
-            "ai_players": {},  # TODO: AI 玩家配置
+            "ai_players": {},
             "max_players": data.get("max_players", 6),
             # "game_mode": data.get("game_mode", "default"),
             "status": "waiting",  # in-game
@@ -281,7 +274,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
 
         allowed_max_players = [4, 6, 8, 10, 12, 16]
 
-        # TODO: 校验房间数据
+        # 校验房间数据
         if not room_data["title"]:
             await self.send(text_data=json.dumps({
                 "type": "warning",
@@ -352,7 +345,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                 return
 
             await self.remove_room(room_id)
-            # TODO: 前端在收到 "room_removed" 事件后，如果用户在房间中，应该自动退出房间
+            # 前端在收到 "room_removed" 事件后，如果用户在房间中，应该自动退出房间
 
             for player in room_data["players"]:
                 await self.clear_user_room_in_cache(player)
@@ -498,7 +491,6 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                             "message": "房间不允许 AI 玩家。"
                         }))
                         return
-                    # TODO: 与前端对接
                     original_player_info = data.get("player_info")
                     if original_player_info:
                         player_info = {
@@ -703,10 +695,8 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                         }))
                         return
 
-                    # TODO: 开始游戏，前端应该在收到消息时，检查是否在房间中，如果在房间中则跳转到游戏页面，并连接到游戏的 WebSocket，如果不在，则将房间标记为“游戏中”
                     await self.broadcast_room_update("game_prepared", room_data)
                     # 将房间信息写入房间缓存
-                    # TODO: 设计游戏房间数据结构
                     from django.contrib.auth.models import User
 
                     @database_sync_to_async
@@ -718,8 +708,8 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                         "title": room_data["title"],
                         "description": room_data["description"],
                         "max_players": room_data["max_players"],
-                        # "status": "waiting",  # waiting, night_<num>, day_<num>, finished
-                        "night_count": 1,
+                        "status": "waiting",  # waiting, night_<num>, day_<num>, finished
+                        # "night_count": 1,
                         "roles": {},
                         "roles_for_humans_first": [],  # 敏感
                         "witch_config": {},
@@ -797,7 +787,6 @@ class LobbyConsumer(AsyncWebsocketConsumer):
                     # room_data_in_game["phases"] = unique_phases_list
 
                     await self.set_room_data_in_game_cache(room_id, room_data_in_game)
-                    # TODO: 在大厅中删除房间？
                     # await self.remove_room(room_id)
                     # for player in room_data["players"]:
                     #     await self.clear_user_room_in_cache(player)
@@ -1024,7 +1013,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
         rooms = []
         for room_id in room_list:
             room_data = self.lobby_cache.get(f"room:{room_id}")
-            if room_data:
+            if room_data and room_data["status"] == "waiting":
                 rooms.append(room_data)
             else:
                 # 如果房间数据不存在，从房间列表中移除
@@ -1036,7 +1025,7 @@ class LobbyConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def update_room_in_cache(self, room_id, room_data):
         room_data["expires_at"] = (datetime.now() + timedelta(seconds=self.room_timeout)).isoformat()
-        self.lobby_cache.set(f"room:{room_id}", room_data, timeout=self.room_timeout)  # TODO: 考虑timeout
+        self.lobby_cache.set(f"room:{room_id}", room_data, timeout=self.room_timeout)
 
     # 删除房间
     @database_sync_to_async

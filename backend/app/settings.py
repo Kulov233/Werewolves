@@ -107,29 +107,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'app.wsgi.application'
 
-
-# Database
-# https://docs.djangoproject.com/en/5.1/ref/settings/#databases
-
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': BASE_DIR / 'db.sqlite3',
-#     }
-# }
-
-DATABASES = { # 转为生产环境时修改
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'werewolves',
-        'USER': 'root',
-        'PASSWORD': 'sbwzs233',
-        'HOST': 'mysql',
-        'PORT': '3306',
-    }
-}
-
-
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
 
@@ -184,6 +161,33 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
 
 ASGI_APPLICATION = 'app.asgi.application'
 
+# Database
+# https://docs.djangoproject.com/en/5.1/ref/settings/#databases
+
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#     }
+# }
+
+from os import environ
+from dotenv import load_dotenv
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / '.env')
+
+DATABASES = { # 转为生产环境时修改
+    'default': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': f'{environ.get("MYSQL_DATABASE")}',
+        'USER': f'{environ.get("DB_USER")}',
+        'PASSWORD': f'{environ.get("DB_PASSWORD")}',
+        'HOST': f'{environ.get("DB_HOST")}',
+        'PORT': f'{environ.get("DB_PORT")}',
+    }
+}
+
 # Channels
 
 import channels_redis
@@ -192,7 +196,7 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [("redis", 6379)],
+            "hosts": [(f"{environ.get('REDIS_HOST')}", f"{environ.get('REDIS_PORT')}")],
         },
     },
 }
@@ -202,7 +206,7 @@ CHANNEL_LAYERS = {
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": "redis://redis:6379/0",  # 主 Redis 数据库
+        "LOCATION": f"redis://{environ.get('REDIS_HOST')}:{environ.get('REDIS_PORT')}/0",  # 主 Redis 数据库
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         },
@@ -210,7 +214,7 @@ CACHES = {
     # 大厅缓存
     "lobby_cache": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": "redis://redis:6379/1",
+        "LOCATION": f"redis://{environ.get('REDIS_HOST')}:{environ.get('REDIS_PORT')}/1",
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         },
@@ -219,7 +223,7 @@ CACHES = {
     # 游戏房间缓存
     "game_cache": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": "redis://redis:6379/1",
+        "LOCATION": f"redis://{environ.get('REDIS_HOST')}:{environ.get('REDIS_PORT')}/1",
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         },
@@ -229,9 +233,9 @@ CACHES = {
 
 # Celery 配置
 
-CELERY_BROKER_URL = 'redis://redis:6379/2'
+CELERY_BROKER_URL = f"redis://{environ.get('REDIS_HOST')}:{environ.get('REDIS_PORT')}/2"
 
-CELERY_RESULT_BACKEND = 'redis://redis:6379/2'
+CELERY_RESULT_BACKEND = f"redis://{environ.get('REDIS_HOST')}:{environ.get('REDIS_PORT')}/2"
 
 CELERY_ACCEPT_CONTENT = ['json']  # Celery 接受的消息内容类型
 
