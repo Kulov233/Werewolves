@@ -6,7 +6,6 @@ import Login from '@/components/Login.vue';
 import Register from '@/components/Register.vue';
 import GameLobby from '@/components/GameLobby.vue';
 import Room from '@/components/GameRoom.vue';
-import test from '@/components/test.vue';
 // 路由配置
 const routes = [
   {
@@ -31,12 +30,6 @@ const routes = [
     path: '/GameLobby',
     name: 'GameLobby',
     component: GameLobby,
-    meta: { requiresAuth: true }
-  },
-  {
-    path: '/test',
-    name: 'test',
-    component: test,
     meta: { requiresAuth: true }
   },
   {

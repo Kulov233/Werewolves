@@ -36,14 +36,6 @@ export default {
     const isLoading = ref(false);
     const cachedViews = ref(['GameLobby', 'GameRoom', 'GameInterface']);
 
-    const navigationRoutes = [
-      { path: '/login', label: '登录' },
-      { path: '/register', label: '注册' },
-      { path: '/GameLobby', label: '大厅' },
-      { path: '/GameRoom', label: '房间内部' },
-      { path: '/GameInterface', label: '对战房间' },
-      { path: '/test', label: '测试页面' },
-    ];
 
     // 检查登录状态
     const checkLoginStatus = () => {
@@ -107,7 +99,6 @@ export default {
     });
 
     return {
-      navigationRoutes,
       isLoading,
       cachedViews,
       handleActivated
