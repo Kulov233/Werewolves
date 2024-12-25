@@ -486,7 +486,7 @@ export default {
           {
             id: 'kill',
             name: '杀人',
-            icon: 'kill.svg',
+            icon: 'wolf.svg',
             description: '每晚可以杀死一名玩家',
             hasCount: false, // 无限次数的技能
           }
