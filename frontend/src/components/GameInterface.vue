@@ -1477,10 +1477,16 @@ export default {
     async function handleVotePhase(message) {
       // 处理投票阶段
       updateGame(message.game)
-      sendNotification("投票阶段开始，请选择你要放逐的玩家", "vote");
-      const target = await select("投票放逐", "放逐", gameData.value.phase_timer[gameData.value.current_phase],
-          null, true);
-      handleVote(target);
+      if (!isDead.value){
+        // 如果没死才投票
+        sendNotification("投票阶段开始，请选择你要放逐的玩家", "vote");
+        const target = await select("投票放逐", "放逐", gameData.value.phase_timer[gameData.value.current_phase],
+            null, true);
+        handleVote(target);
+      }
+      else{
+        sendNotification("投票阶段开始", "vote");
+      }
     }
 
     function handleVoteResult(message) {
