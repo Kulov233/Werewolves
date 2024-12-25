@@ -1281,6 +1281,14 @@ export default {
     const saveRoomSettings = async () => {
       if (!isHost.value || !currentRoom.value) return;
 
+      // 检查修改后的最大人数是否小于当前人数
+      if (editRoomForm.value.max_players < currentRoom.value.currentPeople) {
+        showConfirmDialog('操作被阻止',
+          `当前房间有${currentRoom.value.currentPeople}人，不能修改为${editRoomForm.value.max_players}人。请先减少房间人数后再修改。`,
+          false);
+        return;
+      }
+
       try {
         dialogTitle.value = '更新房间';
         dialogMessage.value = '确定要更新这个房间吗？';
