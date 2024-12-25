@@ -2993,23 +2993,9 @@ p {
   border-radius: 8px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
   padding: 16px;
-  z-index: 1000;
+  z-index: 9999;
 }
 
-
-/* 调整箭头位置，让它指向头像 */
-.profile-card::before {
-  content: '';
-  position: absolute;
-  top: 30px; /* 调整箭头垂直位置以对齐头像 */
-  left: -8px; /* 将箭头放在左侧 */
-  width: 16px;
-  height: 16px;
-  background: #fff;
-  transform: rotate(45deg);
-  box-shadow: -2px 2px 5px rgba(0, 0, 0, 0.04);
-  z-index: -1;
-}
 .profile-header {
   display: flex;
   align-items: center;
