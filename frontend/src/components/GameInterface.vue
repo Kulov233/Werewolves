@@ -4,7 +4,7 @@
 
       <!-- 左侧玩家列表 -->
       <div class="player-list" v-if="Boolean(players && aiPlayers)">
-        <!-- 使用 Object.values() 将对象的值转换为数组-->
+        <!-- 使用 Object.values() 将对象的值转换为数组，并确保通过 .value 访问 ref 的值 -->
         <div v-for="(player, index) in [...Object.values(players), ...Object.values(aiPlayers)].sort((a, b) => a.index - b.index)" :key="index"
              :class="['player-container', { 'selected-player': index + 1 === selectedPlayer }]">
             <div class="player" :class="{ 'dead': ![...Object.values(gameData.players), ...Object.values(gameData.ai_players)].sort((a, b) => a.index - b.index)[index].alive }">
@@ -345,7 +345,6 @@ import CountdownTimer from './shared_components/CountdownTimer.vue';
 // import { validateGame } from '@/schemas/schemas.js';
 import axios from 'axios';
 import ConfirmDialog from "@/components/shared_components/ConfirmDialog.vue";
-import _ from 'lodash';
 
 
 const router = useRouter();
@@ -801,6 +800,7 @@ export default {
       teammates: [],
     });
 
+    // const selectedPlayerId = ref(null);
     const gameData = ref({
       id: "1c134013-3b54-4ccd-a2b9-e42ef088d9a9",
       title: "一个房间",
@@ -1039,7 +1039,8 @@ export default {
             isFriend: checkIsFriend(userId), // 这里可以从好友列表判断
             stats: [
               { label: '游戏场数', value: userData.profile.wins + userData.profile.loses },
-              { label: '胜率', value: calculateWinRate(userData.profile) }
+              { label: '胜率', value: calculateWinRate(userData.profile.games) },
+              //{ label: '评分', value: userData.profile.rating || 0 }
             ],
             recentGames: (userData.profile.recent_games || []).map((game, index) => ({
               id: index.toString(),
@@ -1055,10 +1056,10 @@ export default {
     };
 
     // 辅助函数：计算胜率
-    const calculateWinRate = (userData) => {
-      const totalGames = userData.wins + userData.loses;
-      if (totalGames === 0) return '0%';
-      return `${Math.round((userData.wins / totalGames) * 100)}%`;
+    const calculateWinRate = (games) => {
+      if (!games || games.length === 0) return '0%';
+      const wins = games.filter(game => game.won).length;
+      return `${Math.round((wins / games.length) * 100)}%`;
     };
 
     let initialized = false;
@@ -1312,7 +1313,7 @@ export default {
     async function handleKillPhase(message) {
       // 处理Werewolf投票阶段
       updateGame(message.game);
-      if (roleInfo.value.role === "Werewolf" && !isDead.value) {
+      if (roleInfo.value.role === "Werewolf") {
         sendNotification("狼人请行动", "action", "请选择要杀害的对象");
         await handleMultipleKillVotes();
       }
@@ -1354,7 +1355,7 @@ export default {
       // 处理Prophet查人阶段, 不能告诉他谁死了
 
       updateGame(message.game);
-      if (roleInfo.value.role === "Prophet" && gameData.value.current_phase === "Prophet" && !isDead.value){
+      if (roleInfo.value.role === "Prophet" && gameData.value.current_phase === "Prophet"){
         sendNotification("预言家请行动", "action", "请选择要查验的玩家");
         const checkTarget = await select("选择要查验的目标", "查验",
             gameData.value.phase_timer[gameData.value.current_phase], null, true);
@@ -1379,7 +1380,7 @@ export default {
 
     async function handleWitchInfo(message) {
       // 处理Witch信息
-      if(roleInfo.value.role === "Witch" && !isDead.value){
+      if(roleInfo.value.role === "Witch"){
         roleInfo.value.role_skills = message.role_skills;
         sendNotification("女巫请行动", "action", "请选择使用解药和毒药");
         let cure_target = -1, poison_target = -1;
@@ -1476,16 +1477,10 @@ export default {
     async function handleVotePhase(message) {
       // 处理投票阶段
       updateGame(message.game)
-      if (!isDead.value){
-        // 如果没死才投票
-        sendNotification("投票阶段开始，请选择你要放逐的玩家", "vote");
-        const target = await select("投票放逐", "放逐", gameData.value.phase_timer[gameData.value.current_phase],
-            null, true);
-        handleVote(target);
-      }
-      else{
-        sendNotification("投票阶段开始", "vote");
-      }
+      sendNotification("投票阶段开始，请选择你要放逐的玩家", "vote");
+      const target = await select("投票放逐", "放逐", gameData.value.phase_timer[gameData.value.current_phase],
+          null, true);
+      handleVote(target);
     }
 
     function handleVoteResult(message) {
@@ -1747,51 +1742,12 @@ export default {
         this.hasUnreadMessages = false;
       }
     },
-    // 使用防抖来避免频繁调用
-    scrollToBottom: _.debounce(function() {
+    scrollToBottom() {
       const chatBox = this.$refs.chatBox;
-      if (!chatBox) return;
-
-      // 计算目标滚动位置
-      const targetScroll = chatBox.scrollHeight - chatBox.clientHeight;
-
-      // 如果已经在底部，不需要滚动
-      if (Math.abs(chatBox.scrollTop - targetScroll) < 10) {
-        this.showScrollButton = false;
-        this.hasUnreadMessages = false;
-        return;
-      }
-
-      // 使用平滑滚动
-      try {
-        chatBox.scrollTo({
-          top: targetScroll,
-          behavior: 'smooth'
-        });
-
-        // 添加滚动完成监听
-        const scrollEndHandler = () => {
-          this.showScrollButton = false;
-          this.hasUnreadMessages = false;
-          chatBox.removeEventListener('scrollend', scrollEndHandler);
-        };
-
-        chatBox.addEventListener('scrollend', scrollEndHandler);
-
-        // 设置超时以防止滚动事件没有触发
-        setTimeout(() => {
-          chatBox.removeEventListener('scrollend', scrollEndHandler);
-          this.showScrollButton = false;
-          this.hasUnreadMessages = false;
-        }, 1000);
-      } catch (error) {
-        // 如果平滑滚动失败，使用即时滚动作为后备方案
-        console.warn('Smooth scroll failed, falling back to instant scroll');
-        chatBox.scrollTop = targetScroll;
-        this.showScrollButton = false;
-        this.hasUnreadMessages = false;
-      }
-    }, 100), // 100ms 的防抖延迟
+      chatBox.scrollTop = chatBox.scrollHeight;
+      this.showScrollButton = false;
+      this.hasUnreadMessages = false; // 清除未读消息提示
+    },
 
     startTimer() {  // 计时器
       this.timer = setInterval(() => {
@@ -1817,12 +1773,7 @@ export default {
       // 确认选择
       this.confirmed = true;
     },
-    // 在组件销毁时清理防抖
-    beforeDestroy() {
-      if (this.scrollToBottom.cancel) {
-        this.scrollToBottom.cancel();
-      }
-    },
+
 
 
 
@@ -1921,56 +1872,6 @@ export default {
 
   },
   watch: {
-
-    messages: {
-      handler(newVal, oldVal) {
-        // 检查是否有新消息被添加
-        if (newVal.length > oldVal.length) {
-          // 在下一个事件循环中执行滚动
-          this.$nextTick(() => {
-            const chatBox = this.$refs.chatBox;
-            if (!chatBox) return;
-
-            // 计算用户是否在底部附近（允许50px的误差）
-            const isNearBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight <= 50;
-
-            if (isNearBottom) {
-              // 使用 requestAnimationFrame 确保在下一帧执行滚动
-              requestAnimationFrame(() => {
-                chatBox.scrollTo({
-                  top: chatBox.scrollHeight,
-                  behavior: 'smooth'
-                });
-
-                // 添加滚动完成的检查
-                const checkScroll = () => {
-                  if (Math.abs(chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight) > 1) {
-                    chatBox.scrollTop = chatBox.scrollHeight;
-                  }
-                  this.hasUnreadMessages = false;
-                  this.showScrollButton = false;
-                };
-
-                // 使用 scrollend 事件和超时作为双重保障
-                const scrollEndHandler = () => {
-                  checkScroll();
-                  chatBox.removeEventListener('scrollend', scrollEndHandler);
-                };
-
-                chatBox.addEventListener('scrollend', scrollEndHandler);
-                setTimeout(checkScroll, 300);
-              });
-            } else {
-              // 如果用户不在底部，只显示新消息提示
-              this.hasUnreadMessages = true;
-              this.showScrollButton = true;
-            }
-          });
-        }
-      },
-      deep: true
-    },
-
 
     showDetails(newVal) {
       // 如果玩家信息框被打开，页面滚动到顶部
@@ -2130,7 +2031,6 @@ p {
   margin-bottom: 10px;
   overflow-y: auto;
   border-radius: 15px;
-  scroll-behavior: smooth;
 }
 
 
@@ -2985,9 +2885,23 @@ p {
   border-radius: 8px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
   padding: 16px;
-  z-index: 9999;
+  z-index: 1000;
 }
 
+
+/* 调整箭头位置，让它指向头像 */
+.profile-card::before {
+  content: '';
+  position: absolute;
+  top: 30px; /* 调整箭头垂直位置以对齐头像 */
+  left: -8px; /* 将箭头放在左侧 */
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  transform: rotate(45deg);
+  box-shadow: -2px 2px 5px rgba(0, 0, 0, 0.04);
+  z-index: -1;
+}
 .profile-header {
   display: flex;
   align-items: center;
@@ -3030,35 +2944,28 @@ p {
 }
 
 .profile-stats {
-  display: flex !important;
-  justify-content: space-around !important;
-  padding: 12px 0 !important;
-  border-top: 1px solid #eee !important;
-  border-bottom: 1px solid #eee !important;
-  margin-bottom: 16px !important;
+  display: flex;
+  justify-content: space-around;
+  padding: 12px 0;
+  border-top: 1px solid #eee;
+  border-bottom: 1px solid #eee;
+  margin-bottom: 16px;
 }
 
-stat-item {
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  justify-content: center !important;
-  text-align: center !important;
-  padding: 4px 8px !important;
+.stat-item {
+  text-align: center;
 }
 
 .stat-value {
-  display: block !important;
-  font-size: 1em !important;
-  font-weight: 600 !important;
-  color: #2c3e50 !important;
-  margin-bottom: 4px !important;
+  display: block;
+  font-size: 1em;
+  font-weight: 600;
+  color: #2c3e50;
 }
 
 .stat-label {
-  display: block !important;
-  font-size: 0.75em !important;
-  color: #666 !important;
+  font-size: 0.75em;
+  color: #666;
 }
 
 .profile-actions {

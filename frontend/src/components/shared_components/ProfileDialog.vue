@@ -131,7 +131,7 @@
 </template>
 
 <script>
-import { ref, computed, watch, nextTick  } from 'vue';
+import { ref, computed, watch } from 'vue';
 
 export default {
   name: 'ProfileDialog',
@@ -180,15 +180,6 @@ export default {
       }
     });
 
-    watch(
-      () => props.userProfile.signature,
-      (newSignature) => {
-        if (!isEditingSignature.value) {
-          tempSignature.value = newSignature || '';
-        }
-      }
-    );
-
     // 关闭弹窗
     const handleClose = () => {
       emit('close');
@@ -229,17 +220,15 @@ export default {
       emit('update-avatar', newFile);
     };
 
-    const signatureInput = ref(null);
-
+    // 个性签名编辑功能
     const startEditSignature = () => {
       isEditingSignature.value = true;
       tempSignature.value = props.userProfile.signature || '';
-      // 使用 nextTick 确保 DOM 更新后再设置焦点
-      nextTick(() => {
-        if (signatureInput.value) {
-          signatureInput.value.focus();
-        }
-      });
+      // 在下一个 tick 后聚焦输入框
+      setTimeout(() => {
+        const input = document.querySelector('.form-input');
+        if (input) input.focus();
+      }, 0);
     };
 
     const cancelEditSignature = () => {

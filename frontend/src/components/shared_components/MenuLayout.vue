@@ -264,7 +264,10 @@
             <span class="stat-number">{{winRate}}%</span>
             <span class="stat-label">胜率</span>
           </div>
-
+          <div class="stat-card">
+            <span class="stat-number">{{avgRating}}</span>
+            <span class="stat-label">平均评分</span>
+          </div>
         </div>
 
         <!-- 筛选器 -->
@@ -298,6 +301,10 @@
                 <span class="role-name">{{game.role}}</span>
               </div>
               <div class="game-stats">
+                <div class="stat">
+                  <span class="label">评分</span>
+                  <span class="value">{{game.rating}}</span>
+                </div>
                 <div class="stat">
                   <span class="label">场次时长</span>
                   <span class="value">{{game.duration}}</span>
@@ -358,7 +365,10 @@ const props = defineProps({
     type: Number,
     default: 0
   },
-
+  avgRating: {
+    type: Number,
+    default: 0
+  },
   gameHistory: {
     type: Array,
     default: () => []
