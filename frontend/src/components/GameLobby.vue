@@ -80,12 +80,12 @@
               <!-- 好友系统 -->
               <div class="menu-section">
                 <h4 class="section-title">
-                  <img src="@/assets/wolf.svg" alt="Friends" class="section-icon" />
+                  <img src="@/assets/social.svg" alt="Friends" class="section-icon" />
                   社交中心
                 </h4>
                 <div class="section-content">
                   <button class="menu-button" @click="goToFriends">
-                    <img src="@/assets/wolf.svg" alt="Friend List" />
+                    <img src="@/assets/friends.svg" alt="Friend List" />
                     好友列表
                   </button>
                 </div>
@@ -94,12 +94,12 @@
               <!-- 设置中心 -->
               <div class="menu-section">
                 <h4 class="section-title">
-                  <img src="@/assets/wolf.svg" alt="Settings" class="section-icon" />
+                  <img src="@/assets/settings.svg" alt="Settings" class="section-icon" />
                   设置中心
                 </h4>
                 <div class="section-content">
                   <button class="menu-button" @click="goToProfile">
-                    <img src="@/assets/wolf.svg" alt="Profile" />
+                    <img src="../assets/profile-setting.svg" alt="Profile" />
                     资料设置
                   </button>
                 </div>
