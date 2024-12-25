@@ -851,11 +851,11 @@ export default {
     return {
 
       roleIcons: {
-        //'Witch': require('@/assets/witch.svg'),
+        'Witch': require('@/assets/cure.svg'),
         'Werewolf': require('@/assets/wolf.svg'),
         'Villager': require('@/assets/villager.svg'),
-        //'Prophet': require('@/assets/prophet.svg'),
-        //'Idiot': require('@/assets/idiot.svg')
+        'Prophet': require('@/assets/prophet.svg'),
+        'Idiot': require('@/assets/villager.svg')
       },
       //friendRequests: [
       //  {
