@@ -1901,8 +1901,7 @@ export default {
     // 辅助函数：计算胜率
     const calculateWinRate = (games) => {
       if (!games || games.length === 0) return '0%';
-      console.log(JSON.stringify(games));
-      const wins = games.filter(game => game.result === 'win').length;
+      const wins = games.filter(game => game.won).length;
       return `${Math.round((wins / games.length) * 100)}%`;
     };
 
