@@ -1725,11 +1725,11 @@ export default {
         case 'Prophet':
           return require('@/assets/prophet.svg');
         case 'Witch':
-          return require('@/assets/wolf.svg');
+          return require('@/assets/cure.svg');
         case 'Villager':
           return require('@/assets/villager.svg');
         case 'Idiot':
-          return require('@/assets/wolf.svg');
+          return require('@/assets/villager.svg');
         default:
           return '';
       }
