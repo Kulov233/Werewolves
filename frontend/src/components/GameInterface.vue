@@ -1394,9 +1394,6 @@ export default {
            poison_target = await select("毒药选择", "毒杀",
               gameData.value.phase_timer.Witch / 2, null, true);
         }
-        timerSeconds.value = 0;
-
-
         handleWitchAction(cure_target, poison_target);
       }
 
