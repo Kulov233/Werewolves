@@ -1925,16 +1925,52 @@ export default {
           // 在下一个事件循环中执行滚动
           this.$nextTick(() => {
             const chatBox = this.$refs.chatBox;
+            if (!chatBox) return;
+
             const scrollPosition = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight;
 
             // 如果已经接近底部或没有显示滚动按钮，则平滑滚动到底部
             if (scrollPosition <= 100 || !this.showScrollButton) {
+              // 先进行平滑滚动
               chatBox.scrollTo({
                 top: chatBox.scrollHeight,
                 behavior: 'smooth'
               });
+
+              // 确保最终会滚动到底部
+              const finalScrollCheck = () => {
+                // 检查是否真的到底部了
+                const currentPosition = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight;
+                if (currentPosition > 1) { // 如果没到底（允许1px的误差）
+                  chatBox.scrollTop = chatBox.scrollHeight; // 强制滚动到底
+                }
+                this.hasUnreadMessages = false;
+                this.showScrollButton = false;
+              };
+
+              // 监听滚动结束事件
+              const scrollEndHandler = () => {
+                finalScrollCheck();
+                chatBox.removeEventListener('scrollend', scrollEndHandler);
+              };
+              chatBox.addEventListener('scrollend', scrollEndHandler);
+
+              // 设置一个合理的超时时间作为后备方案
+              setTimeout(() => {
+                finalScrollCheck();
+              }, 300); // 300ms 通常足够完成平滑滚动
+
+              // 同时用 requestAnimationFrame 确保视觉上的连贯性
+              requestAnimationFrame(() => {
+                if (!chatBox.scrollTop) { // 如果还没开始滚动
+                  chatBox.scrollTo({
+                    top: chatBox.scrollHeight,
+                    behavior: 'smooth'
+                  });
+                }
+              });
             } else {
-              // 否则显示新消息提示
+              // 如果用户不在底部，显示新消息提示
               this.hasUnreadMessages = true;
             }
           });
