@@ -1,44 +1,5 @@
 ## 智狼之夜  
 
-### 前端
-
-#### Project setup
-```
-npm install
-```
-
-#### Compiles and hot-reloads for development
-```
-npm run serve
-```
-
-#### Compiles and minifies for production
-```
-npm run build
-```
-
-#### Lints and fixes files
-```
-npm run lint
-```
-
-#### Customize configuration
-See [Configuration Reference](https://cli.vuejs.org/config/).
-
-### 后端
-
-项目中的Dockerfile和docker-compose.yml文件只是一个示例，请暂时将mysql和redis的端口暴露到本机，并单独启动后端以进行调试。调试时，请修改redis的默认端口，以防止公网扫描。  
-
-Django的数据库配置在backend/app/settings.py:105-114，redis的配置在backend/app/settings.py:172-215，可以视情况修改。  
-
-完成配置并启动项目时，请使用uvicorn以获得WebSocket支持，并开启Celery以处理任务队列。  
-需要额外注意的是，如果在Windows下使用Celery，需要在环境变量中设置`FORKED_BY_MULTIPROCESSING`为`1`。  
-请自行在backend/game/ai/keys.py中配置AI Keys。
-在设置好后，可以通过以下指令启动：  
-```shell
-# 在backend/下
-uvicorn app.asgi:application --host 127.0.0.1 --port 8000 --reload
-celery -A app worker --loglevel=info
-```  
-对局内消息规范请见：[消息规范](https://kcn1xdbl9m26.feishu.cn/wiki/EBuhw0fzfi3wHskS8jncf3o4nze?from=from_copylink)  
-接口文档请见：[接口设计与文档](https://apifox.com/apidoc/shared-78bc5d54-d6f2-4d57-a7de-6950273258d8)
+请完成backend/docker-compose.yml中的TODO；修改backend/.env.example中的内容，并将其重命名为.env；此外，还需要在backend/game/ai/keys.py中配置AI Key。所给的Key需要有智谱GLM 4 Plus的token余额。如果Key不正确，AI将无法正常工作。  
+配置完后，请在frontend目录下运行npm install，然后运行npm run build即可编译前端服务。编译完后，将生成的dist目录下的文件复制到backend目录下。  
+完成以上操作后，在backend目录下运行docker compose up -d --build即可启动服务。

@@ -111,7 +111,6 @@ class PromptGenerator:
         return messages
 
     def kill_prompt(self, previous_messages: List[str], second_kill=False) -> list[dict[str, str]]:
-        # TODO: 增加初次杀人的随机性
         system_messages = self.system_prompt()
         past_messages = self.past_messages(previous_messages)
         user_messages = [
@@ -126,7 +125,6 @@ class PromptGenerator:
         return messages
 
     def check_prompt(self, previous_messages: List[str]) -> list[dict[str, str]]:
-        # TODO:添加已经查过的人的信息，提醒一下。
         system_messages = self.system_prompt()
         past_messages = self.past_messages(previous_messages)
         user_messages = [

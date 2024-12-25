@@ -126,7 +126,6 @@ def handle_game_readiness(room_id, result):
     else:
         # 返回未连接玩家列表
         async_to_sync(GameConsumer.handle_not_connected)(room_id, result['status'], result['message'], result['offline_players'])
-        # TODO: 前端应该在此时返回大厅。处理channel和cache中的残留？
         game_cache = caches['game_cache']
         game_data = game_cache.get(f"room:{room_id}")
         for user_id, _ in game_data["players"].items():
@@ -146,7 +145,6 @@ def initialize(room_id):
                 game_config = configs[str(game_data['max_players'])]
             else:
                 raise ValueError("没有找到对应玩家数量的游戏配置。")
-        # TODO: 确定ai数量
         game_specified_prompt = "当前游戏中有"
         last_role = ""
         role_cnt = 0
@@ -175,7 +173,6 @@ def initialize(room_id):
         game_cache.set(f"room:{room_id}", game_data)
 
     except Exception as e:
-        # TODO: 前端应该在此时返回大厅。处理channel和cache中的残留？
         print(f"初始化游戏失败：{str(e)}")
         game_cache = caches['game_cache']
         game_data = game_cache.get(f"room:{room_id}")
@@ -280,7 +277,6 @@ def assign_roles_to_players(room_id):
 
             async_to_sync(GameConsumer.send_role_to_player)(room_id, user_id, role_info)
 
-        # TODO: 通知狼人他们的队友
         message = "狼人玩家的编号分别是："
 
         message += "、".join(werewolves)
@@ -314,7 +310,6 @@ def get_kill_result(room_id):
     """
     获取狼人杀人结果
     """
-    # TODO: BUG len()
     game_cache = caches['game_cache']
     game_data = game_cache.get(f"room:{room_id}")
 
@@ -350,7 +345,6 @@ def get_vote_result(room_id):
     """
     获取投票
     """
-    # TODO: bug len()
     game_cache = caches['game_cache']
     game_data = game_cache.get(f"room:{room_id}")
 
@@ -382,7 +376,6 @@ def get_vote_result(room_id):
     print(f"{room_id}中的最高票数：{max_votes}，玩家：{players_with_max_votes}")
 
     # 如果有多个玩家最高票数，则不放逐
-    # TODO: 计算比例？
     if len(players_with_max_votes) > 1 or len(players_with_max_votes) == 0:
         game_data["action_history"].append({
             "all": "投票结果：平票，没有人被放逐。"
@@ -448,7 +441,7 @@ def check_victory(room_id):
                         break
 
         if eval(game_data["victory_conditions"]['idiot_win'], {"voted_out": idiot_voted_out}):
-            # TODO: 白痴胜利
+            # 白痴胜利
             result["end"] = True
             result["victory"] = {
                 role: False
@@ -463,7 +456,7 @@ def check_victory(room_id):
     except:
         pass
     if eval(game_data["victory_conditions"]['good_win'], {"wolf_num": wolf_num, "good_num": good_num}):
-        # TODO: 好人胜利
+        # 好人胜利
         result["end"] = True
         result["victory"] = {
             role: False
@@ -495,12 +488,11 @@ def check_victory(room_id):
     return result
 
 # @with_game_data_lock(timeout=5)
-def end_current_phase(room_id): # TODO: BUG
+def end_current_phase(room_id):
     try:
         game_cache = caches['game_cache']
         task_id = game_cache.get(f"room_{room_id}_current_task")
 
-        # TODO: 检验是否能够按预期工作？
         app.control.revoke(task_id, terminate=True)
 
         game_data = game_cache.get(f"room:{room_id}")
@@ -557,7 +549,6 @@ def handle_phase_timed_out(room_id: str, current_phase: str):
                             break
 
         # 2. 通知当前阶段结束
-        # TODO: 阶段结束，进行相应处理
         # 游戏数据应该分别在进行阶段处理的函数中更新
         if current_phase == 'Initialize':
             initialize(room_id)
@@ -623,8 +614,9 @@ def handle_phase_timed_out(room_id: str, current_phase: str):
                 print(f"正在清理 {room_id} 房间。")
                 lobby_cache = caches['lobby_cache']
                 room_data = lobby_cache.get(f"room:{room_id}")
-                room_data["status"] = "waiting"
-                lobby_cache.set(f"room:{room_id}", room_data)
+                if room_data:
+                    room_data["status"] = "waiting"
+                    lobby_cache.set(f"room:{room_id}", room_data)
                 return
 
 
@@ -793,7 +785,6 @@ def start_phase(room_id: str, phase: str):
         game_data["current_phase"] = phase
 
         # 1. 通知阶段开始
-        # TODO: 接入 AI
         action = {}
         delay = 10
 
@@ -901,7 +892,6 @@ def start_phase(room_id: str, phase: str):
 
             async_to_sync(GameConsumer.broadcast_night_death_info)(room_id, victims)
             # 记录在对战历史中
-            # TODO: 确定对战历史的数据结构
             if victims:
                 victims_str = "、".join(victims)
                 game_data["action_history"].append({
