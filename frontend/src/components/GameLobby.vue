@@ -53,13 +53,6 @@
               </div>
             </div>
 
-            <!-- 个人统计数据 -->
-            <div class="profile-stats">
-              <div v-for="stat in userProfile.stats" :key="stat.label" class="stat-card">
-                <span class="stat-value">{{ stat.value }}</span>
-                <span class="stat-label">{{ stat.label }}</span>
-              </div>
-            </div>
 
             <!-- 功能区块 -->
             <div class="menu-sections">
@@ -276,7 +269,7 @@
                       <div class="recent-games">
                         <h5>最近对战</h5>
                         <div class="game-list">
-                          <div v-for="game in selectedProfile.recentGames"
+                          <div v-for="game in [...selectedProfile.recentGames].reverse()"
                               :key="game.id"
                               class="game-item">
                             <span class="game-result" :class="game.result">
@@ -349,7 +342,7 @@
                       <div class="recent-games">
                         <h5>最近对战</h5>
                         <div class="game-list">
-                          <div v-for="game in selectedProfile.recentGames"
+                          <div v-for="game in [...selectedProfile.recentGames].reverse()"
                               :key="game.id"
                               class="game-item">
                             <span class="game-result" :class="game.result">
@@ -572,7 +565,7 @@
                       <div class="recent-games">
                         <h5>最近对战</h5>
                         <div class="game-list">
-                          <div v-for="game in selectedProfile.recentGames"
+                          <div v-for="game in [...selectedProfile.recentGames].reverse()"
                               :key="game.id"
                               class="game-item">
                             <span class="game-result" :class="game.result">
@@ -1989,7 +1982,7 @@ export default {
       });
     },
       filteredGameHistory() {
-      let filtered = this.userProfile?.games || this.gameHistory;
+      let filtered = this.userProfile?.games || [];
 
       // 按时间筛选
       if (this.timeFilter !== 'all') {
@@ -2010,8 +2003,8 @@ export default {
 
       // 按时间排序
       filtered.sort((a, b) => {
-        const timeA = new Date(a.time).getTime();
-        const timeB = new Date(b.time).getTime();
+        const timeA = new Date(a.date).getTime();
+        const timeB = new Date(b.date).getTime();
         return this.timeSort === 'desc' ? timeB - timeA : timeA - timeB;
       });
 

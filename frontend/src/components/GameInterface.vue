@@ -66,7 +66,7 @@
                   <div class="recent-games">
                     <h5>最近对战</h5>
                     <div class="game-list">
-                      <div v-for="game in selectedProfile.recentGames"
+                      <div v-for="game in [...selectedProfile.recentGames].reverse()"
                           :key="game.id"
                           class="game-item">
                         <span class="game-result" :class="game.result">
@@ -345,6 +345,7 @@ import CountdownTimer from './shared_components/CountdownTimer.vue';
 // import { validateGame } from '@/schemas/schemas.js';
 import axios from 'axios';
 import ConfirmDialog from "@/components/shared_components/ConfirmDialog.vue";
+import _ from 'lodash';
 
 
 const router = useRouter();
@@ -1742,12 +1743,51 @@ export default {
         this.hasUnreadMessages = false;
       }
     },
-    scrollToBottom() {
+    // 使用防抖来避免频繁调用
+    scrollToBottom: _.debounce(function() {
       const chatBox = this.$refs.chatBox;
-      chatBox.scrollTop = chatBox.scrollHeight;
-      this.showScrollButton = false;
-      this.hasUnreadMessages = false; // 清除未读消息提示
-    },
+      if (!chatBox) return;
+
+      // 计算目标滚动位置
+      const targetScroll = chatBox.scrollHeight - chatBox.clientHeight;
+
+      // 如果已经在底部，不需要滚动
+      if (Math.abs(chatBox.scrollTop - targetScroll) < 10) {
+        this.showScrollButton = false;
+        this.hasUnreadMessages = false;
+        return;
+      }
+
+      // 使用平滑滚动
+      try {
+        chatBox.scrollTo({
+          top: targetScroll,
+          behavior: 'smooth'
+        });
+
+        // 添加滚动完成监听
+        const scrollEndHandler = () => {
+          this.showScrollButton = false;
+          this.hasUnreadMessages = false;
+          chatBox.removeEventListener('scrollend', scrollEndHandler);
+        };
+
+        chatBox.addEventListener('scrollend', scrollEndHandler);
+
+        // 设置超时以防止滚动事件没有触发
+        setTimeout(() => {
+          chatBox.removeEventListener('scrollend', scrollEndHandler);
+          this.showScrollButton = false;
+          this.hasUnreadMessages = false;
+        }, 1000);
+      } catch (error) {
+        // 如果平滑滚动失败，使用即时滚动作为后备方案
+        console.warn('Smooth scroll failed, falling back to instant scroll');
+        chatBox.scrollTop = targetScroll;
+        this.showScrollButton = false;
+        this.hasUnreadMessages = false;
+      }
+    }, 100), // 100ms 的防抖延迟
 
     startTimer() {  // 计时器
       this.timer = setInterval(() => {
@@ -1773,7 +1813,12 @@ export default {
       // 确认选择
       this.confirmed = true;
     },
-
+    // 在组件销毁时清理防抖
+    beforeDestroy() {
+      if (this.scrollToBottom.cancel) {
+        this.scrollToBottom.cancel();
+      }
+    },
 
 
 
@@ -1872,6 +1917,68 @@ export default {
 
   },
   watch: {
+
+    messages: {
+      handler(newVal, oldVal) {
+        // 检查是否有新消息被添加
+        if (newVal.length > oldVal.length) {
+          // 在下一个事件循环中执行滚动
+          this.$nextTick(() => {
+            const chatBox = this.$refs.chatBox;
+            if (!chatBox) return;
+
+            const scrollPosition = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight;
+
+            // 如果已经接近底部或没有显示滚动按钮，则平滑滚动到底部
+            if (scrollPosition <= 100 || !this.showScrollButton) {
+              // 先进行平滑滚动
+              chatBox.scrollTo({
+                top: chatBox.scrollHeight,
+                behavior: 'smooth'
+              });
+
+              // 确保最终会滚动到底部
+              const finalScrollCheck = () => {
+                // 检查是否真的到底部了
+                const currentPosition = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight;
+                if (currentPosition > 1) { // 如果没到底（允许1px的误差）
+                  chatBox.scrollTop = chatBox.scrollHeight; // 强制滚动到底
+                }
+                this.hasUnreadMessages = false;
+                this.showScrollButton = false;
+              };
+
+              // 监听滚动结束事件
+              const scrollEndHandler = () => {
+                finalScrollCheck();
+                chatBox.removeEventListener('scrollend', scrollEndHandler);
+              };
+              chatBox.addEventListener('scrollend', scrollEndHandler);
+
+              // 设置一个合理的超时时间作为后备方案
+              setTimeout(() => {
+                finalScrollCheck();
+              }, 300); // 300ms 通常足够完成平滑滚动
+
+              // 同时用 requestAnimationFrame 确保视觉上的连贯性
+              requestAnimationFrame(() => {
+                if (!chatBox.scrollTop) { // 如果还没开始滚动
+                  chatBox.scrollTo({
+                    top: chatBox.scrollHeight,
+                    behavior: 'smooth'
+                  });
+                }
+              });
+            } else {
+              // 如果用户不在底部，显示新消息提示
+              this.hasUnreadMessages = true;
+            }
+          });
+        }
+      },
+      deep: true
+    },
+
 
     showDetails(newVal) {
       // 如果玩家信息框被打开，页面滚动到顶部
@@ -2031,6 +2138,7 @@ p {
   margin-bottom: 10px;
   overflow-y: auto;
   border-radius: 15px;
+  scroll-behavior: smooth;
 }
 
 
