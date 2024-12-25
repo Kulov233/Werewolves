@@ -1790,7 +1790,7 @@ export default {
           games:gameHistory,
           stats: [
             { label: '游戏场数', value: data.profile.games.length },
-            { label: '胜率', value: calculateWinRate(data.profile.games) },
+            { label: '胜率', value: calculateWinRate(data.profile) },
           ]
         };
       } catch (error) {
@@ -1875,8 +1875,7 @@ export default {
           isFriend: checkIsFriend(userId),
           stats: [
             { label: '游戏场数', value: data.profile.wins + data.profile.loses },
-            { label: '胜率', value: `${calculateWinRate(data.profile.games)}` },
-            { label: '评分', value: data.profile.rating || 0 }
+            { label: '胜率', value: `${calculateWinRate(data.profile)}` },
           ],
           recentGames: (data.profile.recent_games || []).map((game, index) => ({
             id: index.toString(),
@@ -1891,10 +1890,10 @@ export default {
     };
 
     // 辅助函数：计算胜率
-    const calculateWinRate = (games) => {
-      if (!games || games.length === 0) return '0%';
-      const wins = games.filter(game => game.won).length;
-      return `${Math.round((wins / games.length) * 100)}%`;
+    const calculateWinRate = (userData) => {
+      const totalGames = userData.wins + userData.loses;
+      if (totalGames === 0) return '0%';
+      return `${Math.round((userData.wins / totalGames) * 100)}%`;
     };
 
     // 辅助函数：计算平均评分

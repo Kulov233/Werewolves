@@ -960,7 +960,7 @@ export default {
             isFriend: checkIsFriend(userId), // 这里可以从好友列表判断
             stats: [
               { label: '游戏场数', value: userData.profile.wins + userData.profile.loses },
-              { label: '胜率', value: calculateWinRate(userData.profile.games) }
+              { label: '胜率', value: calculateWinRate(userData.profile) }
             ],
             recentGames: (userData.profile.recent_games || []).map((game, index) => ({
               id: index.toString(),
@@ -976,11 +976,12 @@ export default {
     };
 
     // 辅助函数：计算胜率
-    const calculateWinRate = (games) => {
-      if (!games || games.length === 0) return '0%';
-      const wins = games.filter(game => game.won).length;
-      return `${Math.round((wins / games.length) * 100)}%`;
+    const calculateWinRate = (userData) => {
+      const totalGames = userData.wins + userData.loses;
+      if (totalGames === 0) return '0%';
+      return `${Math.round((userData.wins / totalGames) * 100)}%`;
     };
+
 
     // 处理新玩家加入
     async function handlePlayerJoined(data){

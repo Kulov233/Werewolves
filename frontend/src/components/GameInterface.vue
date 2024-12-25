@@ -1039,7 +1039,7 @@ export default {
             isFriend: checkIsFriend(userId), // 这里可以从好友列表判断
             stats: [
               { label: '游戏场数', value: userData.profile.wins + userData.profile.loses },
-              { label: '胜率', value: calculateWinRate(userData.profile.games) }
+              { label: '胜率', value: calculateWinRate(userData.profile) }
             ],
             recentGames: (userData.profile.recent_games || []).map((game, index) => ({
               id: index.toString(),
@@ -1055,10 +1055,10 @@ export default {
     };
 
     // 辅助函数：计算胜率
-    const calculateWinRate = (games) => {
-      if (!games || games.length === 0) return '0%';
-      const wins = games.filter(game => game.won).length;
-      return `${Math.round((wins / games.length) * 100)}%`;
+    const calculateWinRate = (userData) => {
+      const totalGames = userData.wins + userData.loses;
+      if (totalGames === 0) return '0%';
+      return `${Math.round((userData.wins / totalGames) * 100)}%`;
     };
 
     let initialized = false;
@@ -3030,28 +3030,28 @@ p {
 }
 
 .profile-stats {
-  display: flex;
-  justify-content: space-around;
-  padding: 12px 0;
-  border-top: 1px solid #eee;
-  border-bottom: 1px solid #eee;
-  margin-bottom: 16px;
+  display: flex !important;
+  justify-content: space-around !important;
+  padding: 12px 0 !important;
+  border-top: 1px solid #eee !important;
+  border-bottom: 1px solid #eee !important;
+  margin-bottom: 16px !important;
 }
 
 .stat-item {
-  text-align: center;
+  text-align: center !important;
 }
 
 .stat-value {
-  display: block;
-  font-size: 1em;
-  font-weight: 600;
-  color: #2c3e50;
+  display: block !important;
+  font-size: 1em !important;
+  font-weight: 600 !important;
+  color: #2c3e50 !important;
 }
 
 .stat-label {
-  font-size: 0.75em;
-  color: #666;
+  font-size: 0.75em !important;
+  color: #666 !important;
 }
 
 .profile-actions {
