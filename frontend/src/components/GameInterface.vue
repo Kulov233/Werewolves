@@ -1039,8 +1039,7 @@ export default {
             isFriend: checkIsFriend(userId), // 这里可以从好友列表判断
             stats: [
               { label: '游戏场数', value: userData.profile.wins + userData.profile.loses },
-              { label: '胜率', value: calculateWinRate(userData.profile.games) },
-              //{ label: '评分', value: userData.profile.rating || 0 }
+              { label: '胜率', value: calculateWinRate(userData.profile.games) }
             ],
             recentGames: (userData.profile.recent_games || []).map((game, index) => ({
               id: index.toString(),
